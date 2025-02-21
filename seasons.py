@@ -50,29 +50,42 @@ async def run_game():
     last_direction = 0
     start_movement = 0
     angle = 0
-    total_duration = 5000
+    last_led = 25
+    ease = easing_functions.ExponentialEaseInOut(start=1, end=last_led, duration=1)
     start_ticks = pygame.time.get_ticks()
-
-    ease = easing_functions.QuinticEaseInOut(start=1, end=25, duration=total_duration)
+    pygame.mixer.music.load("music/Rise Up.wav")
+    pygame.mixer.music.play()
+    beat_per_ms = 13.0/6000.0
+    last_beat_in_measure = 0
+    measure = 0
+    beats_per_measure = 8
     while True:
-        duration = pygame.time.get_ticks() - start_ticks
-        if duration > total_duration:
-            start_ticks = pygame.time.get_ticks()
-            duration = 0
+        duration_ms = pygame.time.get_ticks() - start_ticks
+        beat_float = duration_ms * beat_per_ms
+        beat = int(beat_float)
+        beat_in_measure = beat % beats_per_measure
+        fractional_beat = beat_float % 1
+        if beat_in_measure != last_beat_in_measure:
+            last_beat_in_measure = beat_in_measure
+            if beat_in_measure == 0:
+                pygame.mixer.music.play()
+                print(f"{beat_in_measure} {beat} looping music")
+            print(f"{beat} {beat} {pygame.mixer.music.get_pos()} {duration_ms}")
 
         pygame.draw.line(screen, Color("orange"), (0, 0), (128, 0))
         for i in range(40):
             pygame.draw.circle(screen, Color("red"), (i*5, 8), 2)
-        x = int(ease(duration))
+        percent_of_measure = (fractional_beat / beats_per_measure) + (beat_in_measure / beats_per_measure)
+        x = int(ease(percent_of_measure))
+        x = int(percent_of_measure*last_led)
+        print(f"easing {percent_of_measure} {x}")
         pygame.draw.circle(screen, Color("blue"), (x*5, 8), 2)
         for key, keydown in get_key():
-            print(f"{key}, {keydown}")
+            # print(f"{key}, {keydown} {x}")
             if keydown:
-                start_movement = pygame.time.get_ticks()
-                if key == "right":
-                    last_direction = 1
-                elif key == "left":
-                    last_direction = -1
+                pass
+                # if x >= 24:
+                #     print("hit!")
             elif not keydown:
                 last_direction = 0
             if key == "quit":
@@ -85,7 +98,7 @@ async def run_game():
         pygame.transform.scale(screen,
         display_surface.get_rect().size, dest_surface=display_surface)
         pygame.display.update()
-        await clock.tick(30)
+        # await clock.tick(30) 
 
 async def main():
     async with aiomqtt.Client(MQTT_SERVER) as subscribe_client:
