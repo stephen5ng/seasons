@@ -29,6 +29,7 @@ NUMBER_OF_LEDS = 40
 CIRCLE_RADIUS = 30
 CIRCLE_CENTER_X = SCREEN_WIDTH // 2
 CIRCLE_CENTER_Y = SCREEN_HEIGHT // 2
+HIT_DURATION_MS = 500  # How long to show the green LED after a hit
 
 # Global state
 quit_app = False
@@ -41,8 +42,8 @@ async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
             quit_app = True
 
 def draw_led(screen, i, color) -> None:
-    """Draw an LED at position i in a circular pattern."""
-    angle = (2 * math.pi * i) / NUMBER_OF_LEDS
+    """Draw an LED at position i in a circular pattern, starting at 180 degrees."""
+    angle = math.pi + (2 * math.pi * i) / NUMBER_OF_LEDS
     x = CIRCLE_CENTER_X + int(CIRCLE_RADIUS * math.cos(angle))
     y = CIRCLE_CENTER_Y + int(CIRCLE_RADIUS * math.sin(angle))
     screen.set_at((x, y), color)
@@ -64,6 +65,7 @@ async def run_game() -> None:
     ease = easing_functions.ExponentialEaseInOut(start=1, end=LAST_LED, duration=1)
     start_ticks = pygame.time.get_ticks()
     last_beat_in_measure = 0
+    hit_time = 0  # Track when the last hit occurred
     
     # Initialize music
     pygame.mixer.music.load("music/Rise Up.wav")
@@ -90,13 +92,20 @@ async def run_game() -> None:
         # Calculate and draw beat position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
         beat_position = int(percent_of_measure * NUMBER_OF_LEDS)
-        draw_led(screen, beat_position, Color("blue"))
+        
+        # Check if we should show green LED (within hit duration)
+        current_time = pygame.time.get_ticks()
+        if current_time - hit_time < HIT_DURATION_MS:
+            draw_led(screen, beat_position, Color("green"))
+        else:
+            draw_led(screen, beat_position, Color("blue"))
 
         # Handle input
         for key, keydown in get_key():
             if keydown:
                 if beat_position >= NUMBER_OF_LEDS - 1 or beat_position <= 0:
                     print("hit!")
+                    hit_time = current_time
             elif not keydown:
                 last_direction = 0
             if key == "quit":
