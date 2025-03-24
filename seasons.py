@@ -70,7 +70,7 @@ async def run_game():
             if beat_in_measure == 0:
                 pygame.mixer.music.play()
                 print(f"{beat_in_measure} {beat} looping music")
-            print(f"{beat} {beat} {pygame.mixer.music.get_pos()} {duration_ms}")
+            # print(f"{beat} {beat} {pygame.mixer.music.get_pos()} {duration_ms}")
 
         pygame.draw.line(screen, Color("orange"), (0, 0), (128, 0))
         for i in range(40):
@@ -78,14 +78,13 @@ async def run_game():
         percent_of_measure = (fractional_beat / beats_per_measure) + (beat_in_measure / beats_per_measure)
         x = int(ease(percent_of_measure))
         x = int(percent_of_measure*last_led)
-        print(f"easing {percent_of_measure} {x}")
+        # print(f"easing {percent_of_measure} {x}")
         pygame.draw.circle(screen, Color("blue"), (x*5, 8), 2)
         for key, keydown in get_key():
             # print(f"{key}, {keydown} {x}")
             if keydown:
-                pass
-                # if x >= 24:
-                #     print("hit!")
+                if x >= 24 or x <= 0:
+                    print("hit!")
             elif not keydown:
                 last_direction = 0
             if key == "quit":
