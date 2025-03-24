@@ -30,6 +30,12 @@ CIRCLE_RADIUS = 30
 CIRCLE_CENTER_X = SCREEN_WIDTH // 2
 CIRCLE_CENTER_Y = SCREEN_HEIGHT // 2
 HIT_DURATION_MS = 500  # How long to show the green LED after a hit
+FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
+MIN_BLUE = 50  # Minimum blue value
+MAX_BLUE = 255  # Maximum blue value
+
+# Create easing function once
+BLUE_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
 
 # Global state
 quit_app = False
@@ -48,6 +54,18 @@ def draw_led(screen, i, color) -> None:
     y = CIRCLE_CENTER_Y + int(CIRCLE_RADIUS * math.sin(angle))
     screen.set_at((x, y), color)
     
+def get_blue_color(position: int) -> Color:
+    """Calculate blue color intensity based on position relative to zero.
+    Creates a smooth symmetric fade in and out effect using easing."""
+    if position >= FADE_THRESHOLD:
+        return Color(0, 0, MIN_BLUE)  # Dark blue
+    
+    normalized_pos = position / FADE_THRESHOLD
+    intensity = BLUE_EASE(normalized_pos)
+    
+    blue_value = int(MIN_BLUE + (MAX_BLUE - MIN_BLUE) * (1 - intensity))
+    return Color(0, 0, blue_value)
+
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
     global quit_app
@@ -87,7 +105,7 @@ async def run_game() -> None:
 
         # Draw game elements
         for i in range(NUMBER_OF_LEDS):
-            draw_led(screen, i, Color("red"))
+            draw_led(screen, i, Color("black"))
         
         # Calculate and draw beat position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
@@ -98,7 +116,9 @@ async def run_game() -> None:
         if current_time - hit_time < HIT_DURATION_MS:
             draw_led(screen, beat_position, Color("green"))
         else:
-            draw_led(screen, beat_position, Color("blue"))
+            distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
+            print(f"beat_position: {beat_position}, distance_to_zero: {distance_to_zero}")
+            draw_led(screen, beat_position, get_blue_color(distance_to_zero))
 
         # Handle input
         for key, keydown in get_key():
