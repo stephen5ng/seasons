@@ -1,0 +1,6 @@
+aiomqtt
+easing-functions
+pillow
+pygame-ce
+pyvidplayer2
+RGBMatrixEmulator
