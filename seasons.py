@@ -33,6 +33,7 @@ HIT_DURATION_MS = 500  # How long to show the green LED after a hit
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_BLUE = 50  # Minimum blue value
 MAX_BLUE = 255  # Maximum blue value
+FADE_FACTOR = 0.95  # Factor to reduce RGB values by when fading LEDs
 
 # Create easing function once
 BLUE_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
@@ -47,13 +48,27 @@ async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
         if message.topic.matches("password_game/quit"):
             quit_app = True
 
-def draw_led(screen, i, color) -> None:
-    """Draw an LED at position i in a circular pattern, starting at 180 degrees."""
+def get_led_position(i: int) -> tuple[int, int]:
+    """Convert LED index to x,y coordinates in a circular pattern."""
     angle = math.pi + (2 * math.pi * i) / NUMBER_OF_LEDS
     x = CIRCLE_CENTER_X + int(CIRCLE_RADIUS * math.cos(angle))
     y = CIRCLE_CENTER_Y + int(CIRCLE_RADIUS * math.sin(angle))
-    screen.set_at((x, y), color)
-    
+    return (x, y)
+
+def draw_led(screen, i, color) -> None:
+    screen.set_at(get_led_position(i), color)
+
+def fade_led(screen, i) -> None:
+    """Fade the LED at position i by reducing its RGB values by FADE_FACTOR."""
+    c = screen.get_at(get_led_position(i))
+    faded_color = Color(
+        int(c[0] * FADE_FACTOR),  # Red
+        int(c[1] * FADE_FACTOR),  # Green
+        int(c[2] * FADE_FACTOR),  # Blue
+        c[3]                      # Alpha (unchanged)
+    )
+    screen.set_at(get_led_position(i), faded_color)
+
 def get_blue_color(position: int) -> Color:
     """Calculate blue color intensity based on position relative to zero.
     Creates a smooth symmetric fade in and out effect using easing."""
@@ -105,7 +120,8 @@ async def run_game() -> None:
 
         # Draw game elements
         for i in range(NUMBER_OF_LEDS):
-            draw_led(screen, i, Color("black"))
+            fade_led(screen, i)
+#            draw_led(screen, i, Color("black"))
         
         # Calculate and draw beat position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
@@ -117,7 +133,6 @@ async def run_game() -> None:
             draw_led(screen, beat_position, Color("green"))
         else:
             distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
-            print(f"beat_position: {beat_position}, distance_to_zero: {distance_to_zero}")
             draw_led(screen, beat_position, get_blue_color(distance_to_zero))
 
         # Handle input
