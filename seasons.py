@@ -4,6 +4,7 @@ import asyncio
 import os
 import platform
 from typing import Optional
+import math
 
 import aiomqtt
 import easing_functions
@@ -24,6 +25,10 @@ MQTT_SERVER = os.environ.get("MQTT_SERVER", "localhost")
 BEATS_PER_MEASURE = 8
 BEAT_PER_MS = 13.0 / 6000.0
 LAST_LED = 25
+NUMBER_OF_LEDS = 40
+CIRCLE_RADIUS = 30
+CIRCLE_CENTER_X = SCREEN_WIDTH // 2
+CIRCLE_CENTER_Y = SCREEN_HEIGHT // 2
 
 # Global state
 quit_app = False
@@ -35,6 +40,13 @@ async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
         if message.topic.matches("password_game/quit"):
             quit_app = True
 
+def draw_led(screen, i, color) -> None:
+    """Draw an LED at position i in a circular pattern."""
+    angle = (2 * math.pi * i) / NUMBER_OF_LEDS
+    x = CIRCLE_CENTER_X + int(CIRCLE_RADIUS * math.cos(angle))
+    y = CIRCLE_CENTER_Y + int(CIRCLE_RADIUS * math.sin(angle))
+    screen.set_at((x, y), color)
+    
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
     global quit_app
@@ -72,19 +84,18 @@ async def run_game() -> None:
                 pygame.mixer.music.play()
 
         # Draw game elements
-        pygame.draw.line(screen, Color("orange"), (0, 0), (128, 0))
-        for i in range(40):
-            pygame.draw.circle(screen, Color("red"), (i * 5, 8), 2)
+        for i in range(NUMBER_OF_LEDS):
+            draw_led(screen, i, Color("red"))
         
         # Calculate and draw beat position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
-        x = int(percent_of_measure * LAST_LED)
-        pygame.draw.circle(screen, Color("blue"), (x * 5, 8), 2)
+        beat_position = int(percent_of_measure * NUMBER_OF_LEDS)
+        draw_led(screen, beat_position, Color("blue"))
 
         # Handle input
         for key, keydown in get_key():
             if keydown:
-                if x >= 24 or x <= 0:
+                if beat_position >= NUMBER_OF_LEDS - 1 or beat_position <= 0:
                     print("hit!")
             elif not keydown:
                 last_direction = 0
