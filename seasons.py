@@ -31,7 +31,7 @@ CIRCLE_CENTER_X = SCREEN_WIDTH // 2
 CIRCLE_CENTER_Y = SCREEN_HEIGHT // 2
 HIT_DURATION_MS = 500  # How long to show the green LED after a hit
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
-MIN_BLUE = 50  # Minimum blue value
+MIN_BLUE = 128  # Minimum blue value
 MAX_BLUE = 255  # Maximum blue value
 FADE_FACTOR = 0.95  # Factor to reduce RGB values by when fading LEDs
 
@@ -40,7 +40,35 @@ BLUE_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
 
 # Global state
 quit_app = False
-
+class ButtonPressHandler:
+    def __init__(self) -> None:
+        self.button_pressed: bool = False
+        self.penalty_applied: bool = False
+        self.round_active: bool = False
+    
+    def is_in_valid_window(self, beat_position: int) -> bool:
+        return beat_position >= NUMBER_OF_LEDS - 2 or beat_position <= 2
+    
+    def apply_penalty(self, score: float) -> float:
+        if not self.button_pressed and not self.penalty_applied:
+            score -= 0.5
+            self.penalty_applied = True
+        return score
+    
+    def reset_flags(self, beat_position: int) -> None:
+        if self.is_in_valid_window(beat_position) and not self.round_active:
+            self.button_pressed = False
+            self.penalty_applied = False
+            self.round_active = True  # Start a new scoring round
+        elif not self.is_in_valid_window(beat_position):
+            self.round_active = False  # End the current scoring round
+    
+    def handle_keypress(self, beat_position: int, score: float) -> float:
+        if self.is_in_valid_window(beat_position) and not self.button_pressed:
+            score += 1
+            self.button_pressed = True
+            self.penalty_applied = False
+        return score
 async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
     """Handle MQTT events for game control."""
     global quit_app
@@ -81,6 +109,15 @@ def get_blue_color(position: int) -> Color:
     blue_value = int(MIN_BLUE + (MAX_BLUE - MIN_BLUE) * (1 - intensity))
     return Color(0, 0, blue_value)
 
+def draw_vertical_line(screen) -> None:
+    """Draw a vertical line on the right side of the screen."""
+    for y in range(SCREEN_HEIGHT):
+        screen.set_at((SCREEN_WIDTH - 1, y), Color("white"))
+
+def trigger_window(beat_position: int) -> bool:
+    """Return True if the beat position is within the trigger window."""
+    return beat_position >= NUMBER_OF_LEDS - 2 or beat_position <= 2
+
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
     global quit_app
@@ -92,8 +129,6 @@ async def run_game() -> None:
     screen = screen.convert_alpha()
     
     # Game state
-    current_position = 0
-    last_direction = 0
     angle = 0
     ease = easing_functions.ExponentialEaseInOut(start=1, end=LAST_LED, duration=1)
     start_ticks = pygame.time.get_ticks()
@@ -103,8 +138,13 @@ async def run_game() -> None:
     # Initialize music
     pygame.mixer.music.load("music/Rise Up.wav")
     pygame.mixer.music.play()
-
+    score = 0
+    next_loop = 1
+    loop_count = 0
+    triggered = False
+    button_press_handler = ButtonPressHandler()
     while True:
+        
         # Calculate beat timing
         duration_ms = pygame.time.get_ticks() - start_ticks
         beat_float = duration_ms * BEAT_PER_MS
@@ -119,17 +159,34 @@ async def run_game() -> None:
                 pygame.mixer.music.play()
 
         # Draw game elements
-        for i in range(NUMBER_OF_LEDS):
-            fade_led(screen, i)
-#            draw_led(screen, i, Color("black"))
-        
         # Calculate and draw beat position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
         beat_position = int(percent_of_measure * NUMBER_OF_LEDS)
         
+        # Use a latch to count the number of loops
+        if percent_of_measure < 0.5:
+            if loop_count != next_loop:
+                loop_count = next_loop
+        elif next_loop == loop_count:
+            next_loop = loop_count + 1
+                
+        if not button_press_handler.is_in_valid_window(beat_position):
+            new_score = button_press_handler.apply_penalty(score)
+            if new_score != score:
+                score = new_score
+                print(f"penalty score: {score}")
+        button_press_handler.reset_flags(beat_position)
+        
+        in_trigger_window = trigger_window(beat_position)
+        for i in range(NUMBER_OF_LEDS):
+            fade_led(screen, i)
+        
+        # Draw vertical line
+        draw_vertical_line(screen)
+        
         # Check if we should show green LED (within hit duration)
         current_time = pygame.time.get_ticks()
-        if current_time - hit_time < HIT_DURATION_MS:
+        if False and current_time - hit_time < HIT_DURATION_MS:
             draw_led(screen, beat_position, Color("green"))
         else:
             distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
@@ -138,17 +195,10 @@ async def run_game() -> None:
         # Handle input
         for key, keydown in get_key():
             if keydown:
-                if beat_position >= NUMBER_OF_LEDS - 1 or beat_position <= 0:
-                    print("hit!")
-                    hit_time = current_time
-            elif not keydown:
-                last_direction = 0
+                score = button_press_handler.handle_keypress(beat_position, score)
+                print(f"hit score: {score}")
             if key == "quit":
                 return
-
-            current_position += last_direction
-            current_position = min(current_position, 100)
-            current_position = max(current_position, 0)
 
         # Update display
         hub75.update(screen)
