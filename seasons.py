@@ -39,6 +39,11 @@ FADE_FACTOR = 0.95  # Factor to reduce RGB values by when fading LEDs
 VERTICAL_LINE_X = SCREEN_WIDTH - 1
 VERTICAL_LINE_COLOR = Color("white")
 
+# Score line constants
+SCORE_LINE_COLOR = Color("green")
+SCORE_LINE_SPACING = 2  # Pixels between score lines
+SCORE_LINE_HEIGHT = 1  # Height of each score line
+
 # Create easing function once
 BLUE_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
 
@@ -55,7 +60,7 @@ class ButtonPressHandler:
     
     def apply_penalty(self, score: float) -> float:
         if not self.button_pressed and not self.penalty_applied:
-            score -= 0.5
+            score /= 2
             self.penalty_applied = True
         return score
     
@@ -73,6 +78,7 @@ class ButtonPressHandler:
             self.button_pressed = True
             self.penalty_applied = False
         return score
+
 async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
     """Handle MQTT events for game control."""
     global quit_app
@@ -120,6 +126,20 @@ def draw_vertical_line(screen: pygame.Surface) -> None:
                     (VERTICAL_LINE_X, 0), 
                     (VERTICAL_LINE_X, SCREEN_HEIGHT - 1))
 
+def draw_score_lines(screen: pygame.Surface, score: float) -> None:
+    """Draw horizontal lines from the bottom of the screen to represent the score.
+    Each line represents one point."""
+    # Calculate how many full points we have
+    num_lines = int(score)
+    
+    # Draw lines from bottom up
+    for i in range(num_lines):
+        y = SCREEN_HEIGHT - 1 - (i * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
+        if y >= 0:  # Only draw if we haven't gone off the top of the screen
+            pygame.draw.line(screen, SCORE_LINE_COLOR,
+                           (0, y),
+                           (SCREEN_WIDTH - 1, y))
+
 def trigger_window(beat_position: int) -> bool:
     """Return True if the beat position is within the trigger window."""
     return beat_position >= NUMBER_OF_LEDS - 2 or beat_position <= 2
@@ -152,6 +172,8 @@ async def run_game() -> None:
     button_press_handler = ButtonPressHandler()
 
     while True:
+        screen.fill((0, 0, 0))
+
         # Calculate beat timing
         duration_ms = pygame.time.get_ticks() - start_ticks
         beat_float = duration_ms * BEAT_PER_MS
@@ -188,8 +210,9 @@ async def run_game() -> None:
         for i in range(NUMBER_OF_LEDS):
             fade_led(screen, i)
         
-        # Draw vertical line
-        draw_vertical_line(screen)
+        
+        # Draw score lines
+        draw_score_lines(screen, score)
         
         # Draw beat indicator
         current_time = pygame.time.get_ticks()
