@@ -35,6 +35,10 @@ MIN_BLUE = 128  # Minimum blue value
 MAX_BLUE = 255  # Maximum blue value
 FADE_FACTOR = 0.95  # Factor to reduce RGB values by when fading LEDs
 
+# Vertical line constants
+VERTICAL_LINE_X = SCREEN_WIDTH - 1
+VERTICAL_LINE_COLOR = Color("white")
+
 # Create easing function once
 BLUE_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
 
@@ -83,10 +87,11 @@ def get_led_position(i: int) -> tuple[int, int]:
     y = CIRCLE_CENTER_Y + int(CIRCLE_RADIUS * math.sin(angle))
     return (x, y)
 
-def draw_led(screen, i, color) -> None:
+def draw_led(screen: pygame.Surface, i: int, color: Color) -> None:
+    """Draw an LED at position i in a circular pattern."""
     screen.set_at(get_led_position(i), color)
 
-def fade_led(screen, i) -> None:
+def fade_led(screen: pygame.Surface, i: int) -> None:
     """Fade the LED at position i by reducing its RGB values by FADE_FACTOR."""
     c = screen.get_at(get_led_position(i))
     faded_color = Color(
@@ -109,10 +114,11 @@ def get_blue_color(position: int) -> Color:
     blue_value = int(MIN_BLUE + (MAX_BLUE - MIN_BLUE) * (1 - intensity))
     return Color(0, 0, blue_value)
 
-def draw_vertical_line(screen) -> None:
-    """Draw a vertical line on the right side of the screen."""
-    for y in range(SCREEN_HEIGHT):
-        screen.set_at((SCREEN_WIDTH - 1, y), Color("white"))
+def draw_vertical_line(screen: pygame.Surface) -> None:
+    """Draw a vertical line on the right side of the screen using pygame.draw.line for better performance."""
+    pygame.draw.line(screen, VERTICAL_LINE_COLOR, 
+                    (VERTICAL_LINE_X, 0), 
+                    (VERTICAL_LINE_X, SCREEN_HEIGHT - 1))
 
 def trigger_window(beat_position: int) -> bool:
     """Return True if the beat position is within the trigger window."""
@@ -138,13 +144,14 @@ async def run_game() -> None:
     # Initialize music
     pygame.mixer.music.load("music/Rise Up.wav")
     pygame.mixer.music.play()
+    
+    # Game scoring state
     score = 0
     next_loop = 1
     loop_count = 0
-    triggered = False
     button_press_handler = ButtonPressHandler()
+
     while True:
-        
         # Calculate beat timing
         duration_ms = pygame.time.get_ticks() - start_ticks
         beat_float = duration_ms * BEAT_PER_MS
@@ -158,18 +165,18 @@ async def run_game() -> None:
             if beat_in_measure == 0:
                 pygame.mixer.music.play()
 
-        # Draw game elements
-        # Calculate and draw beat position
+        # Calculate beat position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
         beat_position = int(percent_of_measure * NUMBER_OF_LEDS)
         
-        # Use a latch to count the number of loops
+        # Handle loop counting
         if percent_of_measure < 0.5:
             if loop_count != next_loop:
                 loop_count = next_loop
         elif next_loop == loop_count:
             next_loop = loop_count + 1
                 
+        # Handle scoring and penalties
         if not button_press_handler.is_in_valid_window(beat_position):
             new_score = button_press_handler.apply_penalty(score)
             if new_score != score:
@@ -177,14 +184,14 @@ async def run_game() -> None:
                 print(f"penalty score: {score}")
         button_press_handler.reset_flags(beat_position)
         
-        in_trigger_window = trigger_window(beat_position)
+        # Draw game elements
         for i in range(NUMBER_OF_LEDS):
             fade_led(screen, i)
         
         # Draw vertical line
         draw_vertical_line(screen)
         
-        # Check if we should show green LED (within hit duration)
+        # Draw beat indicator
         current_time = pygame.time.get_ticks()
         if False and current_time - hit_time < HIT_DURATION_MS:
             draw_led(screen, beat_position, Color("green"))
