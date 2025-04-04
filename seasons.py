@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 import aiomqtt
 import easing_functions
 import pygame
-from pygame import Color
+from pygame import Color, K_r, K_g
 from pygameasync import Clock
 
 from get_key import get_key
@@ -131,11 +131,21 @@ class ButtonPressHandler:
             self.round_active = False  # End the current scoring round
     
     def handle_keypress(self, led_position: int, score: float, current_time: int) -> float:
-        """Handle keypress and update score if in valid window."""
-        if self.is_in_valid_window(led_position) and not self.button_pressed:
-            score += 1
-            self.button_pressed = True
-            self.penalty_applied = False
+        """Handle keypress and update score if in valid window with correct key."""
+        if not self.button_pressed and self.is_in_valid_window(led_position):
+            # Check if near end targets (0 or NUMBER_OF_LEDS)
+            near_end_target = led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2
+            # Check if near middle target
+            near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
+            
+            keys_pressed = pygame.key.get_pressed()
+            r_pressed = keys_pressed[pygame.K_r]
+            g_pressed = keys_pressed[pygame.K_g]
+            
+            if (near_end_target and r_pressed) or (near_middle_target and g_pressed):
+                score += 1
+                self.button_pressed = True
+                self.penalty_applied = False
         return score
 
 class GameState:
