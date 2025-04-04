@@ -58,13 +58,15 @@ COLOR_CYCLE_SPEED = 2000  # Time in ms for one complete color cycle
 SCORE_LINE_COLOR = Color("green")
 SCORE_LINE_SPACING = 2  # Pixels between score lines
 SCORE_LINE_HEIGHT = 1  # Height of each score line
-SCORE_FLASH_DURATION_MS = 500  # How long the score flash lasts
+SCORE_FLASH_DURATION_MS = 1000  # How long the score flash lasts
+SCORE_LINE_ANIMATION_SPEED = 100  # ms per line animation (slowed down from 50ms)
 
 # MQTT settings
 MQTT_SERVER = os.environ.get("MQTT_SERVER", "localhost")
 
 # Create easing functions once
 CYAN_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
+SCORE_FLASH_EASE = easing_functions.ExponentialEaseOut(start=0, end=1, duration=1)  # Smooth animation for score flashes
 
 # Global state
 quit_app = False
@@ -311,13 +313,30 @@ def get_led_color(base_color: Color, led_position: int) -> Color:
     return base_color  # Return normal cyan color when not near targets
 
 def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float, flash_type: str) -> None:
-    """Draw horizontal lines representing the score."""
+    """Draw horizontal lines representing the score with top-to-bottom animation."""
     num_lines = int(score)
+    current_line = num_lines  # Default to all lines unlit
+    
+    if flash_intensity > 0:
+        # Calculate which line should be lit based on time since flash started
+        time_since_flash = SCORE_FLASH_DURATION_MS * (1 - flash_intensity)
+        current_line = int(time_since_flash / SCORE_LINE_ANIMATION_SPEED)
+        # Ensure we start from the top (line 0) and move downward
+        current_line = min(current_line, num_lines - 1)
+    
     for i in range(num_lines):
-        y = SCREEN_HEIGHT - 1 - (i * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
+        y = SCREEN_HEIGHT - 1 - ((num_lines - 1 - i) * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
         if y >= 0:  # Only draw if we haven't gone off the top of the screen
-            base_color = get_rainbow_color(current_time, i) if score > HIGH_SCORE_THRESHOLD else SCORE_LINE_COLOR
-            line_color = get_score_line_color(base_color, flash_intensity, flash_type)
+            # Only use rainbow effect when not flashing
+            if flash_intensity > 0 and i <= current_line:
+                # During flash animation, use base green color for flash effect
+                base_color = SCORE_LINE_COLOR
+                line_color = get_score_line_color(base_color, flash_intensity, flash_type)
+            elif flash_intensity == 0:
+                # When not flashing, use rainbow effect for high scores
+                base_color = get_rainbow_color(current_time, i) if score > HIGH_SCORE_THRESHOLD else SCORE_LINE_COLOR
+                line_color = base_color
+                
             pygame.draw.line(screen, line_color, (0, y), (SCREEN_WIDTH - 1, y))
 
 async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
