@@ -93,8 +93,8 @@ async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
             quit_app = True
 
 def get_led_position(i: int) -> tuple[int, int]:
-    """Convert LED index to x,y coordinates in a circular pattern."""
-    angle = math.pi + (2 * math.pi * i) / NUMBER_OF_LEDS
+    """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
+    angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
     x = CIRCLE_CENTER_X + int(CIRCLE_RADIUS * math.cos(angle))
     y = CIRCLE_CENTER_Y + int(CIRCLE_RADIUS * math.sin(angle))
     return (x, y)
