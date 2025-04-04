@@ -33,8 +33,8 @@ SECONDS_PER_MEASURE = 3.7
 NUMBER_OF_LEDS = 40
 HIT_DURATION_MS = 500  # How long to show the green LED after a hit
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
-MIN_BLUE = 128  # Minimum blue value for LED color
-MAX_BLUE = 255  # Maximum blue value for LED color
+MIN_CYAN = 128  # Minimum cyan value for LED color
+MAX_CYAN = 255  # Maximum cyan value for LED color
 
 # Fade effect constants
 MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
@@ -53,7 +53,7 @@ SCORE_LINE_HEIGHT = 1  # Height of each score line
 MQTT_SERVER = os.environ.get("MQTT_SERVER", "localhost")
 
 # Create easing functions once
-BLUE_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
+CYAN_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
 
 # Global state
 quit_app = False
@@ -77,7 +77,7 @@ class LEDTrail:
         for i, pos in enumerate(self.positions):
             trail_fade = (i + 1) / len(self.positions)
             distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
-            base_color = get_blue_color(distance_to_zero)
+            base_color = get_cyan_color(distance_to_zero)
             fade_factor = get_fade_factor(score) * trail_fade
             
             faded_color = Color(
@@ -176,15 +176,15 @@ def get_fade_factor(score: float) -> float:
     normalized_score = min(score / FADE_SCORE_SCALE, 1.0)
     return MIN_FADE_FACTOR + normalized_score * (MAX_FADE_FACTOR - MIN_FADE_FACTOR)
 
-def get_blue_color(position: int) -> Color:
-    """Calculate blue color intensity based on position relative to zero."""
+def get_cyan_color(position: int) -> Color:
+    """Calculate cyan color intensity based on position relative to zero."""
     if position >= FADE_THRESHOLD:
-        return Color(0, MIN_BLUE, MIN_BLUE)
+        return Color(0, MIN_CYAN, MIN_CYAN)
     
     normalized_pos = position / FADE_THRESHOLD
-    intensity = BLUE_EASE(normalized_pos)
-    blue_value = int(MIN_BLUE + (MAX_BLUE - MIN_BLUE) * (1 - intensity))
-    return Color(0, blue_value, blue_value)
+    intensity = CYAN_EASE(normalized_pos)
+    cyan_value = int(MIN_CYAN + (MAX_CYAN - MIN_CYAN) * (1 - intensity))
+    return Color(0, cyan_value, cyan_value)
 
 def draw_score_lines(screen: pygame.Surface, score: float, current_time: int) -> None:
     """Draw horizontal lines representing the score."""
@@ -272,7 +272,7 @@ async def run_game() -> None:
         
         # Draw current beat position
         distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
-        draw_led(screen, beat_position, get_blue_color(distance_to_zero))
+        draw_led(screen, beat_position, get_cyan_color(distance_to_zero))
 
         # Handle input
         for key, keydown in get_key():
