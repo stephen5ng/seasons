@@ -50,6 +50,7 @@ COLOR_CYCLE_SPEED = 2000  # Time in ms for one complete color cycle
 SCORE_LINE_COLOR = Color("green")
 SCORE_LINE_SPACING = 2  # Pixels between score lines
 SCORE_LINE_HEIGHT = 1  # Height of each score line
+SCORE_FLASH_DURATION_MS = 500  # How long the score flash lasts
 
 # MQTT settings
 MQTT_SERVER = os.environ.get("MQTT_SERVER", "localhost")
@@ -147,6 +148,8 @@ class GameState:
         self.start_ticks = pygame.time.get_ticks()
         self.last_beat_in_measure = 0
         self.score = 0
+        self.previous_score = 0  # Track previous score to detect changes
+        self.score_flash_time: Optional[int] = None  # When the score last changed
         self.next_loop = 1
         self.loop_count = 0
         self.button_handler = ButtonPressHandler()
@@ -173,8 +176,27 @@ class GameState:
             if beat_in_measure == 0:
                 current_time = pygame.time.get_ticks()
                 measure_offset = (current_time - self.beat_start_time) / 1000.0
-                start_time = self.score * SECONDS_PER_MEASURE + measure_offset
+                start_time = int(self.score) * SECONDS_PER_MEASURE + measure_offset
+                print(f"Starting music at {start_time} seconds")
                 pygame.mixer.music.play(start=start_time)
+    
+    def update_score(self, new_score: float, current_time: int) -> None:
+        """Update score and trigger flash effect if score increased."""
+        if new_score > self.score:
+            self.score_flash_time = current_time
+        self.previous_score = self.score
+        self.score = new_score
+    
+    def get_score_flash_intensity(self, current_time: int) -> float:
+        """Calculate the intensity of the score flash effect."""
+        if self.score_flash_time is None:
+            return 0.0
+        
+        time_since_flash = current_time - self.score_flash_time
+        if time_since_flash >= SCORE_FLASH_DURATION_MS:
+            return 0.0
+        
+        return 1.0 - (time_since_flash / SCORE_FLASH_DURATION_MS)
 
 def get_led_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
@@ -223,14 +245,14 @@ def get_hit_flash_color(base_color: Color, flash_intensity: float) -> Color:
         base_color[3]
     )
 
-def draw_score_lines(screen: pygame.Surface, score: float, current_time: int) -> None:
-    """Draw horizontal lines representing the score."""
-    num_lines = int(score)
-    for i in range(num_lines):
-        y = SCREEN_HEIGHT - 1 - (i * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
-        if y >= 0:  # Only draw if we haven't gone off the top of the screen
-            line_color = get_rainbow_color(current_time, i) if score > HIGH_SCORE_THRESHOLD else SCORE_LINE_COLOR
-            pygame.draw.line(screen, line_color, (0, y), (SCREEN_WIDTH - 1, y))
+def get_score_line_color(base_color: Color, flash_intensity: float) -> Color:
+    """Create a red flash effect for score lines."""
+    return Color(
+        min(255, int(255 * flash_intensity + base_color[0] * (1 - flash_intensity))),
+        int(base_color[1] * (1 - flash_intensity)),
+        int(base_color[2] * (1 - flash_intensity)),
+        base_color[3]
+    )
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
@@ -248,6 +270,16 @@ def get_rainbow_color(time_ms: int, line_index: int) -> Color:
         return Color(int(255 * (hue * 6 - 4)), 0, 255)
     else:  # Magenta to Red
         return Color(255, 0, int(255 * (6 - hue * 6)))
+
+def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float) -> None:
+    """Draw horizontal lines representing the score."""
+    num_lines = int(score)
+    for i in range(num_lines):
+        y = SCREEN_HEIGHT - 1 - (i * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
+        if y >= 0:  # Only draw if we haven't gone off the top of the screen
+            base_color = get_rainbow_color(current_time, i) if score > HIGH_SCORE_THRESHOLD else SCORE_LINE_COLOR
+            line_color = get_score_line_color(base_color, flash_intensity)
+            pygame.draw.line(screen, line_color, (0, y), (SCREEN_WIDTH - 1, y))
 
 async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
     """Handle MQTT events for game control."""
@@ -298,15 +330,16 @@ async def run_game() -> None:
         if not game_state.button_handler.is_in_valid_window(beat_position):
             new_score = game_state.button_handler.apply_penalty(game_state.score)
             if new_score != game_state.score:
-                game_state.score = new_score
+                game_state.update_score(new_score, current_time)
         game_state.button_handler.reset_flags(beat_position)
         
         # Update and draw trail
         game_state.led_trail.update(beat_position)
         game_state.led_trail.draw(screen, game_state.score)
         
-        # Draw score lines
-        draw_score_lines(screen, game_state.score, current_time)
+        # Draw score lines with flash effect
+        flash_intensity = game_state.get_score_flash_intensity(current_time)
+        draw_score_lines(screen, game_state.score, current_time, flash_intensity)
         
         # Draw current beat position with hit flash effect
         distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
@@ -318,8 +351,10 @@ async def run_game() -> None:
         # Handle input
         for key, keydown in get_key():
             if keydown:
-                game_state.score = game_state.button_handler.handle_keypress(
+                new_score = game_state.button_handler.handle_keypress(
                     beat_position, game_state.score, current_time)
+                if new_score != game_state.score:
+                    game_state.update_score(new_score, current_time)
             if key == "quit":
                 return
 
