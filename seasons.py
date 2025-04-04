@@ -31,12 +31,16 @@ SECONDS_PER_MEASURE = 3.7
 
 # LED display constants
 NUMBER_OF_LEDS = 40
-HIT_DURATION_MS = 2000  # How long to show the red flash after a hit (2 seconds)
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_CYAN = 128  # Minimum cyan value for LED color
 MAX_CYAN = 255  # Maximum cyan value for LED color
-SPARKLE_INTENSITY = 0.7  # Maximum brightness of sparkle effect
-SPARKLE_SPEED = 0.2  # Speed of sparkle animation (higher = faster)
+RED_WINDOW_SIZE = 4  # How many LEDs before/after target to start showing red
+LED_RED_INTENSITY = 0.7  # How much red to add to the LED
+
+# Game timing constants
+BEATS_PER_MEASURE = 8
+BEAT_PER_MS = 13.0 / 6000.0
+SECONDS_PER_MEASURE = 3.7
 
 # Fade effect constants
 MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
@@ -98,7 +102,6 @@ class ButtonPressHandler:
         self.button_pressed: bool = False
         self.penalty_applied: bool = False
         self.round_active: bool = False
-        self.last_hit_time: Optional[int] = None  # Track when the last successful hit occurred
     
     def is_in_valid_window(self, beat_position: int) -> bool:
         """Check if the current beat position is in a valid window for scoring."""
@@ -126,20 +129,7 @@ class ButtonPressHandler:
             score += 1
             self.button_pressed = True
             self.penalty_applied = False
-            self.last_hit_time = current_time  # Record the time of successful hit
         return score
-    
-    def get_hit_flash_intensity(self, current_time: int) -> float:
-        """Calculate the intensity of the hit flash effect."""
-        if self.last_hit_time is None:
-            return 0.0
-        
-        time_since_hit = current_time - self.last_hit_time
-        if time_since_hit >= HIT_DURATION_MS:
-            return 0.0
-        
-        # Create a quick bright flash that fades out
-        return 1.0 - (time_since_hit / HIT_DURATION_MS)
 
 class GameState:
     """Manages game state and timing."""
@@ -224,33 +214,12 @@ def get_cyan_color(position: int) -> Color:
     cyan_value = int(MIN_CYAN + (MAX_CYAN - MIN_CYAN) * (1 - intensity))
     return Color(0, cyan_value, cyan_value)
 
-def get_sparkle_color(base_color: Color, current_time: int) -> Color:
-    """Add a sparkling effect to the base color using a sine wave."""
-    sparkle = abs(math.sin(current_time * SPARKLE_SPEED))
-    sparkle_amount = sparkle * SPARKLE_INTENSITY
-    
+def get_window_color(base_color: Color) -> Color:
+    """Add a yellow tint to the base color in the valid window."""
     return Color(
-        min(255, int(base_color[0] + (255 - base_color[0]) * sparkle_amount)),
-        min(255, int(base_color[1] + (255 - base_color[1]) * sparkle_amount)),
-        min(255, int(base_color[2] + (255 - base_color[2]) * sparkle_amount)),
-        base_color[3]
-    )
-
-def get_hit_flash_color(base_color: Color, flash_intensity: float) -> Color:
-    """Create a bright red flash effect by interpolating towards red."""
-    return Color(
-        min(255, int(255 * flash_intensity)),  # Red channel goes to max
-        int(base_color[1] * (1 - flash_intensity)),  # Green fades out
-        int(base_color[2] * (1 - flash_intensity)),  # Blue fades out
-        base_color[3]
-    )
-
-def get_score_line_color(base_color: Color, flash_intensity: float) -> Color:
-    """Create a red flash effect for score lines."""
-    return Color(
-        min(255, int(255 * flash_intensity + base_color[0] * (1 - flash_intensity))),
-        int(base_color[1] * (1 - flash_intensity)),
-        int(base_color[2] * (1 - flash_intensity)),
+        min(255, int(base_color[0] + (255 - base_color[0]) * LED_RED_INTENSITY)),
+        min(255, int(base_color[1] + (255 - base_color[1]) * LED_RED_INTENSITY)),
+        min(255, int(base_color[2] + (255 - base_color[2]) * LED_RED_INTENSITY)),
         base_color[3]
     )
 
@@ -270,6 +239,30 @@ def get_rainbow_color(time_ms: int, line_index: int) -> Color:
         return Color(int(255 * (hue * 6 - 4)), 0, 255)
     else:  # Magenta to Red
         return Color(255, 0, int(255 * (6 - hue * 6)))
+
+def get_score_line_color(base_color: Color, flash_intensity: float) -> Color:
+    """Create a red flash effect for score lines."""
+    return Color(
+        min(255, int(255 * flash_intensity + base_color[0] * (1 - flash_intensity))),
+        int(base_color[1] * (1 - flash_intensity)),
+        int(base_color[2] * (1 - flash_intensity)),
+        base_color[3]
+    )
+
+def get_led_color(base_color: Color, beat_position: int) -> Color:
+    """Add red flash to the LED when near target windows."""
+    # Check if we're near either target window (0 or NUMBER_OF_LEDS)
+    distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
+    if distance_to_zero <= RED_WINDOW_SIZE:
+        # Calculate red intensity based on proximity to target
+        red_factor = LED_RED_INTENSITY * (1 - distance_to_zero / RED_WINDOW_SIZE)
+        return Color(
+            min(255, int(255 * red_factor)),  # Red component
+            int(base_color[1] * (1 - red_factor)),  # Reduce green
+            int(base_color[2] * (1 - red_factor)),  # Reduce blue
+            base_color[3]
+        )
+    return base_color  # Return normal cyan color when not near targets
 
 def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float) -> None:
     """Draw horizontal lines representing the score."""
@@ -341,11 +334,10 @@ async def run_game() -> None:
         flash_intensity = game_state.get_score_flash_intensity(current_time)
         draw_score_lines(screen, game_state.score, current_time, flash_intensity)
         
-        # Draw current beat position with hit flash effect
+        # Draw current beat position with red flash near targets
         distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
         base_color = get_cyan_color(distance_to_zero)
-        flash_intensity = game_state.button_handler.get_hit_flash_intensity(current_time)
-        led_color = get_hit_flash_color(base_color, flash_intensity)
+        led_color = get_led_color(base_color, beat_position)
         draw_led(screen, beat_position, led_color)
 
         # Handle input
