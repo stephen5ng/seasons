@@ -4,6 +4,7 @@ import asyncio
 import math
 import os
 import platform
+import sys
 from typing import List, Optional, Tuple
 
 import aiomqtt
@@ -35,7 +36,10 @@ FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_CYAN = 128  # Minimum cyan value for LED color
 MAX_CYAN = 255  # Maximum cyan value for LED color
 RED_WINDOW_SIZE = 4  # How many LEDs before/after target to start showing red
-LED_RED_INTENSITY = 0.7  # How much red to add to the LED
+GREEN_WINDOW_SIZE = 4  # How many LEDs before/after mid target to start showing green
+LED_COLOR_INTENSITY = 0.7  # How much color to add to the LED
+GREEN_COLOR_INTENSITY = 1.0  # How much green to add (brighter than other colors)
+MID_TARGET_POS = NUMBER_OF_LEDS/2  # Position of the middle target
 
 # Game timing constants
 BEATS_PER_MEASURE = 8
@@ -103,9 +107,12 @@ class ButtonPressHandler:
         self.penalty_applied: bool = False
         self.round_active: bool = False
     
-    def is_in_valid_window(self, beat_position: int) -> bool:
-        """Check if the current beat position is in a valid window for scoring."""
-        return beat_position >= NUMBER_OF_LEDS - 2 or beat_position <= 2
+    def is_in_valid_window(self, led_position: int) -> bool:
+        """Check if the current LED position is in a valid window for scoring."""
+        return_value = (led_position >= NUMBER_OF_LEDS - 2 or 
+                led_position <= 2 or
+                abs(led_position - MID_TARGET_POS) <= 2)
+        return return_value
     
     def apply_penalty(self, score: float) -> float:
         """Apply penalty if button wasn't pressed in valid window."""
@@ -114,18 +121,18 @@ class ButtonPressHandler:
             self.penalty_applied = True
         return score
     
-    def reset_flags(self, beat_position: int) -> None:
-        """Reset state flags based on beat position."""
-        if self.is_in_valid_window(beat_position) and not self.round_active:
+    def reset_flags(self, led_position: int) -> None:
+        """Reset state flags based on LED position."""
+        if self.is_in_valid_window(led_position) and not self.round_active:
             self.button_pressed = False
             self.penalty_applied = False
             self.round_active = True  # Start a new scoring round
-        elif not self.is_in_valid_window(beat_position):
+        elif not self.is_in_valid_window(led_position):
             self.round_active = False  # End the current scoring round
     
-    def handle_keypress(self, beat_position: int, score: float, current_time: int) -> float:
+    def handle_keypress(self, led_position: int, score: float, current_time: int) -> float:
         """Handle keypress and update score if in valid window."""
-        if self.is_in_valid_window(beat_position) and not self.button_pressed:
+        if self.is_in_valid_window(led_position) and not self.button_pressed:
             score += 1
             self.button_pressed = True
             self.penalty_applied = False
@@ -217,9 +224,9 @@ def get_cyan_color(position: int) -> Color:
 def get_window_color(base_color: Color) -> Color:
     """Add a yellow tint to the base color in the valid window."""
     return Color(
-        min(255, int(base_color[0] + (255 - base_color[0]) * LED_RED_INTENSITY)),
-        min(255, int(base_color[1] + (255 - base_color[1]) * LED_RED_INTENSITY)),
-        min(255, int(base_color[2] + (255 - base_color[2]) * LED_RED_INTENSITY)),
+        min(255, int(base_color[0] + (255 - base_color[0]) * LED_COLOR_INTENSITY)),
+        min(255, int(base_color[1] + (255 - base_color[1]) * LED_COLOR_INTENSITY)),
+        min(255, int(base_color[2] + (255 - base_color[2]) * LED_COLOR_INTENSITY)),
         base_color[3]
     )
 
@@ -249,19 +256,32 @@ def get_score_line_color(base_color: Color, flash_intensity: float) -> Color:
         base_color[3]
     )
 
-def get_led_color(base_color: Color, beat_position: int) -> Color:
-    """Add red flash to the LED when near target windows."""
-    # Check if we're near either target window (0 or NUMBER_OF_LEDS)
-    distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
+def get_led_color(base_color: Color, led_position: int) -> Color:
+    """Add color to the LED when near target windows."""
+    # Check if we're near either end target window (0 or NUMBER_OF_LEDS)
+    distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
     if distance_to_zero <= RED_WINDOW_SIZE:
         # Calculate red intensity based on proximity to target
-        red_factor = LED_RED_INTENSITY * (1 - distance_to_zero / RED_WINDOW_SIZE)
+        color_factor = LED_COLOR_INTENSITY * (1 - distance_to_zero / RED_WINDOW_SIZE)
         return Color(
-            min(255, int(255 * red_factor)),  # Red component
-            int(base_color[1] * (1 - red_factor)),  # Reduce green
-            int(base_color[2] * (1 - red_factor)),  # Reduce blue
+            min(255, int(255 * color_factor)),  # Red component
+            int(base_color[1] * (1 - color_factor)),  # Reduce green
+            int(base_color[2] * (1 - color_factor)),  # Reduce blue
             base_color[3]
         )
+    
+    # Check if we're near the middle target
+    distance_to_mid = abs(led_position - MID_TARGET_POS)
+    if distance_to_mid <= GREEN_WINDOW_SIZE:
+        # Calculate green intensity based on proximity to middle target
+        color_factor = GREEN_COLOR_INTENSITY * (1 - distance_to_mid / GREEN_WINDOW_SIZE)
+        return Color(
+            0,  # No red
+            min(255, int(255 * color_factor)),  # Pure green at full intensity
+            0,  # No blue
+            base_color[3]
+        )
+    
     return base_color  # Return normal cyan color when not near targets
 
 def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float) -> None:
@@ -308,9 +328,9 @@ async def run_game() -> None:
 
         current_time = pygame.time.get_ticks()
 
-        # Calculate beat position
+        # Calculate LED position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
-        beat_position = int(percent_of_measure * NUMBER_OF_LEDS)
+        led_position = int(percent_of_measure * NUMBER_OF_LEDS)
         
         # Handle loop counting
         if percent_of_measure < 0.5:
@@ -320,31 +340,31 @@ async def run_game() -> None:
             game_state.next_loop = game_state.loop_count + 1
                 
         # Handle scoring and penalties
-        if not game_state.button_handler.is_in_valid_window(beat_position):
+        if not game_state.button_handler.is_in_valid_window(led_position):
             new_score = game_state.button_handler.apply_penalty(game_state.score)
             if new_score != game_state.score:
                 game_state.update_score(new_score, current_time)
-        game_state.button_handler.reset_flags(beat_position)
+        game_state.button_handler.reset_flags(led_position)
         
         # Update and draw trail
-        game_state.led_trail.update(beat_position)
+        game_state.led_trail.update(led_position)
         game_state.led_trail.draw(screen, game_state.score)
         
         # Draw score lines with flash effect
         flash_intensity = game_state.get_score_flash_intensity(current_time)
         draw_score_lines(screen, game_state.score, current_time, flash_intensity)
         
-        # Draw current beat position with red flash near targets
-        distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
+        # Draw current LED position with red flash near targets
+        distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
         base_color = get_cyan_color(distance_to_zero)
-        led_color = get_led_color(base_color, beat_position)
-        draw_led(screen, beat_position, led_color)
+        led_color = get_led_color(base_color, led_position)
+        draw_led(screen, led_position, led_color)
 
         # Handle input
         for key, keydown in get_key():
             if keydown:
                 new_score = game_state.button_handler.handle_keypress(
-                    beat_position, game_state.score, current_time)
+                    led_position, game_state.score, current_time)
                 if new_score != game_state.score:
                     game_state.update_score(new_score, current_time)
             if key == "quit":
