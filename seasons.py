@@ -40,6 +40,7 @@ MAX_BLUE = 255  # Maximum blue value for LED color
 MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
 MAX_FADE_FACTOR = 0.98   # Maximum fade factor (slowest fade)
 FADE_SCORE_SCALE = 10.0  # Score at which fade factor reaches maximum
+TRAIL_LENGTH = 8  # Number of previous positions to remember
 
 # Score display constants
 HIGH_SCORE_THRESHOLD = 5  # Score threshold for exciting effects
@@ -133,12 +134,12 @@ def get_blue_color(position: int) -> Color:
     """Calculate blue color intensity based on position relative to zero.
     Creates a smooth symmetric fade in and out effect using easing."""
     if position >= FADE_THRESHOLD:
-        return Color(0, 0, MIN_BLUE)  # Dark blue
+        return Color(0, MIN_BLUE, MIN_BLUE)  # Dark blue
     
     normalized_pos = position / FADE_THRESHOLD
     intensity = BLUE_EASE(normalized_pos)
     blue_value = int(MIN_BLUE + (MAX_BLUE - MIN_BLUE) * (1 - intensity))
-    return Color(0, 0, blue_value)
+    return Color(0, blue_value, blue_value)
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
@@ -202,7 +203,10 @@ async def run_game() -> None:
     next_loop = 1
     loop_count = 0
     button_press_handler = ButtonPressHandler()
-
+    
+    # Trail state
+    previous_positions = []  # List of previous LED positions
+    
     # Initialize music
     pygame.mixer.music.load("music/Rise Up.mp3")
     pygame.mixer.music.play(start=0)
@@ -233,6 +237,12 @@ async def run_game() -> None:
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
         beat_position = int(percent_of_measure * NUMBER_OF_LEDS)
         
+        # Update trail
+        if not previous_positions or previous_positions[-1] != beat_position:
+            previous_positions.append(beat_position)
+            if len(previous_positions) > TRAIL_LENGTH:
+                previous_positions.pop(0)
+        
         # Handle loop counting
         if percent_of_measure < 0.5:
             if loop_count != next_loop:
@@ -247,15 +257,28 @@ async def run_game() -> None:
                 score = new_score
         button_press_handler.reset_flags(beat_position)
         
-        # Draw game elements
-        for i in range(NUMBER_OF_LEDS):
-            fade_led(screen, i, score)
+        # Draw trail with fading
+        for i, pos in enumerate(previous_positions):
+            # Calculate fade based on position in trail
+            trail_fade = (i + 1) / len(previous_positions)
+            distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
+            base_color = get_blue_color(distance_to_zero)
+            fade_factor = get_fade_factor(score) * trail_fade
+            
+            # Apply fade to color
+            faded_color = Color(
+                int(base_color[0] * fade_factor),
+                int(base_color[1] * fade_factor),
+                int(base_color[2] * fade_factor),
+                base_color[3]
+            )
+            draw_led(screen, pos, faded_color)
         
         # Draw score lines
         current_time = pygame.time.get_ticks()
         draw_score_lines(screen, score, current_time)
         
-        # Draw beat indicator
+        # Draw current beat position (on top of trail)
         distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
         draw_led(screen, beat_position, get_blue_color(distance_to_zero))
 
