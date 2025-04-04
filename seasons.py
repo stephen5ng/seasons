@@ -117,7 +117,7 @@ class ButtonPressHandler:
     def apply_penalty(self, score: float) -> float:
         """Apply penalty if button wasn't pressed in valid window."""
         if not self.button_pressed and not self.penalty_applied:
-            score /= 2
+            score *= 0.75  # Reduce score by 25% instead of 50%
             self.penalty_applied = True
         return score
     
