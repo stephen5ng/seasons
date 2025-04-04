@@ -31,10 +31,12 @@ SECONDS_PER_MEASURE = 3.7
 
 # LED display constants
 NUMBER_OF_LEDS = 40
-HIT_DURATION_MS = 500  # How long to show the green LED after a hit
+HIT_DURATION_MS = 2000  # How long to show the red flash after a hit (2 seconds)
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_CYAN = 128  # Minimum cyan value for LED color
 MAX_CYAN = 255  # Maximum cyan value for LED color
+SPARKLE_INTENSITY = 0.7  # Maximum brightness of sparkle effect
+SPARKLE_SPEED = 0.2  # Speed of sparkle animation (higher = faster)
 
 # Fade effect constants
 MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
@@ -95,6 +97,7 @@ class ButtonPressHandler:
         self.button_pressed: bool = False
         self.penalty_applied: bool = False
         self.round_active: bool = False
+        self.last_hit_time: Optional[int] = None  # Track when the last successful hit occurred
     
     def is_in_valid_window(self, beat_position: int) -> bool:
         """Check if the current beat position is in a valid window for scoring."""
@@ -116,13 +119,26 @@ class ButtonPressHandler:
         elif not self.is_in_valid_window(beat_position):
             self.round_active = False  # End the current scoring round
     
-    def handle_keypress(self, beat_position: int, score: float) -> float:
+    def handle_keypress(self, beat_position: int, score: float, current_time: int) -> float:
         """Handle keypress and update score if in valid window."""
         if self.is_in_valid_window(beat_position) and not self.button_pressed:
             score += 1
             self.button_pressed = True
             self.penalty_applied = False
+            self.last_hit_time = current_time  # Record the time of successful hit
         return score
+    
+    def get_hit_flash_intensity(self, current_time: int) -> float:
+        """Calculate the intensity of the hit flash effect."""
+        if self.last_hit_time is None:
+            return 0.0
+        
+        time_since_hit = current_time - self.last_hit_time
+        if time_since_hit >= HIT_DURATION_MS:
+            return 0.0
+        
+        # Create a quick bright flash that fades out
+        return 1.0 - (time_since_hit / HIT_DURATION_MS)
 
 class GameState:
     """Manages game state and timing."""
@@ -186,6 +202,27 @@ def get_cyan_color(position: int) -> Color:
     cyan_value = int(MIN_CYAN + (MAX_CYAN - MIN_CYAN) * (1 - intensity))
     return Color(0, cyan_value, cyan_value)
 
+def get_sparkle_color(base_color: Color, current_time: int) -> Color:
+    """Add a sparkling effect to the base color using a sine wave."""
+    sparkle = abs(math.sin(current_time * SPARKLE_SPEED))
+    sparkle_amount = sparkle * SPARKLE_INTENSITY
+    
+    return Color(
+        min(255, int(base_color[0] + (255 - base_color[0]) * sparkle_amount)),
+        min(255, int(base_color[1] + (255 - base_color[1]) * sparkle_amount)),
+        min(255, int(base_color[2] + (255 - base_color[2]) * sparkle_amount)),
+        base_color[3]
+    )
+
+def get_hit_flash_color(base_color: Color, flash_intensity: float) -> Color:
+    """Create a bright red flash effect by interpolating towards red."""
+    return Color(
+        min(255, int(255 * flash_intensity)),  # Red channel goes to max
+        int(base_color[1] * (1 - flash_intensity)),  # Green fades out
+        int(base_color[2] * (1 - flash_intensity)),  # Blue fades out
+        base_color[3]
+    )
+
 def draw_score_lines(screen: pygame.Surface, score: float, current_time: int) -> None:
     """Draw horizontal lines representing the score."""
     num_lines = int(score)
@@ -244,6 +281,8 @@ async def run_game() -> None:
         beat, beat_in_measure, beat_float, fractional_beat = game_state.update_timing()
         game_state.handle_music_loop(beat_in_measure)
 
+        current_time = pygame.time.get_ticks()
+
         # Calculate beat position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
         beat_position = int(percent_of_measure * NUMBER_OF_LEDS)
@@ -267,18 +306,20 @@ async def run_game() -> None:
         game_state.led_trail.draw(screen, game_state.score)
         
         # Draw score lines
-        current_time = pygame.time.get_ticks()
         draw_score_lines(screen, game_state.score, current_time)
         
-        # Draw current beat position
+        # Draw current beat position with hit flash effect
         distance_to_zero = min(beat_position, NUMBER_OF_LEDS - beat_position)
-        draw_led(screen, beat_position, get_cyan_color(distance_to_zero))
+        base_color = get_cyan_color(distance_to_zero)
+        flash_intensity = game_state.button_handler.get_hit_flash_intensity(current_time)
+        led_color = get_hit_flash_color(base_color, flash_intensity)
+        draw_led(screen, beat_position, led_color)
 
         # Handle input
         for key, keydown in get_key():
             if keydown:
                 game_state.score = game_state.button_handler.handle_keypress(
-                    beat_position, game_state.score)
+                    beat_position, game_state.score, current_time)
             if key == "quit":
                 return
 
