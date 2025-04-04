@@ -34,6 +34,7 @@ FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_BLUE = 128  # Minimum blue value
 MAX_BLUE = 255  # Maximum blue value
 FADE_FACTOR = 0.95  # Factor to reduce RGB values by when fading LEDs
+SECONDS_PER_MEASURE = 3.7
 
 # Vertical line constants
 VERTICAL_LINE_X = SCREEN_WIDTH - 1
@@ -162,8 +163,8 @@ async def run_game() -> None:
     hit_time = 0  # Track when the last hit occurred
     
     # Initialize music
-    pygame.mixer.music.load("music/Rise Up.wav")
-    pygame.mixer.music.play()
+    pygame.mixer.music.load("music/Rise Up.mp3")
+    pygame.mixer.music.play(start=0)
     
     # Game scoring state
     score = 0
@@ -179,13 +180,22 @@ async def run_game() -> None:
         beat_float = duration_ms * BEAT_PER_MS
         beat = int(beat_float)
         beat_in_measure = beat % BEATS_PER_MEASURE
+        if beat_in_measure == 0:
+            beat_start_time = pygame.time.get_ticks()
         fractional_beat = beat_float % 1
 
         # Handle music looping
         if beat_in_measure != last_beat_in_measure:
+            print(f"beat duration: {duration_ms} {pygame.time.get_ticks()-beat_start_time}")
             last_beat_in_measure = beat_in_measure
             if beat_in_measure == 0:
-                pygame.mixer.music.play()
+                # Calculate the offset into the current measure
+                current_time = pygame.time.get_ticks()
+                measure_offset = (current_time - beat_start_time) / 1000.0  # Convert to seconds
+                # Start at score * SECONDS_PER_BEAT plus the current offset
+                start_time = int(score) * SECONDS_PER_MEASURE + measure_offset
+                print(f"start_time: {start_time}")
+                pygame.mixer.music.play(start=start_time)
 
         # Calculate beat position
         percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
@@ -210,6 +220,8 @@ async def run_game() -> None:
         for i in range(NUMBER_OF_LEDS):
             fade_led(screen, i)
         
+        # Draw vertical line
+        draw_vertical_line(screen)
         
         # Draw score lines
         draw_score_lines(screen, score)
