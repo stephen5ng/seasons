@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 import aiomqtt
 import easing_functions
 import pygame
-from pygame import Color, K_r, K_g
+from pygame import Color, K_r, K_b
 from pygameasync import Clock
 
 from get_key import get_key
@@ -36,9 +36,9 @@ FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_CYAN = 128  # Minimum cyan value for LED color
 MAX_CYAN = 255  # Maximum cyan value for LED color
 RED_WINDOW_SIZE = 4  # How many LEDs before/after target to start showing red
-GREEN_WINDOW_SIZE = 4  # How many LEDs before/after mid target to start showing green
+BLUE_WINDOW_SIZE = 4  # How many LEDs before/after mid target to start showing blue
 LED_COLOR_INTENSITY = 0.7  # How much color to add to the LED
-GREEN_COLOR_INTENSITY = 1.0  # How much green to add (brighter than other colors)
+BLUE_COLOR_INTENSITY = 1.0  # How much blue to add (brighter than other colors)
 MID_TARGET_POS = NUMBER_OF_LEDS/2  # Position of the middle target
 
 # Game timing constants
@@ -140,13 +140,19 @@ class ButtonPressHandler:
             
             keys_pressed = pygame.key.get_pressed()
             r_pressed = keys_pressed[pygame.K_r]
-            g_pressed = keys_pressed[pygame.K_g]
+            b_pressed = keys_pressed[pygame.K_b]
             
-            if (near_end_target and r_pressed) or (near_middle_target and g_pressed):
+            if near_end_target and r_pressed:
                 score += 1
                 self.button_pressed = True
                 self.penalty_applied = False
-        return score
+                return score, "red"
+            elif near_middle_target and b_pressed:
+                score += 1
+                self.button_pressed = True
+                self.penalty_applied = False
+                return score, "blue"
+        return score, "none"
 
 class GameState:
     """Manages game state and timing."""
@@ -157,6 +163,7 @@ class GameState:
         self.score = 0
         self.previous_score = 0  # Track previous score to detect changes
         self.score_flash_time: Optional[int] = None  # When the score last changed
+        self.last_hit_target = "none"  # Track which target was hit: "red", "blue", or "none"
         self.next_loop = 1
         self.loop_count = 0
         self.button_handler = ButtonPressHandler()
@@ -187,10 +194,11 @@ class GameState:
                 print(f"Starting music at {start_time} seconds")
                 pygame.mixer.music.play(start=start_time)
     
-    def update_score(self, new_score: float, current_time: int) -> None:
+    def update_score(self, new_score: float, current_time: int, target_type: str = "none") -> None:
         """Update score and trigger flash effect if score increased."""
         if new_score > self.score:
             self.score_flash_time = current_time
+            self.last_hit_target = target_type
         self.previous_score = self.score
         self.score = new_score
     
@@ -257,14 +265,22 @@ def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     else:  # Magenta to Red
         return Color(255, 0, int(255 * (6 - hue * 6)))
 
-def get_score_line_color(base_color: Color, flash_intensity: float) -> Color:
-    """Create a red flash effect for score lines."""
-    return Color(
-        min(255, int(255 * flash_intensity + base_color[0] * (1 - flash_intensity))),
-        int(base_color[1] * (1 - flash_intensity)),
-        int(base_color[2] * (1 - flash_intensity)),
-        base_color[3]
-    )
+def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: str) -> Color:
+    """Create a flash effect for score lines based on which target was hit."""
+    if flash_type == "blue":
+        return Color(
+            int(base_color[0] * (1 - flash_intensity)),
+            int(base_color[1] * (1 - flash_intensity)),
+            min(255, int(255 * flash_intensity + base_color[2] * (1 - flash_intensity))),
+            base_color[3]
+        )
+    else:  # Default to red flash
+        return Color(
+            min(255, int(255 * flash_intensity + base_color[0] * (1 - flash_intensity))),
+            int(base_color[1] * (1 - flash_intensity)),
+            int(base_color[2] * (1 - flash_intensity)),
+            base_color[3]
+        )
 
 def get_led_color(base_color: Color, led_position: int) -> Color:
     """Add color to the LED when near target windows."""
@@ -282,26 +298,26 @@ def get_led_color(base_color: Color, led_position: int) -> Color:
     
     # Check if we're near the middle target
     distance_to_mid = abs(led_position - MID_TARGET_POS)
-    if distance_to_mid <= GREEN_WINDOW_SIZE:
-        # Calculate green intensity based on proximity to middle target
-        color_factor = GREEN_COLOR_INTENSITY * (1 - distance_to_mid / GREEN_WINDOW_SIZE)
+    if distance_to_mid <= BLUE_WINDOW_SIZE:
+        # Calculate blue intensity based on proximity to middle target
+        color_factor = BLUE_COLOR_INTENSITY * (1 - distance_to_mid / BLUE_WINDOW_SIZE)
         return Color(
             0,  # No red
-            min(255, int(255 * color_factor)),  # Pure green at full intensity
-            0,  # No blue
+            0,  # No green
+            min(255, int(255 * color_factor)),  # Pure blue at full intensity
             base_color[3]
         )
     
     return base_color  # Return normal cyan color when not near targets
 
-def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float) -> None:
+def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float, flash_type: str) -> None:
     """Draw horizontal lines representing the score."""
     num_lines = int(score)
     for i in range(num_lines):
         y = SCREEN_HEIGHT - 1 - (i * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
         if y >= 0:  # Only draw if we haven't gone off the top of the screen
             base_color = get_rainbow_color(current_time, i) if score > HIGH_SCORE_THRESHOLD else SCORE_LINE_COLOR
-            line_color = get_score_line_color(base_color, flash_intensity)
+            line_color = get_score_line_color(base_color, flash_intensity, flash_type)
             pygame.draw.line(screen, line_color, (0, y), (SCREEN_WIDTH - 1, y))
 
 async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
@@ -362,9 +378,9 @@ async def run_game() -> None:
         
         # Draw score lines with flash effect
         flash_intensity = game_state.get_score_flash_intensity(current_time)
-        draw_score_lines(screen, game_state.score, current_time, flash_intensity)
+        draw_score_lines(screen, game_state.score, current_time, flash_intensity, game_state.last_hit_target)
         
-        # Draw current LED position with red flash near targets
+        # Draw current LED position with color based on target proximity
         distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
         base_color = get_cyan_color(distance_to_zero)
         led_color = get_led_color(base_color, led_position)
@@ -373,10 +389,10 @@ async def run_game() -> None:
         # Handle input
         for key, keydown in get_key():
             if keydown:
-                new_score = game_state.button_handler.handle_keypress(
+                new_score, target_hit = game_state.button_handler.handle_keypress(
                     led_position, game_state.score, current_time)
                 if new_score != game_state.score:
-                    game_state.update_score(new_score, current_time)
+                    game_state.update_score(new_score, current_time, target_hit)
             if key == "quit":
                 return
 
