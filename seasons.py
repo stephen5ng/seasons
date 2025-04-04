@@ -33,7 +33,10 @@ HIT_DURATION_MS = 500  # How long to show the green LED after a hit
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_BLUE = 128  # Minimum blue value
 MAX_BLUE = 255  # Maximum blue value
-FADE_FACTOR = 0.95  # Factor to reduce RGB values by when fading LEDs
+BASE_FADE_FACTOR = 0.95  # Base factor to reduce RGB values by when fading LEDs
+MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
+MAX_FADE_FACTOR = 0.98   # Maximum fade factor (slowest fade)
+FADE_SCORE_SCALE = 10.0  # Score at which fade factor reaches maximum
 SECONDS_PER_MEASURE = 3.7
 
 # Vertical line constants
@@ -44,6 +47,8 @@ VERTICAL_LINE_COLOR = Color("white")
 SCORE_LINE_COLOR = Color("green")
 SCORE_LINE_SPACING = 2  # Pixels between score lines
 SCORE_LINE_HEIGHT = 1  # Height of each score line
+HIGH_SCORE_THRESHOLD = 5  # Score threshold for exciting effects
+COLOR_CYCLE_SPEED = 2000  # Time in ms for one complete color cycle
 
 # Create easing function once
 BLUE_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
@@ -98,13 +103,13 @@ def draw_led(screen: pygame.Surface, i: int, color: Color) -> None:
     """Draw an LED at position i in a circular pattern."""
     screen.set_at(get_led_position(i), color)
 
-def fade_led(screen: pygame.Surface, i: int) -> None:
+def fade_led(screen: pygame.Surface, i: int, score: float) -> None:
     """Fade the LED at position i by reducing its RGB values by FADE_FACTOR."""
     c = screen.get_at(get_led_position(i))
     faded_color = Color(
-        int(c[0] * FADE_FACTOR),  # Red
-        int(c[1] * FADE_FACTOR),  # Green
-        int(c[2] * FADE_FACTOR),  # Blue
+        int(c[0] * BASE_FADE_FACTOR ** (score / FADE_SCORE_SCALE)),  # Red
+        int(c[1] * BASE_FADE_FACTOR ** (score / FADE_SCORE_SCALE)),  # Green
+        int(c[2] * BASE_FADE_FACTOR ** (score / FADE_SCORE_SCALE)),  # Blue
         c[3]                      # Alpha (unchanged)
     )
     screen.set_at(get_led_position(i), faded_color)
@@ -127,9 +132,42 @@ def draw_vertical_line(screen: pygame.Surface) -> None:
                     (VERTICAL_LINE_X, 0), 
                     (VERTICAL_LINE_X, SCREEN_HEIGHT - 1))
 
-def draw_score_lines(screen: pygame.Surface, score: float) -> None:
+def get_rainbow_color(time_ms: int, line_index: int) -> Color:
+    """Generate a rainbow color based on time and line position."""
+    # Offset each line's hue by its position for a wave effect
+    hue = (time_ms / COLOR_CYCLE_SPEED + line_index * 0.1) % 1.0
+    
+    # Convert HSV to RGB (simplified conversion)
+    if hue < 1/6:  # Red to Yellow
+        r = 255
+        g = int(255 * (hue * 6))
+        b = 0
+    elif hue < 2/6:  # Yellow to Green
+        r = int(255 * (2 - hue * 6))
+        g = 255
+        b = 0
+    elif hue < 3/6:  # Green to Cyan
+        r = 0
+        g = 255
+        b = int(255 * (hue * 6 - 2))
+    elif hue < 4/6:  # Cyan to Blue
+        r = 0
+        g = int(255 * (4 - hue * 6))
+        b = 255
+    elif hue < 5/6:  # Blue to Magenta
+        r = int(255 * (hue * 6 - 4))
+        g = 0
+        b = 255
+    else:  # Magenta to Red
+        r = 255
+        g = 0
+        b = int(255 * (6 - hue * 6))
+    
+    return Color(r, g, b)
+
+def draw_score_lines(screen: pygame.Surface, score: float, current_time: int) -> None:
     """Draw horizontal lines from the bottom of the screen to represent the score.
-    Each line represents one point."""
+    Each line represents one point. Above HIGH_SCORE_THRESHOLD, lines flash with rainbow colors."""
     # Calculate how many full points we have
     num_lines = int(score)
     
@@ -137,7 +175,13 @@ def draw_score_lines(screen: pygame.Surface, score: float) -> None:
     for i in range(num_lines):
         y = SCREEN_HEIGHT - 1 - (i * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
         if y >= 0:  # Only draw if we haven't gone off the top of the screen
-            pygame.draw.line(screen, SCORE_LINE_COLOR,
+            if score > HIGH_SCORE_THRESHOLD:
+                # Use rainbow colors for high scores
+                line_color = get_rainbow_color(current_time, i)
+            else:
+                line_color = SCORE_LINE_COLOR
+            
+            pygame.draw.line(screen, line_color,
                            (0, y),
                            (SCREEN_WIDTH - 1, y))
 
@@ -193,8 +237,7 @@ async def run_game() -> None:
                 current_time = pygame.time.get_ticks()
                 measure_offset = (current_time - beat_start_time) / 1000.0  # Convert to seconds
                 # Start at score * SECONDS_PER_BEAT plus the current offset
-                start_time = int(score) * SECONDS_PER_MEASURE + measure_offset
-                print(f"start_time: {start_time}")
+                start_time = score * SECONDS_PER_MEASURE + measure_offset
                 pygame.mixer.music.play(start=start_time)
 
         # Calculate beat position
@@ -218,16 +261,13 @@ async def run_game() -> None:
         
         # Draw game elements
         for i in range(NUMBER_OF_LEDS):
-            fade_led(screen, i)
+            fade_led(screen, i, score)
         
-        # Draw vertical line
-        draw_vertical_line(screen)
-        
-        # Draw score lines
-        draw_score_lines(screen, score)
+        # Draw score lines with current time for animation
+        current_time = pygame.time.get_ticks()
+        draw_score_lines(screen, score, current_time)
         
         # Draw beat indicator
-        current_time = pygame.time.get_ticks()
         if False and current_time - hit_time < HIT_DURATION_MS:
             draw_led(screen, beat_position, Color("green"))
         else:
