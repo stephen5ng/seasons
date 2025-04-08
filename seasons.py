@@ -14,10 +14,18 @@ from pygame import Color, K_r, K_b
 from pygameasync import Clock
 
 from get_key import get_key
-import my_inputs
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("arm")
+
+# Check if keyboard is available
+try:
+    import my_inputs
+    my_inputs.get_key()
+    HAS_KEYBOARD = True
+except (ImportError, my_inputs.UnpluggedError):
+    HAS_KEYBOARD = False
+    print("No keyboard found, running in auto-score mode")
 
 if IS_RASPBERRY_PI:
     from rpi_ws281x import PixelStrip, Color as LEDColor
@@ -118,6 +126,12 @@ class LEDTrail:
             )
             draw_led(screen, pos, faded_color)
 
+def get_keyboard_input():
+    """Get keyboard input if available, otherwise return empty list."""
+    if HAS_KEYBOARD:
+        return get_key()
+    return []
+
 class ButtonPressHandler:
     """Handles button press logic and scoring."""
     
@@ -163,12 +177,16 @@ class ButtonPressHandler:
             # Check if near left target (270 degrees)
             near_left_target = abs(led_position - LEFT_TARGET_POS) <= 2
             
-            # Check for either real key press or ALWAYS_SCORE
-            keys_pressed = pygame.key.get_pressed()
-            r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
-            b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
-            g_pressed = keys_pressed[pygame.K_g] or ALWAYS_SCORE
-            y_pressed = keys_pressed[pygame.K_y] or ALWAYS_SCORE
+            # Check for either real key press or auto-score mode
+            if HAS_KEYBOARD:
+                keys_pressed = pygame.key.get_pressed()
+                r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
+                b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
+                g_pressed = keys_pressed[pygame.K_g] or ALWAYS_SCORE
+                y_pressed = keys_pressed[pygame.K_y] or ALWAYS_SCORE
+            else:
+                # In auto-score mode, all targets are hit automatically
+                r_pressed = b_pressed = g_pressed = y_pressed = True
             
             if near_end_target and r_pressed:
                 score += 0.25
@@ -560,7 +578,7 @@ async def run_game() -> None:
         display.set_pixel(led_position, led_color)
 
         # Handle input (only for quit)
-        for key, keydown in get_key():
+        for key, keydown in get_keyboard_input():
             if key == "quit":
                 if IS_RASPBERRY_PI:
                     display.clear()
@@ -584,9 +602,5 @@ async def main() -> None:
         pygame.quit()
 
 if __name__ == "__main__":
-    if platform.system() != "Darwin":
-        my_inputs.get_key()
-
     pygame.init()
-
     asyncio.run(main())
