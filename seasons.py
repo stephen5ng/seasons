@@ -14,18 +14,10 @@ from pygame import Color, K_r, K_b
 from pygameasync import Clock
 
 from get_key import get_key
+import my_inputs
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("arm")
-
-# Check if keyboard is available
-try:
-    import my_inputs
-    my_inputs.get_key()
-    HAS_KEYBOARD = True
-except (ImportError, my_inputs.UnpluggedError):
-    HAS_KEYBOARD = False
-    print("No keyboard found, running in auto-score mode")
 
 if IS_RASPBERRY_PI:
     from rpi_ws281x import PixelStrip, Color as LEDColor
@@ -86,9 +78,6 @@ SCORE_LINE_HEIGHT = 0.5  # Height of each score line
 SCORE_FLASH_DURATION_MS = 1000  # How long the score flash lasts
 SCORE_LINE_ANIMATION_SPEED = 100  # ms per line animation (slowed down from 50ms)
 
-# MQTT settings
-MQTT_SERVER = os.environ.get("MQTT_SERVER", "localhost")
-
 # Create easing functions once
 CYAN_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
 SCORE_FLASH_EASE = easing_functions.ExponentialEaseOut(start=0, end=1, duration=1)  # Smooth animation for score flashes
@@ -125,12 +114,6 @@ class LEDTrail:
                 base_color[3]
             )
             draw_led(screen, pos, faded_color)
-
-def get_keyboard_input():
-    """Get keyboard input if available, otherwise return empty list."""
-    if HAS_KEYBOARD:
-        return get_key()
-    return []
 
 class ButtonPressHandler:
     """Handles button press logic and scoring."""
@@ -177,16 +160,12 @@ class ButtonPressHandler:
             # Check if near left target (270 degrees)
             near_left_target = abs(led_position - LEFT_TARGET_POS) <= 2
             
-            # Check for either real key press or auto-score mode
-            if HAS_KEYBOARD:
-                keys_pressed = pygame.key.get_pressed()
-                r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
-                b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
-                g_pressed = keys_pressed[pygame.K_g] or ALWAYS_SCORE
-                y_pressed = keys_pressed[pygame.K_y] or ALWAYS_SCORE
-            else:
-                # In auto-score mode, all targets are hit automatically
-                r_pressed = b_pressed = g_pressed = y_pressed = True
+            # Check for either real key press or ALWAYS_SCORE
+            keys_pressed = pygame.key.get_pressed()
+            r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
+            b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
+            g_pressed = keys_pressed[pygame.K_g] or ALWAYS_SCORE
+            y_pressed = keys_pressed[pygame.K_y] or ALWAYS_SCORE
             
             if near_end_target and r_pressed:
                 score += 0.25
@@ -503,13 +482,6 @@ class LEDDisplay:
                 self.display_surface)
             pygame.display.update()
 
-async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
-    """Handle MQTT events for game control."""
-    global quit_app
-    async for message in subscribe_client.messages:
-        if message.topic.matches("password_game/quit"):
-            quit_app = True
-
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
     global quit_app
@@ -578,7 +550,7 @@ async def run_game() -> None:
         display.set_pixel(led_position, led_color)
 
         # Handle input (only for quit)
-        for key, keydown in get_keyboard_input():
+        for key, keydown in get_key():
             if key == "quit":
                 if IS_RASPBERRY_PI:
                     display.clear()
@@ -591,16 +563,13 @@ async def run_game() -> None:
 
 async def main() -> None:
     """Initialize and run the game with MQTT support."""
-    async with aiomqtt.Client(MQTT_SERVER) as subscribe_client:
-        await subscribe_client.subscribe("#")
-        subscribe_task = asyncio.create_task(
-            trigger_events_from_mqtt(subscribe_client),
-            name="mqtt subscribe handler")
-
-        await run_game()
-        subscribe_task.cancel()
-        pygame.quit()
+    await run_game()
+    pygame.quit()
 
 if __name__ == "__main__":
+    if platform.system() != "Darwin":
+        my_inputs.get_key()
+
     pygame.init()
+
     asyncio.run(main())
