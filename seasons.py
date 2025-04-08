@@ -164,7 +164,7 @@ class GameState:
         self.last_beat_in_measure = 0
         self.score = 0
         self.previous_score = 0  # Track previous score to detect changes
-        self.score_flash_time: Optional[int] = None  # When the score last changed
+        self.score_flash_start_beat: Optional[float] = None  # When the score last changed (in beats)
         self.last_hit_target = "none"  # Track which target was hit: "red", "blue", or "none"
         self.next_loop = 1
         self.loop_count = 0
@@ -196,24 +196,24 @@ class GameState:
                 print(f"Starting music at {start_time} seconds")
                 pygame.mixer.music.play(start=start_time)
     
-    def update_score(self, new_score: float, current_time: int, target_type: str = "none") -> None:
+    def update_score(self, new_score: float, current_time: int, target_type: str = "none", beat_float: float = 0) -> None:
         """Update score and trigger flash effect if score increased."""
         if new_score > self.score:
-            self.score_flash_time = current_time
+            self.score_flash_start_beat = beat_float
             self.last_hit_target = target_type
         self.previous_score = self.score
         self.score = new_score
     
-    def get_score_flash_intensity(self, current_time: int) -> float:
-        """Calculate the intensity of the score flash effect."""
-        if self.score_flash_time is None:
+    def get_score_flash_intensity(self, beat_float: float) -> float:
+        """Calculate the intensity of the score flash effect based on musical beats."""
+        if self.score_flash_start_beat is None:
             return 0.0
         
-        time_since_flash = current_time - self.score_flash_time
-        if time_since_flash >= SCORE_FLASH_DURATION_MS:
+        beats_since_flash = beat_float - self.score_flash_start_beat
+        if beats_since_flash >= 2.0:  # Flash lasts for 2 beats
             return 0.0
         
-        return 1.0 - (time_since_flash / SCORE_FLASH_DURATION_MS)
+        return 1.0 - (beats_since_flash / 2.0)
 
 def get_led_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
@@ -361,7 +361,7 @@ async def run_game() -> None:
     game_state = GameState()
     
     # Initialize music
-    pygame.mixer.music.load("music/Rise Up.mp3")
+    pygame.mixer.music.load("music/Rise Up 3.mp3")
     pygame.mixer.music.play(start=0)
 
     while True:
@@ -388,7 +388,7 @@ async def run_game() -> None:
         if not game_state.button_handler.is_in_valid_window(led_position):
             new_score = game_state.button_handler.apply_penalty(game_state.score)
             if new_score != game_state.score:
-                game_state.update_score(new_score, current_time)
+                game_state.update_score(new_score, current_time, "none", beat_float)
         game_state.button_handler.reset_flags(led_position)
         
         # Update and draw trail
@@ -396,7 +396,7 @@ async def run_game() -> None:
         game_state.led_trail.draw(screen, game_state.score)
         
         # Draw score lines with flash effect
-        flash_intensity = game_state.get_score_flash_intensity(current_time)
+        flash_intensity = game_state.get_score_flash_intensity(beat_float)
         draw_score_lines(screen, game_state.score, current_time, flash_intensity, game_state.last_hit_target)
         
         # Draw current LED position with color based on target proximity
@@ -411,7 +411,7 @@ async def run_game() -> None:
                 new_score, target_hit = game_state.button_handler.handle_keypress(
                     led_position, game_state.score, current_time)
                 if new_score != game_state.score:
-                    game_state.update_score(new_score, current_time, target_hit)
+                    game_state.update_score(new_score, current_time, target_hit, beat_float)
             if key == "quit":
                 return
 
