@@ -31,7 +31,7 @@ BEAT_PER_MS = 13.0 / 6000.0
 SECONDS_PER_MEASURE = 3.7
 
 # Debug settings
-ALWAYS_SCORE = False  # When True, automatically scores on every round
+ALWAYS_SCORE = True  # When True, automatically scores on every round
 
 # LED display constants
 NUMBER_OF_LEDS = 40
@@ -54,8 +54,8 @@ TRAIL_LENGTH = 8  # Number of previous positions to remember
 HIGH_SCORE_THRESHOLD = 5  # Score threshold for exciting effects
 COLOR_CYCLE_SPEED = 2000  # Time in ms for one complete color cycle
 SCORE_LINE_COLOR = Color("green")
-SCORE_LINE_SPACING = 2  # Pixels between score lines
-SCORE_LINE_HEIGHT = 1  # Height of each score line
+SCORE_LINE_SPACING = 0.5  # Pixels between score lines
+SCORE_LINE_HEIGHT = 0.5  # Height of each score line
 SCORE_FLASH_DURATION_MS = 1000  # How long the score flash lasts
 SCORE_LINE_ANIMATION_SPEED = 100  # ms per line animation (slowed down from 50ms)
 
@@ -172,6 +172,8 @@ class GameState:
         self.beat_start_time = 0
         self.last_music_start_time = 0.0  # Track when we last started playing music
         self.last_music_start_pos = 0.0   # Track from what position we started playing
+        self.total_beats = 0  # Track total beats in song
+        self.last_beat = -1  # Track last beat for increment
     
     def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
@@ -180,6 +182,12 @@ class GameState:
         beat = int(beat_float)
         beat_in_measure = beat % BEATS_PER_MEASURE
         fractional_beat = beat_float % 1
+        
+        # Update total beats when we cross a beat boundary
+        if beat > self.last_beat:
+            self.total_beats += 1
+            self.last_beat = beat
+            print(f"Total beats in song: {self.total_beats}")
         
         if beat_in_measure == 0:
             self.beat_start_time = pygame.time.get_ticks()
@@ -205,6 +213,10 @@ class GameState:
                     print(f"difference {abs(current_music_pos - target_time)}")
                     print(f"Starting music at {target_time} seconds")
                     self.last_music_start_pos = target_time
+                    # Update total beats based on new target time
+                    target_beats = int(target_time * (1000 * BEAT_PER_MS))
+                    self.total_beats = target_beats
+                    self.last_beat = target_beats - 1
                     pygame.mixer.music.play(start=target_time)
     
     def update_score(self, new_score: float, current_time: int, target_type: str = "none", beat_float: float = 0) -> None:
@@ -380,6 +392,7 @@ async def run_game() -> None:
 
         # Update timing and music
         beat, beat_in_measure, beat_float, fractional_beat = game_state.update_timing()
+        # print(f"beat: {beat}, beat_in_measure: {beat_in_measure}, beat_float: {beat_float}, fractional_beat: {fractional_beat}")
         game_state.handle_music_loop(beat_in_measure)
 
         current_time = pygame.time.get_ticks()
