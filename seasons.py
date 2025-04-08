@@ -40,9 +40,15 @@ MIN_CYAN = 128  # Minimum cyan value for LED color
 MAX_CYAN = 255  # Maximum cyan value for LED color
 RED_WINDOW_SIZE = 4  # How many LEDs before/after target to start showing red
 BLUE_WINDOW_SIZE = 4  # How many LEDs before/after mid target to start showing blue
+GREEN_WINDOW_SIZE = 4  # How many LEDs before/after 90 degree target to start showing green
+YELLOW_WINDOW_SIZE = 4  # How many LEDs before/after 270 degree target to start showing yellow
 LED_COLOR_INTENSITY = 0.7  # How much color to add to the LED
 BLUE_COLOR_INTENSITY = 1.0  # How much blue to add (brighter than other colors)
+GREEN_COLOR_INTENSITY = 1.0  # How much green to add (brighter than other colors)
+YELLOW_COLOR_INTENSITY = 1.0  # How much yellow to add (brighter than other colors)
 MID_TARGET_POS = NUMBER_OF_LEDS/2  # Position of the middle target
+RIGHT_TARGET_POS = NUMBER_OF_LEDS/4  # Position of the 90 degree target
+LEFT_TARGET_POS = 3*NUMBER_OF_LEDS/4  # Position of the 270 degree target
 
 # Fade effect constants
 MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
@@ -111,7 +117,9 @@ class ButtonPressHandler:
         """Check if the current LED position is in a valid window for scoring."""
         return_value = (led_position >= NUMBER_OF_LEDS - 2 or 
                 led_position <= 2 or
-                abs(led_position - MID_TARGET_POS) <= 2)
+                abs(led_position - MID_TARGET_POS) <= 2 or
+                abs(led_position - RIGHT_TARGET_POS) <= 2 or
+                abs(led_position - LEFT_TARGET_POS) <= 2)
         return return_value
     
     def apply_penalty(self, score: float) -> float:
@@ -130,29 +138,45 @@ class ButtonPressHandler:
         elif not self.is_in_valid_window(led_position):
             self.round_active = False  # End the current scoring round
     
-    def handle_keypress(self, led_position: int, score: float, current_time: int) -> float:
+    def handle_keypress(self, led_position: int, score: float, current_time: int) -> Tuple[float, str]:
         """Handle keypress and update score if in valid window with correct key."""
         if not self.button_pressed and self.is_in_valid_window(led_position):
             # Check if near end targets (0 or NUMBER_OF_LEDS)
             near_end_target = led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2
             # Check if near middle target
             near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
+            # Check if near right target (90 degrees)
+            near_right_target = abs(led_position - RIGHT_TARGET_POS) <= 2
+            # Check if near left target (270 degrees)
+            near_left_target = abs(led_position - LEFT_TARGET_POS) <= 2
             
             # Check for either real key press or ALWAYS_SCORE
             keys_pressed = pygame.key.get_pressed()
             r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
             b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
+            g_pressed = keys_pressed[pygame.K_g] or ALWAYS_SCORE
+            y_pressed = keys_pressed[pygame.K_y] or ALWAYS_SCORE
             
             if near_end_target and r_pressed:
-                score += 0.5
+                score += 0.25
                 self.button_pressed = True
                 self.penalty_applied = False
                 return score, "red"
             elif near_middle_target and b_pressed:
-                score += 0.5
+                score += 0.25
                 self.button_pressed = True
                 self.penalty_applied = False
                 return score, "blue"
+            elif near_right_target and g_pressed:
+                score += 0.25
+                self.button_pressed = True
+                self.penalty_applied = False
+                return score, "green"
+            elif near_left_target and y_pressed:
+                score += 0.25
+                self.button_pressed = True
+                self.penalty_applied = False
+                return score, "yellow"
         return score, "none"
 
 class GameState:
@@ -350,6 +374,30 @@ def get_led_color(base_color: Color, led_position: int) -> Color:
             0,  # No red
             0,  # No green
             min(255, int(255 * color_factor)),  # Pure blue at full intensity
+            base_color[3]
+        )
+    
+    # Check if we're near the right target (90 degrees)
+    distance_to_right = abs(led_position - RIGHT_TARGET_POS)
+    if distance_to_right <= GREEN_WINDOW_SIZE:
+        # Calculate green intensity based on proximity to right target
+        color_factor = GREEN_COLOR_INTENSITY * (1 - distance_to_right / GREEN_WINDOW_SIZE)
+        return Color(
+            0,  # No red
+            min(255, int(255 * color_factor)),  # Pure green at full intensity
+            0,  # No blue
+            base_color[3]
+        )
+    
+    # Check if we're near the left target (270 degrees)
+    distance_to_left = abs(led_position - LEFT_TARGET_POS)
+    if distance_to_left <= YELLOW_WINDOW_SIZE:
+        # Calculate yellow intensity based on proximity to left target
+        color_factor = YELLOW_COLOR_INTENSITY * (1 - distance_to_left / YELLOW_WINDOW_SIZE)
+        return Color(
+            min(255, int(255 * color_factor)),  # Red component
+            min(255, int(255 * color_factor)),  # Green component
+            0,  # No blue
             base_color[3]
         )
     
