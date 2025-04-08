@@ -30,6 +30,9 @@ BEATS_PER_MEASURE = 8
 BEAT_PER_MS = 13.0 / 6000.0
 SECONDS_PER_MEASURE = 3.7
 
+# Debug settings
+ALWAYS_SCORE = True  # When True, automatically scores on every round
+
 # LED display constants
 NUMBER_OF_LEDS = 40
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
@@ -40,11 +43,6 @@ BLUE_WINDOW_SIZE = 4  # How many LEDs before/after mid target to start showing b
 LED_COLOR_INTENSITY = 0.7  # How much color to add to the LED
 BLUE_COLOR_INTENSITY = 1.0  # How much blue to add (brighter than other colors)
 MID_TARGET_POS = NUMBER_OF_LEDS/2  # Position of the middle target
-
-# Game timing constants
-BEATS_PER_MEASURE = 8
-BEAT_PER_MS = 13.0 / 6000.0
-SECONDS_PER_MEASURE = 3.7
 
 # Fade effect constants
 MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
@@ -141,16 +139,18 @@ class ButtonPressHandler:
             near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
             
             keys_pressed = pygame.key.get_pressed()
-            r_pressed = keys_pressed[pygame.K_r]
-            b_pressed = keys_pressed[pygame.K_b]
-            
+            r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
+            b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
+            print(f"ALWAYS_SCORE: {ALWAYS_SCORE}")
+            print(f"r_pressed: {r_pressed}, b_pressed: {b_pressed}")
+            print(f"near_end_target: {near_end_target}, near_middle_target: {near_middle_target}")
             if near_end_target and r_pressed:
-                score += 1
+                score += 0.5
                 self.button_pressed = True
                 self.penalty_applied = False
                 return score, "red"
             elif near_middle_target and b_pressed:
-                score += 1
+                score += 0.5
                 self.button_pressed = True
                 self.penalty_applied = False
                 return score, "blue"
@@ -171,6 +171,8 @@ class GameState:
         self.button_handler = ButtonPressHandler()
         self.led_trail = LEDTrail(TRAIL_LENGTH)
         self.beat_start_time = 0
+        self.last_music_start_time = 0.0  # Track when we last started playing music
+        self.last_music_start_pos = 0.0   # Track from what position we started playing
     
     def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
@@ -192,9 +194,19 @@ class GameState:
             if beat_in_measure == 0:
                 current_time = pygame.time.get_ticks()
                 measure_offset = (current_time - self.beat_start_time) / 1000.0
-                start_time = int(self.score) * SECONDS_PER_MEASURE + measure_offset
-                print(f"Starting music at {start_time} seconds")
-                pygame.mixer.music.play(start=start_time)
+                target_time = int(self.score) * SECONDS_PER_MEASURE + measure_offset
+                
+                # Get current music position in seconds, accounting for start position
+                current_music_pos = self.last_music_start_pos + (pygame.mixer.music.get_pos() / 1000.0)
+                
+                print(f"Current music position: {current_music_pos}, Score: {self.score}")
+                print(f"Target time: {target_time}")
+                # Only restart if the difference is more than 0.1 seconds
+                if abs(current_music_pos - target_time) > 0.1:
+                    print(f"difference {abs(current_music_pos - target_time)}")
+                    print(f"Starting music at {target_time} seconds")
+                    self.last_music_start_pos = target_time
+                    pygame.mixer.music.play(start=target_time)
     
     def update_score(self, new_score: float, current_time: int, target_type: str = "none", beat_float: float = 0) -> None:
         """Update score and trigger flash effect if score increased."""
@@ -314,7 +326,7 @@ def get_led_color(base_color: Color, led_position: int) -> Color:
 
 def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float, flash_type: str) -> None:
     """Draw horizontal lines representing the score with top-to-bottom animation."""
-    num_lines = int(score)
+    num_lines = int(score*2)
     current_line = num_lines  # Default to all lines unlit
     
     if flash_intensity > 0:
@@ -390,6 +402,21 @@ async def run_game() -> None:
             if new_score != game_state.score:
                 game_state.update_score(new_score, current_time, "none", beat_float)
         game_state.button_handler.reset_flags(led_position)
+        
+        # Auto-scoring logic when ALWAYS_SCORE is enabled
+        if ALWAYS_SCORE and game_state.button_handler.is_in_valid_window(led_position) and not game_state.button_handler.button_pressed:
+            near_end_target = led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2
+            near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
+            
+            if near_end_target:
+                new_score = game_state.score + 0.5
+                game_state.button_handler.button_pressed = True
+                game_state.update_score(new_score, current_time, "red", beat_float)
+            elif near_middle_target:
+                new_score = game_state.score + 0.5
+                game_state.button_handler.button_pressed = True
+                game_state.update_score(new_score, current_time, "blue", beat_float)
+            print(f"new_score: {new_score}, score: {game_state.score}")
         
         # Update and draw trail
         game_state.led_trail.update(led_position)
