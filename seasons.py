@@ -31,7 +31,7 @@ BEAT_PER_MS = 13.0 / 6000.0
 SECONDS_PER_MEASURE = 3.7
 
 # Debug settings
-ALWAYS_SCORE = True  # When True, automatically scores on every round
+ALWAYS_SCORE = False  # When True, automatically scores on every round
 
 # LED display constants
 NUMBER_OF_LEDS = 40
@@ -138,12 +138,11 @@ class ButtonPressHandler:
             # Check if near middle target
             near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
             
+            # Check for either real key press or ALWAYS_SCORE
             keys_pressed = pygame.key.get_pressed()
             r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
             b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
-            print(f"ALWAYS_SCORE: {ALWAYS_SCORE}")
-            print(f"r_pressed: {r_pressed}, b_pressed: {b_pressed}")
-            print(f"near_end_target: {near_end_target}, near_middle_target: {near_middle_target}")
+            
             if near_end_target and r_pressed:
                 score += 0.5
                 self.button_pressed = True
@@ -403,20 +402,11 @@ async def run_game() -> None:
                 game_state.update_score(new_score, current_time, "none", beat_float)
         game_state.button_handler.reset_flags(led_position)
         
-        # Auto-scoring logic when ALWAYS_SCORE is enabled
-        if ALWAYS_SCORE and game_state.button_handler.is_in_valid_window(led_position) and not game_state.button_handler.button_pressed:
-            near_end_target = led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2
-            near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
-            
-            if near_end_target:
-                new_score = game_state.score + 0.5
-                game_state.button_handler.button_pressed = True
-                game_state.update_score(new_score, current_time, "red", beat_float)
-            elif near_middle_target:
-                new_score = game_state.score + 0.5
-                game_state.button_handler.button_pressed = True
-                game_state.update_score(new_score, current_time, "blue", beat_float)
-            print(f"new_score: {new_score}, score: {game_state.score}")
+        # Check for scoring (both manual and auto)
+        new_score, target_hit = game_state.button_handler.handle_keypress(
+            led_position, game_state.score, current_time)
+        if new_score != game_state.score:
+            game_state.update_score(new_score, current_time, target_hit, beat_float)
         
         # Update and draw trail
         game_state.led_trail.update(led_position)
@@ -432,13 +422,8 @@ async def run_game() -> None:
         led_color = get_led_color(base_color, led_position)
         draw_led(screen, led_position, led_color)
 
-        # Handle input
+        # Handle input (only for quit)
         for key, keydown in get_key():
-            if keydown:
-                new_score, target_hit = game_state.button_handler.handle_keypress(
-                    led_position, game_state.score, current_time)
-                if new_score != game_state.score:
-                    game_state.update_score(new_score, current_time, target_hit, beat_float)
             if key == "quit":
                 return
 
