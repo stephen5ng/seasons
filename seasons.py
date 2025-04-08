@@ -238,6 +238,26 @@ class GameState:
         
         return 1.0 - (beats_since_flash / 2.0)
 
+    def calculate_led_position(self, beat_in_measure: int, fractional_beat: float) -> int:
+        """Calculate the current LED position based on beat timing."""
+        percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
+        return int(percent_of_measure * NUMBER_OF_LEDS)
+    
+    def update_loop_count(self, percent_of_measure: float) -> None:
+        """Update the loop count based on measure progress."""
+        if percent_of_measure < 0.5:
+            if self.loop_count != self.next_loop:
+                self.loop_count = self.next_loop
+        elif self.next_loop == self.loop_count:
+            self.next_loop = self.loop_count + 1
+
+    def draw_current_led(self, screen: pygame.Surface, led_position: int) -> None:
+        """Draw the current LED position with appropriate color."""
+        distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
+        base_color = get_cyan_color(distance_to_zero)
+        led_color = get_led_color(base_color, led_position)
+        draw_led(screen, led_position, led_color)
+
 def get_led_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
     angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
@@ -392,21 +412,13 @@ async def run_game() -> None:
 
         # Update timing and music
         beat, beat_in_measure, beat_float, fractional_beat = game_state.update_timing()
-        # print(f"beat: {beat}, beat_in_measure: {beat_in_measure}, beat_float: {beat_float}, fractional_beat: {fractional_beat}")
         game_state.handle_music_loop(beat_in_measure)
 
         current_time = pygame.time.get_ticks()
-
-        # Calculate LED position
-        percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
-        led_position = int(percent_of_measure * NUMBER_OF_LEDS)
         
-        # Handle loop counting
-        if percent_of_measure < 0.5:
-            if game_state.loop_count != game_state.next_loop:
-                game_state.loop_count = game_state.next_loop
-        elif game_state.next_loop == game_state.loop_count:
-            game_state.next_loop = game_state.loop_count + 1
+        # Calculate LED position and update loop count
+        led_position = game_state.calculate_led_position(beat_in_measure, fractional_beat)
+        game_state.update_loop_count(led_position / NUMBER_OF_LEDS)
                 
         # Handle scoring and penalties
         if not game_state.button_handler.is_in_valid_window(led_position):
@@ -429,11 +441,8 @@ async def run_game() -> None:
         flash_intensity = game_state.get_score_flash_intensity(beat_float)
         draw_score_lines(screen, game_state.score, current_time, flash_intensity, game_state.last_hit_target)
         
-        # Draw current LED position with color based on target proximity
-        distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
-        base_color = get_cyan_color(distance_to_zero)
-        led_color = get_led_color(base_color, led_position)
-        draw_led(screen, led_position, led_color)
+        # Draw current LED
+        game_state.draw_current_led(screen, led_position)
 
         # Handle input (only for quit)
         for key, keydown in get_key():
