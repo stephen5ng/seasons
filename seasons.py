@@ -17,6 +17,7 @@ from get_key import get_key
 import my_inputs
 
 # Display constants
+SCALING_FACTOR = 9
 SCREEN_WIDTH = 128
 SCREEN_HEIGHT = 96
 CIRCLE_RADIUS = 30
@@ -441,7 +442,8 @@ async def run_game() -> None:
 
     # Initialize display
     clock = Clock()
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    display_surface = pygame.display.set_mode((SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR))
+    screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
     
     # Initialize game state
     game_state = GameState()
@@ -493,6 +495,7 @@ async def run_game() -> None:
                 return
 
         # Update display
+        pygame.transform.scale(screen, (SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR), display_surface)
         pygame.display.update()
         await clock.tick(30)
 
