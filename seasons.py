@@ -14,11 +14,9 @@ from pygame import Color, K_r, K_b
 from pygameasync import Clock
 
 from get_key import get_key
-import hub75
 import my_inputs
 
 # Display constants
-SCALING_FACTOR = 9
 SCREEN_WIDTH = 128
 SCREEN_HEIGHT = 96
 CIRCLE_RADIUS = 30
@@ -443,10 +441,7 @@ async def run_game() -> None:
 
     # Initialize display
     clock = Clock()
-    display_surface = pygame.display.set_mode(
-        (SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR))
-    screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), flags=pygame.SRCALPHA)
-    screen = screen.convert_alpha()
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     
     # Initialize game state
     game_state = GameState()
@@ -498,9 +493,6 @@ async def run_game() -> None:
                 return
 
         # Update display
-        hub75.update(screen)
-        pygame.transform.scale(screen,
-            display_surface.get_rect().size, dest_surface=display_surface)
         pygame.display.update()
         await clock.tick(30)
 
@@ -520,7 +512,6 @@ if __name__ == "__main__":
     if platform.system() != "Darwin":
         my_inputs.get_key()
 
-    hub75.init()
     pygame.init()
 
     asyncio.run(main())
