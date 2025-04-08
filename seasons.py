@@ -5,7 +5,7 @@ import math
 import os
 import platform
 import sys
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import aiomqtt
 import easing_functions
@@ -15,6 +15,20 @@ from pygameasync import Clock
 
 from get_key import get_key
 import my_inputs
+
+# Check if we're on Raspberry Pi
+IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("arm")
+
+if IS_RASPBERRY_PI:
+    from rpi_ws281x import PixelStrip, Color as LEDColor
+    # LED strip configuration:
+    LED_COUNT = NUMBER_OF_LEDS  # Number of LED pixels
+    LED_PIN = 18  # GPIO pin connected to the pixels (must support PWM)
+    LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+    LED_DMA = 10  # DMA channel to use for generating signal
+    LED_BRIGHTNESS = 255  # Set to 0 for darkest and 255 for brightest
+    LED_INVERT = False  # True to invert the signal (when using NPN transistor level shift)
+    LED_CHANNEL = 0  # PWM channel
 
 # Display constants
 SCALING_FACTOR = 9
@@ -429,6 +443,48 @@ def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, fl
                 
             pygame.draw.line(screen, line_color, (0, y), (SCREEN_WIDTH - 1, y))
 
+class LEDDisplay:
+    """Handles LED display output for both Pygame and WS281x."""
+    
+    def __init__(self):
+        if IS_RASPBERRY_PI:
+            self.strip = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+            self.strip.begin()
+            self.pygame_surface = None
+            self.display_surface = None
+        else:
+            self.strip = None
+            self.display_surface = pygame.display.set_mode((SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR))
+            self.pygame_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    
+    def clear(self):
+        """Clear the display."""
+        if IS_RASPBERRY_PI:
+            for i in range(self.strip.numPixels()):
+                self.strip.setPixelColor(i, 0)
+        else:
+            self.pygame_surface.fill((0, 0, 0))
+    
+    def set_pixel(self, pos: int, color: Color):
+        """Set pixel color at position."""
+        if IS_RASPBERRY_PI:
+            # Convert Pygame color to WS281x color (RGB order)
+            ws_color = LEDColor(color.r, color.g, color.b)
+            self.strip.setPixelColor(pos, ws_color)
+        else:
+            x, y = get_led_position(pos)
+            self.pygame_surface.set_at((x, y), color)
+    
+    def update(self):
+        """Update the display."""
+        if IS_RASPBERRY_PI:
+            self.strip.show()
+        else:
+            pygame.transform.scale(self.pygame_surface, 
+                (SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR), 
+                self.display_surface)
+            pygame.display.update()
+
 async def trigger_events_from_mqtt(subscribe_client: aiomqtt.Client) -> None:
     """Handle MQTT events for game control."""
     global quit_app
@@ -442,8 +498,7 @@ async def run_game() -> None:
 
     # Initialize display
     clock = Clock()
-    display_surface = pygame.display.set_mode((SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR))
-    screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    display = LEDDisplay()
     
     # Initialize game state
     game_state = GameState()
@@ -453,7 +508,7 @@ async def run_game() -> None:
     pygame.mixer.music.play(start=0)
 
     while True:
-        screen.fill((0, 0, 0))
+        display.clear()
 
         # Update timing and music
         beat, beat_in_measure, beat_float, fractional_beat = game_state.update_timing()
@@ -480,23 +535,40 @@ async def run_game() -> None:
         
         # Update and draw trail
         game_state.led_trail.update(led_position)
-        game_state.led_trail.draw(screen, game_state.score)
+        for pos in game_state.led_trail.positions:
+            distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
+            base_color = get_cyan_color(distance_to_zero)
+            trail_fade = (game_state.led_trail.positions.index(pos) + 1) / len(game_state.led_trail.positions)
+            fade_factor = get_fade_factor(game_state.score) * trail_fade
+            faded_color = Color(
+                int(base_color[0] * fade_factor),
+                int(base_color[1] * fade_factor),
+                int(base_color[2] * fade_factor),
+                base_color[3]
+            )
+            display.set_pixel(pos, faded_color)
         
-        # Draw score lines with flash effect
-        flash_intensity = game_state.get_score_flash_intensity(beat_float)
-        draw_score_lines(screen, game_state.score, current_time, flash_intensity, game_state.last_hit_target)
+        # Draw score lines with flash effect (only in Pygame mode)
+        if not IS_RASPBERRY_PI:
+            flash_intensity = game_state.get_score_flash_intensity(beat_float)
+            draw_score_lines(display.pygame_surface, game_state.score, current_time, flash_intensity, game_state.last_hit_target)
         
         # Draw current LED
-        game_state.draw_current_led(screen, led_position)
+        distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
+        base_color = get_cyan_color(distance_to_zero)
+        led_color = get_led_color(base_color, led_position)
+        display.set_pixel(led_position, led_color)
 
         # Handle input (only for quit)
         for key, keydown in get_key():
             if key == "quit":
+                if IS_RASPBERRY_PI:
+                    display.clear()
+                    display.update()
                 return
 
         # Update display
-        pygame.transform.scale(screen, (SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR), display_surface)
-        pygame.display.update()
+        display.update()
         await clock.tick(30)
 
 async def main() -> None:
