@@ -13,6 +13,7 @@ import easing_functions
 import pygame
 from pygame import Color, K_r, K_b
 from pygameasync import Clock
+import requests
 
 from get_key import get_key
 import my_inputs
@@ -259,9 +260,10 @@ class GameState:
                     if wled_measure in WLED_SETTINGS:
                         self.last_wled_measure = wled_measure
                 wled_command = WLED_SETTINGS[self.last_wled_measure]
-                curl_command = f'curl "http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*2)}" > /dev/null 2>&1'
-                os.system(curl_command)
+                url = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
+                requests.get(url)
                 self.last_wled_score = self.score
+                print(f"score {self.score}")
             
         if beat_in_measure == 0:
             self.beat_start_time = pygame.time.get_ticks()
@@ -283,7 +285,7 @@ class GameState:
                 print(f"Current music position: {current_music_pos}, Score: {self.score}")
                 print(f"Target time: {target_time}")
                 # Only restart if the difference is more than 0.1 seconds
-                if abs(current_music_pos - target_time) > 0.1:
+                if abs(current_music_pos - target_time) > 0.2:
                     print(f"difference {abs(current_music_pos - target_time)}")
                     print(f"Starting music at {target_time} seconds")
                     self.last_music_start_pos = target_time
