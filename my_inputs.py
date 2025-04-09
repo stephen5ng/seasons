@@ -3663,7 +3663,7 @@ def get_key():
     try:
         keyboard = devices.keyboards[0]
     except IndexError:
-        raise UnpluggedError("No keyboard found.")
+        return []
     return keyboard.read()
 
 
