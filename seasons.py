@@ -5,6 +5,7 @@ import math
 import os
 import platform
 import sys
+import argparse
 from typing import List, Optional, Tuple, Union
 
 import aiomqtt
@@ -16,8 +17,15 @@ from pygameasync import Clock
 from get_key import get_key
 import my_inputs
 
-# LED display constants
-NUMBER_OF_LEDS = 40
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='LED rhythm game')
+    parser.add_argument('--leds', type=int, default=40,
+                      help='Number of LEDs in the strip (default: 40)')
+    return parser.parse_args()
+
+args = parse_args()
+NUMBER_OF_LEDS = args.leds
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
