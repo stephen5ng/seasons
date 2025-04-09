@@ -16,6 +16,9 @@ from pygameasync import Clock
 from get_key import get_key
 import my_inputs
 
+# LED display constants
+NUMBER_OF_LEDS = 40
+
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("arm")
 
@@ -47,7 +50,6 @@ SECONDS_PER_MEASURE = 3.7
 ALWAYS_SCORE = True  # When True, automatically scores on every round
 
 # LED display constants
-NUMBER_OF_LEDS = 40
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_CYAN = 128  # Minimum cyan value for LED color
 MAX_CYAN = 255  # Maximum cyan value for LED color
@@ -55,7 +57,7 @@ RED_WINDOW_SIZE = 4  # How many LEDs before/after target to start showing red
 BLUE_WINDOW_SIZE = 4  # How many LEDs before/after mid target to start showing blue
 GREEN_WINDOW_SIZE = 4  # How many LEDs before/after 90 degree target to start showing green
 YELLOW_WINDOW_SIZE = 4  # How many LEDs before/after 270 degree target to start showing yellow
-LED_COLOR_INTENSITY = 0.7  # How much color to add to the LED
+LED_COLOR_INTENSITY = 1.0  # How much color to add to the LED
 BLUE_COLOR_INTENSITY = 1.0  # How much blue to add (brighter than other colors)
 GREEN_COLOR_INTENSITY = 1.0  # How much green to add (brighter than other colors)
 YELLOW_COLOR_INTENSITY = 1.0  # How much yellow to add (brighter than other colors)
@@ -552,9 +554,6 @@ async def run_game() -> None:
         # Handle input (only for quit)
         for key, keydown in get_key():
             if key == "quit":
-                if IS_RASPBERRY_PI:
-                    display.clear()
-                    display.update()
                 return
 
         # Update display
@@ -567,9 +566,6 @@ async def main() -> None:
     pygame.quit()
 
 if __name__ == "__main__":
-    if platform.system() != "Darwin":
-        my_inputs.get_key()
-
     pygame.init()
 
     asyncio.run(main())
