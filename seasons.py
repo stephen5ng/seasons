@@ -17,6 +17,25 @@ from pygameasync import Clock
 from get_key import get_key
 import my_inputs
 
+# Constants
+SPB = 3.69230769  # Seconds per beat
+SPB = 1.84615385
+WLED_IP = "192.168.0.121"
+WLED_SETTINGS = {
+    0: "FX=2&FP=67&SX=32",  # BREATHE / BLINK RED 
+    4: "FX=54&FP=57&SX=48",  # CHASE 3 / CANDY
+    8: "FX=19&FP=10&SX=255",  # DISSOLVE RND / FOREST
+    12: "FX=66&FP=41&SX=128",  # FIRE 2012 / MAGRED
+    16: "FX=9&FP=20&SX=128",  # RAINBOW / PASTEL
+    20: "FX=92&FP=45&SX=192",  # SINELON / CLOUD
+    24: "FX=13&FP=27&SX=96",  # SUNSET / SHERBET
+    32: "FX=3&FP=43&SX=128",  # WIPE / YELBLU
+    35: "FX=34&FP=19&SX=32",  # COLORFUL / TEMPERATURE
+    38: "FX=108&FP=9&SX=128",  # SINE / OCEAN
+    45: "FX=173&FP=34&SX=128",  # TARTAN / TERTIARY
+    48: "FX=34&FP=19&SX=32",  # BREATHE / SPLASH
+}
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='LED rhythm game')
@@ -215,6 +234,8 @@ class GameState:
         self.last_music_start_pos = 0.0   # Track from what position we started playing
         self.total_beats = 0  # Track total beats in song
         self.last_beat = -1  # Track last beat for increment
+        self.last_wled_measure = -1
+        self.last_wled_score = -1
     
     def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
@@ -229,7 +250,19 @@ class GameState:
             self.total_beats += 1
             self.last_beat = beat
             print(f"Total beats in song: {self.total_beats}")
-        
+            
+            # Check WLED_SETTINGS for current beat
+            wled_measure = self.total_beats//BEATS_PER_MEASURE
+            if self.score != self.last_wled_score or self.last_wled_measure != wled_measure:
+                if self.last_wled_measure != wled_measure:
+                    print(f"NEW MEASURE {wled_measure}")
+                    if wled_measure in WLED_SETTINGS:
+                        self.last_wled_measure = wled_measure
+                wled_command = WLED_SETTINGS[self.last_wled_measure]
+                curl_command = f'curl "http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*2)}" > /dev/null 2>&1'
+                os.system(curl_command)
+                self.last_wled_score = self.score
+            
         if beat_in_measure == 0:
             self.beat_start_time = pygame.time.get_ticks()
         
