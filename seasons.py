@@ -53,10 +53,7 @@ ALWAYS_SCORE = True  # When True, automatically scores on every round
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
 MIN_CYAN = 128  # Minimum cyan value for LED color
 MAX_CYAN = 255  # Maximum cyan value for LED color
-RED_WINDOW_SIZE = 4  # How many LEDs before/after target to start showing red
-BLUE_WINDOW_SIZE = 4  # How many LEDs before/after mid target to start showing blue
-GREEN_WINDOW_SIZE = 4  # How many LEDs before/after 90 degree target to start showing green
-YELLOW_WINDOW_SIZE = 4  # How many LEDs before/after 270 degree target to start showing yellow
+TARGET_WINDOW_SIZE = NUMBER_OF_LEDS // 10  # Window size proportional to number of LEDs
 LED_COLOR_INTENSITY = 1.0  # How much color to add to the LED
 BLUE_COLOR_INTENSITY = 1.0  # How much blue to add (brighter than other colors)
 GREEN_COLOR_INTENSITY = 1.0  # How much green to add (brighter than other colors)
@@ -367,9 +364,9 @@ def get_led_color(base_color: Color, led_position: int) -> Color:
     """Add color to the LED when near target windows."""
     # Check if we're near either end target window (0 or NUMBER_OF_LEDS)
     distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
-    if distance_to_zero <= RED_WINDOW_SIZE:
+    if distance_to_zero <= TARGET_WINDOW_SIZE:
         # Calculate red intensity based on proximity to target
-        color_factor = LED_COLOR_INTENSITY * (1 - distance_to_zero / RED_WINDOW_SIZE)
+        color_factor = LED_COLOR_INTENSITY * (1 - distance_to_zero / TARGET_WINDOW_SIZE)
         return Color(
             min(255, int(255 * color_factor)),  # Red component
             int(base_color[1] * (1 - color_factor)),  # Reduce green
@@ -379,9 +376,9 @@ def get_led_color(base_color: Color, led_position: int) -> Color:
     
     # Check if we're near the middle target
     distance_to_mid = abs(led_position - MID_TARGET_POS)
-    if distance_to_mid <= BLUE_WINDOW_SIZE:
+    if distance_to_mid <= TARGET_WINDOW_SIZE:
         # Calculate blue intensity based on proximity to middle target
-        color_factor = BLUE_COLOR_INTENSITY * (1 - distance_to_mid / BLUE_WINDOW_SIZE)
+        color_factor = BLUE_COLOR_INTENSITY * (1 - distance_to_mid / TARGET_WINDOW_SIZE)
         return Color(
             0,  # No red
             0,  # No green
@@ -391,9 +388,9 @@ def get_led_color(base_color: Color, led_position: int) -> Color:
     
     # Check if we're near the right target (90 degrees)
     distance_to_right = abs(led_position - RIGHT_TARGET_POS)
-    if distance_to_right <= GREEN_WINDOW_SIZE:
+    if distance_to_right <= TARGET_WINDOW_SIZE:
         # Calculate green intensity based on proximity to right target
-        color_factor = GREEN_COLOR_INTENSITY * (1 - distance_to_right / GREEN_WINDOW_SIZE)
+        color_factor = GREEN_COLOR_INTENSITY * (1 - distance_to_right / TARGET_WINDOW_SIZE)
         return Color(
             0,  # No red
             min(255, int(255 * color_factor)),  # Pure green at full intensity
@@ -403,9 +400,9 @@ def get_led_color(base_color: Color, led_position: int) -> Color:
     
     # Check if we're near the left target (270 degrees)
     distance_to_left = abs(led_position - LEFT_TARGET_POS)
-    if distance_to_left <= YELLOW_WINDOW_SIZE:
+    if distance_to_left <= TARGET_WINDOW_SIZE:
         # Calculate yellow intensity based on proximity to left target
-        color_factor = YELLOW_COLOR_INTENSITY * (1 - distance_to_left / YELLOW_WINDOW_SIZE)
+        color_factor = YELLOW_COLOR_INTENSITY * (1 - distance_to_left / TARGET_WINDOW_SIZE)
         return Color(
             min(255, int(255 * color_factor)),  # Red component
             min(255, int(255 * color_factor)),  # Green component
