@@ -9,11 +9,11 @@ import argparse
 from typing import List, Optional, Tuple, Union
 
 import aiomqtt
+import aiohttp
 import easing_functions
 import pygame
 from pygame import Color, K_r, K_b
 from pygameasync import Clock
-import requests
 
 from get_key import get_key
 import my_inputs
@@ -238,7 +238,7 @@ class GameState:
         self.last_wled_measure = -1
         self.last_wled_score = -1
     
-    def update_timing(self) -> Tuple[int, int, float, float]:
+    async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
         duration_ms = pygame.time.get_ticks() - self.start_ticks
         beat_float = duration_ms * BEAT_PER_MS
@@ -261,7 +261,9 @@ class GameState:
                         self.last_wled_measure = wled_measure
                 wled_command = WLED_SETTINGS[self.last_wled_measure]
                 url = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
-                requests.get(url)
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        await response.text()
                 self.last_wled_score = self.score
                 print(f"score {self.score}")
             
@@ -543,7 +545,7 @@ async def run_game() -> None:
         display.clear()
 
         # Update timing and music
-        beat, beat_in_measure, beat_float, fractional_beat = game_state.update_timing()
+        beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
         game_state.handle_music_loop(beat_in_measure)
 
         current_time = pygame.time.get_ticks()
