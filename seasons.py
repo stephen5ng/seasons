@@ -125,23 +125,6 @@ class LEDTrail:
             self.positions.append(new_position)
             if len(self.positions) > self.max_length:
                 self.positions.pop(0)
-    
-    def draw(self, screen: pygame.Surface, score: float) -> None:
-        """Draw trail with fading effect based on position age."""
-        for i, pos in enumerate(self.positions):
-            # Should be ease-based.
-            trail_fade = (i + 1) / len(self.positions)
-            distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
-            base_color = get_cyan_color(distance_to_zero)
-            fade_factor = get_fade_factor(score) * trail_fade
-            # Should be HSV perception-based.
-            faded_color = Color(
-                int(base_color[0] * fade_factor),
-                int(base_color[1] * fade_factor),
-                int(base_color[2] * fade_factor),
-                base_color[3]
-            )
-            draw_led(screen, pos, faded_color)
 
 class ButtonPressHandler:
     """Handles button press logic and scoring."""
