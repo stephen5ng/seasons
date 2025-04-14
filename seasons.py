@@ -164,6 +164,7 @@ class ButtonPressHandler:
         """Apply penalty if button wasn't pressed in valid window."""
         if not self.button_pressed and not self.penalty_applied:
             score *= 0.75  # Reduce score by 25% instead of 50%
+            score = round(score * 4) / 4  # Round to nearest 0.25
             self.penalty_applied = True
         return score
     
@@ -187,14 +188,14 @@ class ButtonPressHandler:
             near_right_target = abs(led_position - RIGHT_TARGET_POS) <= 2
             # Check if near left target (270 degrees)
             near_left_target = abs(led_position - LEFT_TARGET_POS) <= 2
-            
+
             # Check for either real key press or ALWAYS_SCORE
             keys_pressed = pygame.key.get_pressed()
             r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
             b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
             g_pressed = keys_pressed[pygame.K_g] or ALWAYS_SCORE
             y_pressed = keys_pressed[pygame.K_y] or ALWAYS_SCORE
-            
+
             # Shouldn't allow scoring if button is pressed continuously.
             if near_end_target and r_pressed:
                 score += 0.25
@@ -240,10 +241,10 @@ class GameState:
         self.last_wled_measure = -1
         self.last_wled_score = -1
         self.http_session = aiohttp.ClientSession()  # Create a single session for all HTTP requests
+        self.current_http_task: Optional[asyncio.Task] = None
     
-    async def send_wled_command(self, wled_command: str) -> None:
-        """Send a command to the WLED device."""
-        url = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
+    async def _send_wled_command_inner(self, url: str) -> None:
+        """Internal method to send WLED command."""
         try:
             async with self.http_session.get(url, timeout=1.0) as response:
                 if response.status != 200:
@@ -255,6 +256,17 @@ class GameState:
             print(f"Error: Failed to connect to WLED: {e}")
         except Exception as e:
             print(f"Error: Unexpected error connecting to WLED: {e}")
+
+    async def send_wled_command(self, wled_command: str) -> None:
+        """Send a command to the WLED device, canceling any outstanding request."""
+        url = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
+        
+        # Don't send multiple requests at once.
+        if self.current_http_task and not self.current_http_task.done():
+            return
+       
+        # Start new request
+        self.current_http_task = asyncio.create_task(self._send_wled_command_inner(url))
 
     async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
@@ -583,6 +595,7 @@ async def run_game() -> None:
             if not game_state.button_handler.is_in_valid_window(led_position):
                 new_score = game_state.button_handler.apply_penalty(game_state.score)
                 if new_score != game_state.score:
+                    print(f"New score: {new_score}, target hit: none")
                     game_state.update_score(new_score, "none", beat_float)
             game_state.button_handler.reset_flags(led_position)
             
@@ -590,6 +603,7 @@ async def run_game() -> None:
             new_score, target_hit = game_state.button_handler.handle_keypress(
                 led_position, game_state.score, current_time)
             if new_score != game_state.score:
+                print(f"New score: {new_score}, target hit: {target_hit}")
                 game_state.update_score(new_score, target_hit, beat_float)
             
             # Update and draw trail
