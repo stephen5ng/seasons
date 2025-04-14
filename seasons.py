@@ -129,11 +129,12 @@ class LEDTrail:
     def draw(self, screen: pygame.Surface, score: float) -> None:
         """Draw trail with fading effect based on position age."""
         for i, pos in enumerate(self.positions):
+            # Should be ease-based.
             trail_fade = (i + 1) / len(self.positions)
             distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
             base_color = get_cyan_color(distance_to_zero)
             fade_factor = get_fade_factor(score) * trail_fade
-            
+            # Should be HSV perception-based.
             faded_color = Color(
                 int(base_color[0] * fade_factor),
                 int(base_color[1] * fade_factor),
@@ -194,6 +195,7 @@ class ButtonPressHandler:
             g_pressed = keys_pressed[pygame.K_g] or ALWAYS_SCORE
             y_pressed = keys_pressed[pygame.K_y] or ALWAYS_SCORE
             
+            # Shouldn't allow scoring if button is pressed continuously.
             if near_end_target and r_pressed:
                 score += 0.25
                 self.button_pressed = True
@@ -274,30 +276,34 @@ class GameState:
     
     def handle_music_loop(self, beat_in_measure: int) -> None:
         """Handle music looping and position updates."""
-        if beat_in_measure != self.last_beat_in_measure:
-            self.last_beat_in_measure = beat_in_measure
-            if beat_in_measure == 0:
-                current_time = pygame.time.get_ticks()
-                measure_offset = (current_time - self.beat_start_time) / 1000.0
-                target_time = int(self.score) * SECONDS_PER_MEASURE + measure_offset
-                
-                # Get current music position in seconds, accounting for start position
-                current_music_pos = self.last_music_start_pos + (pygame.mixer.music.get_pos() / 1000.0)
-                
-                print(f"Current music position: {current_music_pos}, Score: {self.score}")
-                print(f"Target time: {target_time}")
-                # Only restart if the difference is more than 0.1 seconds
-                if abs(current_music_pos - target_time) > 0.2:
-                    print(f"difference {abs(current_music_pos - target_time)}")
-                    print(f"Starting music at {target_time} seconds")
-                    self.last_music_start_pos = target_time
-                    # Update total beats based on new target time
-                    target_beats = int(target_time * (1000 * BEAT_PER_MS))
-                    self.total_beats = target_beats
-                    self.last_beat = target_beats - 1
-                    pygame.mixer.music.play(start=target_time)
-    
-    def update_score(self, new_score: float, current_time: int, target_type: str = "none", beat_float: float = 0) -> None:
+        if beat_in_measure == self.last_beat_in_measure:
+            return
+        self.last_beat_in_measure = beat_in_measure
+        
+        if beat_in_measure != 0:
+            return
+        
+        current_time_ms = pygame.time.get_ticks()
+        measure_offset_s = (current_time_ms - self.beat_start_time) / 1000.0
+        target_time_s = int(self.score) * SECONDS_PER_MEASURE + measure_offset_s
+        
+        # Get current music position in seconds, accounting for start position
+        current_music_pos_s = self.last_music_start_pos + (pygame.mixer.music.get_pos() / 1000.0)
+        
+        print(f"Current music position: {current_music_pos_s}, Score: {self.score}")
+        print(f"Target time: {target_time_s}")
+
+        if abs(current_music_pos_s - target_time_s) > 0.2:
+            print(f"difference {abs(current_music_pos_s - target_time_s)}")
+            print(f"Starting music at {target_time_s} seconds")
+            self.last_music_start_pos = target_time_s
+            # Update total beats based on new target time
+            target_beats = int(target_time_s * (1000 * BEAT_PER_MS))
+            self.total_beats = target_beats
+            self.last_beat = target_beats - 1
+            pygame.mixer.music.play(start=target_time_s)
+
+    def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
         """Update score and trigger flash effect if score increased."""
         if new_score > self.score:
             self.score_flash_start_beat = beat_float
@@ -558,14 +564,14 @@ async def run_game() -> None:
         if not game_state.button_handler.is_in_valid_window(led_position):
             new_score = game_state.button_handler.apply_penalty(game_state.score)
             if new_score != game_state.score:
-                game_state.update_score(new_score, current_time, "none", beat_float)
+                game_state.update_score(new_score, "none", beat_float)
         game_state.button_handler.reset_flags(led_position)
         
         # Check for scoring (both manual and auto)
         new_score, target_hit = game_state.button_handler.handle_keypress(
             led_position, game_state.score, current_time)
         if new_score != game_state.score:
-            game_state.update_score(new_score, current_time, target_hit, beat_float)
+            game_state.update_score(new_score, target_hit, beat_float)
         
         # Update and draw trail
         game_state.led_trail.update(led_position)
