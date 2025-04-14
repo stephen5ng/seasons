@@ -239,16 +239,16 @@ class GameState:
         self.last_beat = -1  # Track last beat for increment
         self.last_wled_measure = -1
         self.last_wled_score = -1
+        self.http_session = aiohttp.ClientSession()  # Create a single session for all HTTP requests
     
     async def send_wled_command(self, wled_command: str) -> None:
         """Send a command to the WLED device."""
         url = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=1.0) as response:
-                    if response.status != 200:
-                        print(f"Error: HTTP {response.status} for {url}")
-                    await response.text()
+            async with self.http_session.get(url, timeout=1.0) as response:
+                if response.status != 200:
+                    print(f"Error: HTTP {response.status} for {url}")
+                await response.text()
         except asyncio.TimeoutError:
             print(f"Error: Timeout connecting to WLED at {url}")
         except aiohttp.ClientError as e:
@@ -348,26 +348,24 @@ class GameState:
         elif self.next_loop == self.loop_count:
             self.next_loop = self.loop_count + 1
 
-    # def draw_current_led(self, screen: pygame.Surface, led_position: int) -> None:
-    #     """Draw the current LED position with appropriate color."""
-    #     distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
-    #     base_color = get_cyan_color(distance_to_zero)
-    #     led_color = get_led_color(base_color, led_position)
-    #     draw_led(screen, led_position, led_color)
+def get_led_position_at_radius(i: int, radius: int) -> Tuple[int, int]:
+    """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
+    angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
+    x = CIRCLE_CENTER_X + int(radius * math.cos(angle))
+    y = CIRCLE_CENTER_Y + int(radius * math.sin(angle))
+    return (x, y)
 
 def get_led_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
-    angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
-    x = CIRCLE_CENTER_X + int(CIRCLE_RADIUS * math.cos(angle))
-    y = CIRCLE_CENTER_Y + int(CIRCLE_RADIUS * math.sin(angle))
-    return (x, y)
+    return get_led_position_at_radius(i, CIRCLE_RADIUS)
 
-def get_led_position2(i: int) -> Tuple[int, int]:
+def get_led_position_inner(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
-    angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
-    x = CIRCLE_CENTER_X + int((CIRCLE_RADIUS - 2)* math.cos(angle))
-    y = CIRCLE_CENTER_Y + int((CIRCLE_RADIUS - 2) * math.sin(angle))
-    return (x, y)
+    return get_led_position_at_radius(i, CIRCLE_RADIUS - 2)
+
+def get_led_position_outer(i: int) -> Tuple[int, int]:
+    """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
+    return get_led_position_at_radius(i, CIRCLE_RADIUS + 2)
 
 def get_fade_factor(score: float) -> float:
     """Calculate fade factor based on current score."""
@@ -537,7 +535,9 @@ class LEDDisplay:
         else:
             x, y = get_led_position(pos)
             self.pygame_surface.set_at((x, y), color)
-            x, y = get_led_position2(pos)
+            x, y = get_led_position_inner(pos)
+            self.pygame_surface.set_at((x, y), color)
+            x, y = get_led_position_outer(pos)
             self.pygame_surface.set_at((x, y), color)
     
     def update(self):
@@ -561,70 +561,74 @@ async def run_game() -> None:
     # Initialize game state
     game_state = GameState()
     
-    # Initialize music
-    pygame.mixer.music.load("music/Rise Up 3.mp3")
-    pygame.mixer.music.play(start=0)
+    try:
+        # Initialize music
+        pygame.mixer.music.load("music/Rise Up 3.mp3")
+        pygame.mixer.music.play(start=0)
 
-    while True:
-        display.clear()
+        while True:
+            display.clear()
 
-        # Update timing and music
-        beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
-        game_state.handle_music_loop(beat_in_measure)
+            # Update timing and music
+            beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
+            game_state.handle_music_loop(beat_in_measure)
 
-        current_time = pygame.time.get_ticks()
-        
-        # Calculate LED position and update loop count
-        led_position = game_state.calculate_led_position(beat_in_measure, fractional_beat)
-        game_state.update_loop_count(led_position / NUMBER_OF_LEDS)
-                
-        # Handle scoring and penalties
-        if not game_state.button_handler.is_in_valid_window(led_position):
-            new_score = game_state.button_handler.apply_penalty(game_state.score)
+            current_time = pygame.time.get_ticks()
+            
+            # Calculate LED position and update loop count
+            led_position = game_state.calculate_led_position(beat_in_measure, fractional_beat)
+            game_state.update_loop_count(led_position / NUMBER_OF_LEDS)
+                    
+            # Handle scoring and penalties
+            if not game_state.button_handler.is_in_valid_window(led_position):
+                new_score = game_state.button_handler.apply_penalty(game_state.score)
+                if new_score != game_state.score:
+                    game_state.update_score(new_score, "none", beat_float)
+            game_state.button_handler.reset_flags(led_position)
+            
+            # Check for scoring (both manual and auto)
+            new_score, target_hit = game_state.button_handler.handle_keypress(
+                led_position, game_state.score, current_time)
             if new_score != game_state.score:
-                game_state.update_score(new_score, "none", beat_float)
-        game_state.button_handler.reset_flags(led_position)
-        
-        # Check for scoring (both manual and auto)
-        new_score, target_hit = game_state.button_handler.handle_keypress(
-            led_position, game_state.score, current_time)
-        if new_score != game_state.score:
-            game_state.update_score(new_score, target_hit, beat_float)
-        
-        # Update and draw trail
-        game_state.led_trail.update(led_position)
-        for pos in game_state.led_trail.positions:
-            distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
+                game_state.update_score(new_score, target_hit, beat_float)
+            
+            # Update and draw trail
+            game_state.led_trail.update(led_position)
+            for pos in game_state.led_trail.positions:
+                distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
+                base_color = get_cyan_color(distance_to_zero)
+                trail_fade = (game_state.led_trail.positions.index(pos) + 1) / len(game_state.led_trail.positions)
+                fade_factor = get_fade_factor(game_state.score) * trail_fade
+                faded_color = Color(
+                    int(base_color[0] * fade_factor),
+                    int(base_color[1] * fade_factor),
+                    int(base_color[2] * fade_factor),
+                    base_color[3]
+                )
+                display.set_pixel(pos, faded_color)
+            
+            # Draw score lines with flash effect (only in Pygame mode)
+            if not IS_RASPBERRY_PI:
+                flash_intensity = game_state.get_score_flash_intensity(beat_float)
+                draw_score_lines(display.pygame_surface, game_state.score, current_time, flash_intensity, game_state.last_hit_target)
+            
+            # Draw current LED
+            distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
             base_color = get_cyan_color(distance_to_zero)
-            trail_fade = (game_state.led_trail.positions.index(pos) + 1) / len(game_state.led_trail.positions)
-            fade_factor = get_fade_factor(game_state.score) * trail_fade
-            faded_color = Color(
-                int(base_color[0] * fade_factor),
-                int(base_color[1] * fade_factor),
-                int(base_color[2] * fade_factor),
-                base_color[3]
-            )
-            display.set_pixel(pos, faded_color)
-        
-        # Draw score lines with flash effect (only in Pygame mode)
-        if not IS_RASPBERRY_PI:
-            flash_intensity = game_state.get_score_flash_intensity(beat_float)
-            draw_score_lines(display.pygame_surface, game_state.score, current_time, flash_intensity, game_state.last_hit_target)
-        
-        # Draw current LED
-        distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
-        base_color = get_cyan_color(distance_to_zero)
-        led_color = get_led_color(base_color, led_position)
-        display.set_pixel(led_position, led_color)
+            led_color = get_led_color(base_color, led_position)
+            display.set_pixel(led_position, led_color)
 
-        # Handle input (only for quit)
-        for key, keydown in get_key():
-            if key == "quit":
-                return
+            # Handle input (only for quit)
+            for key, keydown in get_key():
+                if key == "quit":
+                    return
 
-        # Update display
-        display.update()
-        await clock.tick(30)
+            # Update display
+            display.update()
+            await clock.tick(30)
+    finally:
+        # Clean up the HTTP session
+        await game_state.http_session.close()
 
 async def main() -> None:
     """Initialize and run the game with MQTT support."""
