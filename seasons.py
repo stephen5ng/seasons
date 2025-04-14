@@ -40,7 +40,7 @@ WLED_SETTINGS = {
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='LED rhythm game')
-    parser.add_argument('--leds', type=int, default=40,
+    parser.add_argument('--leds', type=int, default=80,
                       help='Number of LEDs in the strip (default: 40)')
     return parser.parse_args()
 
@@ -75,7 +75,7 @@ BEAT_PER_MS = 13.0 / 6000.0
 SECONDS_PER_MEASURE = 3.7
 
 # Debug settings
-ALWAYS_SCORE = True  # When True, automatically scores on every round
+ALWAYS_SCORE = False  # When True, automatically scores on every round
 
 # LED display constants
 FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
@@ -240,6 +240,22 @@ class GameState:
         self.last_wled_measure = -1
         self.last_wled_score = -1
     
+    async def send_wled_command(self, wled_command: str) -> None:
+        """Send a command to the WLED device."""
+        url = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=1.0) as response:
+                    if response.status != 200:
+                        print(f"Error: HTTP {response.status} for {url}")
+                    await response.text()
+        except asyncio.TimeoutError:
+            print(f"Error: Timeout connecting to WLED at {url}")
+        except aiohttp.ClientError as e:
+            print(f"Error: Failed to connect to WLED: {e}")
+        except Exception as e:
+            print(f"Error: Unexpected error connecting to WLED: {e}")
+
     async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
         duration_ms = pygame.time.get_ticks() - self.start_ticks
@@ -262,10 +278,7 @@ class GameState:
                     if wled_measure in WLED_SETTINGS:
                         self.last_wled_measure = wled_measure
                 wled_command = WLED_SETTINGS[self.last_wled_measure]
-                url = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as response:
-                        await response.text()
+                await self.send_wled_command(wled_command)
                 self.last_wled_score = self.score
                 print(f"score {self.score}")
             
@@ -335,12 +348,12 @@ class GameState:
         elif self.next_loop == self.loop_count:
             self.next_loop = self.loop_count + 1
 
-    def draw_current_led(self, screen: pygame.Surface, led_position: int) -> None:
-        """Draw the current LED position with appropriate color."""
-        distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
-        base_color = get_cyan_color(distance_to_zero)
-        led_color = get_led_color(base_color, led_position)
-        draw_led(screen, led_position, led_color)
+    # def draw_current_led(self, screen: pygame.Surface, led_position: int) -> None:
+    #     """Draw the current LED position with appropriate color."""
+    #     distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
+    #     base_color = get_cyan_color(distance_to_zero)
+    #     led_color = get_led_color(base_color, led_position)
+    #     draw_led(screen, led_position, led_color)
 
 def get_led_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
@@ -349,9 +362,12 @@ def get_led_position(i: int) -> Tuple[int, int]:
     y = CIRCLE_CENTER_Y + int(CIRCLE_RADIUS * math.sin(angle))
     return (x, y)
 
-def draw_led(screen: pygame.Surface, i: int, color: Color) -> None:
-    """Draw an LED at position i in a circular pattern."""
-    screen.set_at(get_led_position(i), color)
+def get_led_position2(i: int) -> Tuple[int, int]:
+    """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
+    angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
+    x = CIRCLE_CENTER_X + int((CIRCLE_RADIUS - 2)* math.cos(angle))
+    y = CIRCLE_CENTER_Y + int((CIRCLE_RADIUS - 2) * math.sin(angle))
+    return (x, y)
 
 def get_fade_factor(score: float) -> float:
     """Calculate fade factor based on current score."""
@@ -520,6 +536,8 @@ class LEDDisplay:
             self.strip.setPixelColor(pos, ws_color)
         else:
             x, y = get_led_position(pos)
+            self.pygame_surface.set_at((x, y), color)
+            x, y = get_led_position2(pos)
             self.pygame_surface.set_at((x, y), color)
     
     def update(self):
