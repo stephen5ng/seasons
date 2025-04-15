@@ -112,20 +112,6 @@ SCORE_FLASH_EASE = easing_functions.ExponentialEaseOut(start=0, end=1, duration=
 # Global state
 quit_app = False
 
-class LEDTrail:
-    """Manages a trail of LED positions with fading effect."""
-    
-    def __init__(self, length: int):
-        self.positions: List[int] = []
-        self.max_length = length
-    
-    def update(self, new_position: int) -> None:
-        """Add new position if different from last and maintain max length."""
-        if not self.positions or self.positions[-1] != new_position:
-            self.positions.append(new_position)
-            if len(self.positions) > self.max_length:
-                self.positions.pop(0)
-
 class ButtonPressHandler:
     """Handles button press logic and scoring."""
     
@@ -215,7 +201,7 @@ class GameState:
         self.next_loop = 1
         self.loop_count = 0
         self.button_handler = ButtonPressHandler()
-        self.led_trail = LEDTrail(TRAIL_LENGTH)
+        self.led_positions: List[int] = []  # List of recent LED positions
         self.beat_start_time = 0
         self.last_music_start_time = 0.0  # Track when we last started playing music
         self.last_music_start_pos = 0.0   # Track from what position we started playing
@@ -361,11 +347,6 @@ def get_led_position_inner(i: int) -> Tuple[int, int]:
 def get_led_position_outer(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
     return get_led_position_at_radius(i, CIRCLE_RADIUS + 2)
-
-def get_fade_factor(score: float) -> float:
-    """Calculate fade factor based on current score."""
-    normalized_score = min(score / FADE_SCORE_SCALE, 1.0)
-    return MIN_FADE_FACTOR + normalized_score * (MAX_FADE_FACTOR - MIN_FADE_FACTOR)
 
 def get_cyan_color(position: int) -> Color:
     """Calculate cyan color intensity based on position relative to zero."""
@@ -590,16 +571,20 @@ async def run_game() -> None:
                 game_state.update_score(new_score, target_hit, beat_float)
             
             # Update and draw trail
-            game_state.led_trail.update(led_position)
-            for pos in game_state.led_trail.positions:
+            if not game_state.led_positions or game_state.led_positions[-1] != led_position:
+                game_state.led_positions.append(led_position)
+                if len(game_state.led_positions) > TRAIL_LENGTH:
+                    game_state.led_positions.pop(0)
+            
+            # Draw trail
+            for i, pos in enumerate(game_state.led_positions):
+                trail_fade = (i + 1) / len(game_state.led_positions)
                 distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
                 base_color = get_cyan_color(distance_to_zero)
-                trail_fade = (game_state.led_trail.positions.index(pos) + 1) / len(game_state.led_trail.positions)
-                fade_factor = get_fade_factor(game_state.score) * trail_fade
                 faded_color = Color(
-                    int(base_color[0] * fade_factor),
-                    int(base_color[1] * fade_factor),
-                    int(base_color[2] * fade_factor),
+                    int(base_color[0] * trail_fade),
+                    int(base_color[1] * trail_fade),
+                    int(base_color[2] * trail_fade),
                     base_color[3]
                 )
                 display.set_pixel(pos, faded_color)
