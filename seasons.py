@@ -596,11 +596,13 @@ async def run_game() -> None:
                 else:
                     brightness = TRAIL_EASE.ease(elapsed_s)
                     base_color = game_state.lit_colors[pos]
+                    # Apply target window colors to trail LEDs
+                    window_color = get_led_color(base_color, pos)
                     faded_color = Color(
-                        int(base_color[0] * brightness),
-                        int(base_color[1] * brightness),
-                        int(base_color[2] * brightness),
-                        base_color[3]
+                        int(window_color[0] * brightness),
+                        int(window_color[1] * brightness),
+                        int(window_color[2] * brightness),
+                        window_color[3]
                     )
                     display.set_pixel(pos, faded_color)
             
