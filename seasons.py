@@ -201,7 +201,7 @@ class GameState:
         self.next_loop = 1
         self.loop_count = 0
         self.button_handler = ButtonPressHandler()
-        self.led_positions: List[int] = []  # List of recent LED positions
+        self.trail_length = 0 
         self.beat_start_time = 0
         self.last_music_start_time = 0.0  # Track when we last started playing music
         self.last_music_start_pos = 0.0   # Track from what position we started playing
@@ -211,6 +211,7 @@ class GameState:
         self.last_wled_score = -1
         self.http_session = aiohttp.ClientSession()  # Create a single session for all HTTP requests
         self.current_http_task: Optional[asyncio.Task] = None
+        self.current_led_position = None  # Track current LED position
     
     async def _send_wled_command_inner(self, url: str) -> None:
         """Internal method to send WLED command."""
@@ -571,15 +572,17 @@ async def run_game() -> None:
                 game_state.update_score(new_score, target_hit, beat_float)
             
             # Update and draw trail
-            if not game_state.led_positions or game_state.led_positions[-1] != led_position:
-                game_state.led_positions.append(led_position)
-                if len(game_state.led_positions) > TRAIL_LENGTH:
-                    game_state.led_positions.pop(0)
+            if led_position != game_state.current_led_position:
+                game_state.current_led_position = led_position
+                game_state.trail_length = min(game_state.trail_length + 1, TRAIL_LENGTH)
             
             # Draw trail
-            for i, pos in enumerate(game_state.led_positions):
-                trail_fade = (i + 1) / len(game_state.led_positions)
-                distance_to_zero = min(pos, NUMBER_OF_LEDS - pos)
+            for i in range(game_state.trail_length):
+                # Invert fade calculation so earlier positions (closer to head) are brighter
+                trail_fade = 1 - (i / game_state.trail_length)
+                # Calculate trail position by subtracting from current position
+                trail_position = (led_position - i - 1) % NUMBER_OF_LEDS
+                distance_to_zero = min(trail_position, NUMBER_OF_LEDS - trail_position)
                 base_color = get_cyan_color(distance_to_zero)
                 faded_color = Color(
                     int(base_color[0] * trail_fade),
@@ -587,7 +590,7 @@ async def run_game() -> None:
                     int(base_color[2] * trail_fade),
                     base_color[3]
                 )
-                display.set_pixel(pos, faded_color)
+                display.set_pixel(trail_position, faded_color)
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
