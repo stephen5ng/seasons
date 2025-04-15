@@ -72,7 +72,7 @@ CIRCLE_CENTER_Y = SCREEN_HEIGHT // 2
 # Game timing constants
 BEATS_PER_MEASURE = 8
 BEAT_PER_MS = 13.0 / 6000.0
-SECONDS_PER_MEASURE = 3.7
+SECONDS_PER_MEASURE_S = 3.7
 
 # Debug settings
 ALWAYS_SCORE = False  # When True, automatically scores on every round
@@ -98,12 +98,12 @@ TRAIL_LENGTH = 8  # Number of previous positions to remember
 
 # Score display constants
 HIGH_SCORE_THRESHOLD = 5  # Score threshold for exciting effects
-COLOR_CYCLE_SPEED = 2000  # Time in ms for one complete color cycle
+COLOR_CYCLE_TIME_MS = 2000  # Time in ms for one complete color cycle
 SCORE_LINE_COLOR = Color("green")
 SCORE_LINE_SPACING = 0.5  # Pixels between score lines
 SCORE_LINE_HEIGHT = 0.5  # Height of each score line
 SCORE_FLASH_DURATION_MS = 1000  # How long the score flash lasts
-SCORE_LINE_ANIMATION_SPEED = 100  # ms per line animation (slowed down from 50ms)
+SCORE_LINE_ANIMATION_TIME_MS = 100  # ms per line animation (slowed down from 50ms)
 
 # Create easing functions once
 CYAN_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
@@ -192,7 +192,7 @@ class GameState:
     """Manages game state and timing."""
     
     def __init__(self) -> None:
-        self.start_ticks = pygame.time.get_ticks()
+        self.start_ticks_ms = pygame.time.get_ticks()
         self.last_beat_in_measure = 0
         self.score = 0
         self.previous_score = 0  # Track previous score to detect changes
@@ -202,9 +202,9 @@ class GameState:
         self.loop_count = 0
         self.button_handler = ButtonPressHandler()
         self.trail_length = 0 
-        self.beat_start_time = 0
-        self.last_music_start_time = 0.0  # Track when we last started playing music
-        self.last_music_start_pos = 0.0   # Track from what position we started playing
+        self.beat_start_time_ms = 0
+        self.last_music_start_time_s = 0.0  # Track when we last started playing music
+        self.last_music_start_pos_s = 0.0   # Track from what position we started playing
         self.total_beats = 0  # Track total beats in song
         self.last_beat = -1  # Track last beat for increment
         self.last_wled_measure = -1
@@ -240,7 +240,7 @@ class GameState:
 
     async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
-        duration_ms = pygame.time.get_ticks() - self.start_ticks
+        duration_ms = pygame.time.get_ticks() - self.start_ticks_ms
         beat_float = duration_ms * BEAT_PER_MS
         beat = int(beat_float)
         beat_in_measure = beat % BEATS_PER_MEASURE
@@ -265,7 +265,7 @@ class GameState:
                 print(f"score {self.score}")
             
         if beat_in_measure == 0:
-            self.beat_start_time = pygame.time.get_ticks()
+            self.beat_start_time_ms = pygame.time.get_ticks()
         
         return beat, beat_in_measure, beat_float, fractional_beat
     
@@ -279,11 +279,11 @@ class GameState:
             return
         
         current_time_ms = pygame.time.get_ticks()
-        measure_offset_s = (current_time_ms - self.beat_start_time) / 1000.0
-        target_time_s = int(self.score) * SECONDS_PER_MEASURE + measure_offset_s
+        measure_offset_s = (current_time_ms - self.beat_start_time_ms) / 1000.0
+        target_time_s = int(self.score) * SECONDS_PER_MEASURE_S + measure_offset_s
         
         # Get current music position in seconds, accounting for start position
-        current_music_pos_s = self.last_music_start_pos + (pygame.mixer.music.get_pos() / 1000.0)
+        current_music_pos_s = self.last_music_start_pos_s + (pygame.mixer.music.get_pos() / 1000.0)
         
         print(f"Current music position: {current_music_pos_s}, Score: {self.score}")
         print(f"Target time: {target_time_s}")
@@ -291,7 +291,7 @@ class GameState:
         if abs(current_music_pos_s - target_time_s) > 0.2:
             print(f"difference {abs(current_music_pos_s - target_time_s)}")
             print(f"Starting music at {target_time_s} seconds")
-            self.last_music_start_pos = target_time_s
+            self.last_music_start_pos_s = target_time_s
             # Update total beats based on new target time
             target_beats = int(target_time_s * (1000 * BEAT_PER_MS))
             self.total_beats = target_beats
@@ -370,7 +370,7 @@ def get_window_color(base_color: Color) -> Color:
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
-    hue = (time_ms / COLOR_CYCLE_SPEED + line_index * 0.1) % 1.0
+    hue = (time_ms / COLOR_CYCLE_TIME_MS + line_index * 0.1) % 1.0
     
     if hue < 1/6:  # Red to Yellow
         return Color(255, int(255 * (hue * 6)), 0)
@@ -462,7 +462,7 @@ def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, fl
     if flash_intensity > 0:
         # Calculate which line should be lit based on time since flash started
         time_since_flash = SCORE_FLASH_DURATION_MS * (1 - flash_intensity)
-        current_line = int(time_since_flash / SCORE_LINE_ANIMATION_SPEED)
+        current_line = int(time_since_flash / SCORE_LINE_ANIMATION_TIME_MS)
         # Ensure we start from the top (line 0) and move downward
         current_line = min(current_line, num_lines - 1)
     
@@ -550,7 +550,7 @@ async def run_game() -> None:
             beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
             game_state.handle_music_loop(beat_in_measure)
 
-            current_time = pygame.time.get_ticks()
+            current_time_ms = pygame.time.get_ticks()
             
             # Calculate LED position and update loop count
             led_position = game_state.calculate_led_position(beat_in_measure, fractional_beat)
@@ -566,7 +566,7 @@ async def run_game() -> None:
             
             # Check for scoring (both manual and auto)
             new_score, target_hit = game_state.button_handler.handle_keypress(
-                led_position, game_state.score, current_time)
+                led_position, game_state.score, current_time_ms)
             if new_score != game_state.score:
                 print(f"New score: {new_score}, target hit: {target_hit}")
                 game_state.update_score(new_score, target_hit, beat_float)
@@ -595,7 +595,7 @@ async def run_game() -> None:
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
                 flash_intensity = game_state.get_score_flash_intensity(beat_float)
-                draw_score_lines(display.pygame_surface, game_state.score, current_time, flash_intensity, game_state.last_hit_target)
+                draw_score_lines(display.pygame_surface, game_state.score, current_time_ms, flash_intensity, game_state.last_hit_target)
             
             # Draw current LED
             distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
