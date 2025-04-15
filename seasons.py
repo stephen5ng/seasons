@@ -95,6 +95,8 @@ MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
 MAX_FADE_FACTOR = 0.98   # Maximum fade factor (slowest fade)
 FADE_SCORE_SCALE = 10.0  # Score at which fade factor reaches maximum
 TRAIL_LENGTH = 8  # Number of previous positions to remember
+TRAIL_FADE_DURATION_S = 0.8  # Time for trail to fade out
+TRAIL_EASE = easing_functions.CircularEaseOut(start=1.0, end=0.0, duration=TRAIL_FADE_DURATION_S)
 
 # Score display constants
 HIGH_SCORE_THRESHOLD = 5  # Score threshold for exciting effects
@@ -212,6 +214,10 @@ class GameState:
         self.http_session = aiohttp.ClientSession()  # Create a single session for all HTTP requests
         self.current_http_task: Optional[asyncio.Task] = None
         self.current_led_position = None  # Track current LED position
+        
+        # Trail state
+        self.lit_positions = {}  # Maps LED position to timestamp when it was lit
+        self.lit_colors = {}    # Maps LED position to base color when it was lit
     
     async def _send_wled_command_inner(self, url: str) -> None:
         """Internal method to send WLED command."""
@@ -551,6 +557,7 @@ async def run_game() -> None:
             game_state.handle_music_loop(beat_in_measure)
 
             current_time_ms = pygame.time.get_ticks()
+            current_time_s = current_time_ms / 1000.0
             
             # Calculate LED position and update loop count
             led_position = game_state.calculate_led_position(beat_in_measure, fractional_beat)
@@ -571,26 +578,36 @@ async def run_game() -> None:
                 print(f"New score: {new_score}, target hit: {target_hit}")
                 game_state.update_score(new_score, target_hit, beat_float)
             
-            # Update and draw trail
+            # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
-                game_state.trail_length = min(game_state.trail_length + 1, TRAIL_LENGTH)
-            
-            # Draw trail
-            for i in range(game_state.trail_length):
-                # Invert fade calculation so earlier positions (closer to head) are brighter
-                trail_fade = 1 - (i / game_state.trail_length)
-                # Calculate trail position by subtracting from current position
-                trail_position = (led_position - i - 1) % NUMBER_OF_LEDS
-                distance_to_zero = min(trail_position, NUMBER_OF_LEDS - trail_position)
+                # Store the timestamp and color for the new position
+                distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
                 base_color = get_cyan_color(distance_to_zero)
-                faded_color = Color(
-                    int(base_color[0] * trail_fade),
-                    int(base_color[1] * trail_fade),
-                    int(base_color[2] * trail_fade),
-                    base_color[3]
-                )
-                display.set_pixel(trail_position, faded_color)
+                game_state.lit_positions[led_position] = current_time_s
+                game_state.lit_colors[led_position] = base_color
+            
+            # Draw trail using temporal easing
+            positions_to_remove = []
+            for pos, lit_time in game_state.lit_positions.items():
+                elapsed_s = current_time_s - lit_time
+                if elapsed_s > TRAIL_FADE_DURATION_S:
+                    positions_to_remove.append(pos)
+                else:
+                    brightness = TRAIL_EASE.ease(elapsed_s)
+                    base_color = game_state.lit_colors[pos]
+                    faded_color = Color(
+                        int(base_color[0] * brightness),
+                        int(base_color[1] * brightness),
+                        int(base_color[2] * brightness),
+                        base_color[3]
+                    )
+                    display.set_pixel(pos, faded_color)
+            
+            # Clean up old trail positions
+            for pos in positions_to_remove:
+                del game_state.lit_positions[pos]
+                del game_state.lit_colors[pos]
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
