@@ -78,22 +78,10 @@ SECONDS_PER_MEASURE_S = 3.7
 ALWAYS_SCORE = False  # When True, automatically scores on every round
 
 # LED display constants
-FADE_THRESHOLD = 5  # Number of LEDs before zero to start fading
-MIN_CYAN = 128  # Minimum cyan value for LED color
-MAX_CYAN = 255  # Maximum cyan value for LED color
 TARGET_WINDOW_SIZE = NUMBER_OF_LEDS // 10  # Window size proportional to number of LEDs
-LED_COLOR_INTENSITY = 1.0  # How much color to add to the LED
-BLUE_COLOR_INTENSITY = 1.0  # How much blue to add (brighter than other colors)
-GREEN_COLOR_INTENSITY = 1.0  # How much green to add (brighter than other colors)
-YELLOW_COLOR_INTENSITY = 1.0  # How much yellow to add (brighter than other colors)
 MID_TARGET_POS = NUMBER_OF_LEDS/2  # Position of the middle target
 RIGHT_TARGET_POS = NUMBER_OF_LEDS/4  # Position of the 90 degree target
 LEFT_TARGET_POS = 3*NUMBER_OF_LEDS/4  # Position of the 270 degree target
-
-# Fade effect constants
-MIN_FADE_FACTOR = 0.95   # Minimum fade factor (fastest fade)
-MAX_FADE_FACTOR = 0.98   # Maximum fade factor (slowest fade)
-FADE_SCORE_SCALE = 10.0  # Score at which fade factor reaches maximum
 TRAIL_LENGTH = 8  # Number of previous positions to remember
 TRAIL_FADE_DURATION_S = 0.8  # Time for trail to fade out
 TRAIL_EASE = easing_functions.CircularEaseOut(start=1.0, end=0.0, duration=TRAIL_FADE_DURATION_S)
@@ -218,6 +206,10 @@ class GameState:
         # Trail state
         self.lit_positions = {}  # Maps LED position to timestamp when it was lit
         self.lit_colors = {}    # Maps LED position to base color when it was lit
+        
+        # Hit trail state
+        self.hit_colors = []  # List of colors for successful hits
+        self.in_scoring_window = False  # Whether currently in a scoring window
     
     async def _send_wled_command_inner(self, url: str) -> None:
         """Internal method to send WLED command."""
@@ -309,6 +301,21 @@ class GameState:
         if new_score > self.score:
             self.score_flash_start_beat = beat_float
             self.last_hit_target = target_type
+            # Add hit color to trail
+            if target_type == "red":
+                self.hit_colors.append(Color(255, 0, 0))
+            elif target_type == "blue":
+                self.hit_colors.append(Color(0, 0, 255))
+            elif target_type == "green":
+                self.hit_colors.append(Color(0, 255, 0))
+            elif target_type == "yellow":
+                self.hit_colors.append(Color(255, 255, 0))
+            
+            # Trim trail to score*4 length, removing newest entries first
+            max_trail_length = int(new_score * 4)
+            if len(self.hit_colors) > max_trail_length:
+                self.hit_colors = self.hit_colors[len(self.hit_colors)-max_trail_length:]
+                
         self.previous_score = self.score
         self.score = new_score
     
@@ -336,6 +343,19 @@ class GameState:
         elif self.next_loop == self.loop_count:
             self.next_loop = self.loop_count + 1
 
+    def reset_flags(self, led_position: int) -> None:
+        """Reset state flags based on LED position."""
+        was_in_window = self.in_scoring_window
+        self.in_scoring_window = self.button_handler.is_in_valid_window(led_position)
+        
+        # Reset button state when entering new window
+        if not was_in_window and self.in_scoring_window:
+            self.button_handler.button_pressed = False
+            self.button_handler.penalty_applied = False
+            self.button_handler.round_active = True
+        elif was_in_window and not self.in_scoring_window:
+            self.button_handler.round_active = False
+
 def get_led_position_at_radius(i: int, radius: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
     angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
@@ -354,16 +374,6 @@ def get_led_position_inner(i: int) -> Tuple[int, int]:
 def get_led_position_outer(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
     return get_led_position_at_radius(i, CIRCLE_RADIUS + 2)
-
-def get_cyan_color(position: int) -> Color:
-    """Calculate cyan color intensity based on position relative to zero."""
-    if position >= FADE_THRESHOLD:
-        return Color(0, MIN_CYAN, MIN_CYAN)
-    
-    normalized_pos = position / FADE_THRESHOLD
-    intensity = CYAN_EASE(normalized_pos)
-    cyan_value = int(MIN_CYAN + (MAX_CYAN - MIN_CYAN) * (1 - intensity))
-    return Color(0, cyan_value, cyan_value)
 
 def get_window_color(base_color: Color) -> Color:
     """Add a yellow tint to the base color in the valid window."""
@@ -407,58 +417,6 @@ def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: 
             int(base_color[2] * (1 - flash_intensity)),
             base_color[3]
         )
-
-def get_led_color(base_color: Color, led_position: int) -> Color:
-    """Add color to the LED when near target windows."""
-    # Check if we're near either end target window (0 or NUMBER_OF_LEDS)
-    distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
-    if distance_to_zero <= TARGET_WINDOW_SIZE:
-        # Calculate red intensity based on proximity to target
-        color_factor = LED_COLOR_INTENSITY * (1 - distance_to_zero / TARGET_WINDOW_SIZE)
-        return Color(
-            min(255, int(255 * color_factor)),  # Red component
-            int(base_color[1] * (1 - color_factor)),  # Reduce green
-            int(base_color[2] * (1 - color_factor)),  # Reduce blue
-            base_color[3]
-        )
-    
-    # Check if we're near the middle target
-    distance_to_mid = abs(led_position - MID_TARGET_POS)
-    if distance_to_mid <= TARGET_WINDOW_SIZE:
-        # Calculate blue intensity based on proximity to middle target
-        color_factor = BLUE_COLOR_INTENSITY * (1 - distance_to_mid / TARGET_WINDOW_SIZE)
-        return Color(
-            0,  # No red
-            0,  # No green
-            min(255, int(255 * color_factor)),  # Pure blue at full intensity
-            base_color[3]
-        )
-    
-    # Check if we're near the right target (90 degrees)
-    distance_to_right = abs(led_position - RIGHT_TARGET_POS)
-    if distance_to_right <= TARGET_WINDOW_SIZE:
-        # Calculate green intensity based on proximity to right target
-        color_factor = GREEN_COLOR_INTENSITY * (1 - distance_to_right / TARGET_WINDOW_SIZE)
-        return Color(
-            0,  # No red
-            min(255, int(255 * color_factor)),  # Pure green at full intensity
-            0,  # No blue
-            base_color[3]
-        )
-    
-    # Check if we're near the left target (270 degrees)
-    distance_to_left = abs(led_position - LEFT_TARGET_POS)
-    if distance_to_left <= TARGET_WINDOW_SIZE:
-        # Calculate yellow intensity based on proximity to left target
-        color_factor = YELLOW_COLOR_INTENSITY * (1 - distance_to_left / TARGET_WINDOW_SIZE)
-        return Color(
-            min(255, int(255 * color_factor)),  # Red component
-            min(255, int(255 * color_factor)),  # Green component
-            0,  # No blue
-            base_color[3]
-        )
-    
-    return base_color  # Return normal cyan color when not near targets
 
 def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float, flash_type: str) -> None:
     """Draw horizontal lines representing the score with top-to-bottom animation."""
@@ -518,8 +476,10 @@ class LEDDisplay:
         else:
             x, y = get_led_position(pos)
             self.pygame_surface.set_at((x, y), color)
-            x, y = get_led_position_inner(pos)
-            self.pygame_surface.set_at((x, y), color)
+    
+    def set_outer_pixel(self, pos: int, color: Color):
+        """Set pixel color at position in outer circle."""
+        if not IS_RASPBERRY_PI:
             x, y = get_led_position_outer(pos)
             self.pygame_surface.set_at((x, y), color)
     
@@ -562,14 +522,14 @@ async def run_game() -> None:
             # Calculate LED position and update loop count
             led_position = game_state.calculate_led_position(beat_in_measure, fractional_beat)
             game_state.update_loop_count(led_position / NUMBER_OF_LEDS)
-                    
+
             # Handle scoring and penalties
             if not game_state.button_handler.is_in_valid_window(led_position):
                 new_score = game_state.button_handler.apply_penalty(game_state.score)
                 if new_score != game_state.score:
                     print(f"New score: {new_score}, target hit: none")
                     game_state.update_score(new_score, "none", beat_float)
-            game_state.button_handler.reset_flags(led_position)
+            game_state.reset_flags(led_position)
             
             # Check for scoring (both manual and auto)
             new_score, target_hit = game_state.button_handler.handle_keypress(
@@ -581,11 +541,9 @@ async def run_game() -> None:
             # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
-                # Store the timestamp and color for the new position
-                distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
-                base_color = get_cyan_color(distance_to_zero)
+                # Store the timestamp and base white color for the new position
                 game_state.lit_positions[led_position] = current_time_s
-                game_state.lit_colors[led_position] = base_color
+                game_state.lit_colors[led_position] = Color(255, 255, 255)  # White
             
             # Draw trail using temporal easing
             positions_to_remove = []
@@ -596,13 +554,29 @@ async def run_game() -> None:
                 else:
                     brightness = TRAIL_EASE.ease(elapsed_s)
                     base_color = game_state.lit_colors[pos]
-                    # Apply target window colors to trail LEDs
-                    window_color = get_led_color(base_color, pos)
+                    
+                    # Check if in target window and apply target color
+                    if game_state.button_handler.is_in_valid_window(pos):
+                        # Check which target window we're in
+                        near_end_target = pos <= 2 or pos >= NUMBER_OF_LEDS - 2
+                        near_middle_target = abs(pos - MID_TARGET_POS) <= 2
+                        near_right_target = abs(pos - RIGHT_TARGET_POS) <= 2
+                        near_left_target = abs(pos - LEFT_TARGET_POS) <= 2
+                        
+                        if near_end_target:
+                            base_color = Color(255, 0, 0)  # Red
+                        elif near_middle_target:
+                            base_color = Color(0, 0, 255)  # Blue
+                        elif near_right_target:
+                            base_color = Color(0, 255, 0)  # Green
+                        elif near_left_target:
+                            base_color = Color(255, 255, 0)  # Yellow
+                    
                     faded_color = Color(
-                        int(window_color[0] * brightness),
-                        int(window_color[1] * brightness),
-                        int(window_color[2] * brightness),
-                        window_color[3]
+                        int(base_color[0] * brightness),
+                        int(base_color[1] * brightness),
+                        int(base_color[2] * brightness),
+                        base_color[3]
                     )
                     display.set_pixel(pos, faded_color)
             
@@ -611,16 +585,36 @@ async def run_game() -> None:
                 del game_state.lit_positions[pos]
                 del game_state.lit_colors[pos]
             
+            # Draw hit trail in outer circle
+            for i, color in enumerate(game_state.hit_colors):
+                trail_pos = (led_position - (i + 1) * 4) % NUMBER_OF_LEDS
+                display.set_outer_pixel(trail_pos, color)
+            
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
                 flash_intensity = game_state.get_score_flash_intensity(beat_float)
                 draw_score_lines(display.pygame_surface, game_state.score, current_time_ms, flash_intensity, game_state.last_hit_target)
             
-            # Draw current LED
-            distance_to_zero = min(led_position, NUMBER_OF_LEDS - led_position)
-            base_color = get_cyan_color(distance_to_zero)
-            led_color = get_led_color(base_color, led_position)
-            display.set_pixel(led_position, led_color)
+            # Draw current LED in white
+            base_color = Color(255, 255, 255)  # White
+            # Apply target colors if in scoring window
+            if game_state.button_handler.is_in_valid_window(led_position):
+                # Check which target window we're in
+                near_end_target = led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2
+                near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
+                near_right_target = abs(led_position - RIGHT_TARGET_POS) <= 2
+                near_left_target = abs(led_position - LEFT_TARGET_POS) <= 2
+                
+                if near_end_target:
+                    base_color = Color(255, 0, 0)  # Red
+                elif near_middle_target:
+                    base_color = Color(0, 0, 255)  # Blue
+                elif near_right_target:
+                    base_color = Color(0, 255, 0)  # Green
+                elif near_left_target:
+                    base_color = Color(255, 255, 0)  # Yellow
+            
+            display.set_pixel(led_position, base_color)
 
             # Handle input (only for quit)
             for key, keydown in get_key():
