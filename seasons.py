@@ -122,8 +122,12 @@ class ButtonPressHandler:
     def apply_penalty(self, score: float) -> float:
         """Apply penalty if button wasn't pressed in valid window."""
         if not self.button_pressed and not self.penalty_applied:
-            score *= 0.75  # Reduce score by 25% instead of 50%
-            score = round(score * 4) / 4  # Round to nearest 0.25
+            # Calculate score after 25% reduction
+            reduced_score = score * 0.75
+            # Make sure it's at least 0.25 less than original score
+            reduced_score = min(reduced_score, score - 0.25)
+            # Round to nearest 0.25 and ensure score doesn't go below 0
+            score = max(0, round(reduced_score * 4) / 4)
             self.penalty_applied = True
         return score
     
@@ -301,20 +305,20 @@ class GameState:
         if new_score > self.score:
             self.score_flash_start_beat = beat_float
             self.last_hit_target = target_type
-            # Add hit color to trail
+            # Add hit color to beginning of trail
             if target_type == "red":
-                self.hit_colors.append(Color(255, 0, 0))
+                self.hit_colors.insert(0, Color(255, 0, 0))
             elif target_type == "blue":
-                self.hit_colors.append(Color(0, 0, 255))
+                self.hit_colors.insert(0, Color(0, 0, 255))
             elif target_type == "green":
-                self.hit_colors.append(Color(0, 255, 0))
+                self.hit_colors.insert(0, Color(0, 255, 0))
             elif target_type == "yellow":
-                self.hit_colors.append(Color(255, 255, 0))
-            
-            # Trim trail to score*4 length, removing newest entries first
-            max_trail_length = int(new_score * 4)
-            if len(self.hit_colors) > max_trail_length:
-                self.hit_colors = self.hit_colors[len(self.hit_colors)-max_trail_length:]
+                self.hit_colors.insert(0, Color(255, 255, 0))
+        
+        # Always update trail length based on new score
+        max_trail_length = int(new_score * 4)
+        if len(self.hit_colors) > max_trail_length:
+            self.hit_colors = self.hit_colors[:max_trail_length]
                 
         self.previous_score = self.score
         self.score = new_score
@@ -443,7 +447,7 @@ def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, fl
                 base_color = get_rainbow_color(current_time, i) if score > HIGH_SCORE_THRESHOLD else SCORE_LINE_COLOR
                 line_color = base_color
                 
-            pygame.draw.line(screen, line_color, (0, y), (SCREEN_WIDTH - 1, y))
+            pygame.draw.line(screen, line_color, (0, y), (10, y))
 
 class LEDDisplay:
     """Handles LED display output for both Pygame and WS281x."""
@@ -587,7 +591,7 @@ async def run_game() -> None:
             
             # Draw hit trail in outer circle
             for i, color in enumerate(game_state.hit_colors):
-                trail_pos = (led_position - (i + 1) * 4) % NUMBER_OF_LEDS
+                trail_pos = (led_position - (i + 1) * 8) % NUMBER_OF_LEDS
                 display.set_outer_pixel(trail_pos, color)
             
             # Draw score lines with flash effect (only in Pygame mode)
