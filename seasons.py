@@ -7,6 +7,7 @@ import platform
 import sys
 import argparse
 from typing import List, Optional, Tuple, Union
+from enum import Enum, auto
 
 import aiomqtt
 import aiohttp
@@ -79,6 +80,12 @@ SECONDS_PER_MEASURE_S = 3.7
 # Debug settings
 ALWAYS_SCORE = False  # When True, automatically scores on every round
 
+class TargetType(Enum):
+    RED = auto()
+    BLUE = auto()
+    GREEN = auto()
+    YELLOW = auto()
+
 # LED display constants
 TARGET_WINDOW_SIZE = NUMBER_OF_LEDS // 20  # Window size proportional to number of LEDs
 MID_TARGET_POS = NUMBER_OF_LEDS/2  # Position of the middle target
@@ -86,6 +93,14 @@ RIGHT_TARGET_POS = NUMBER_OF_LEDS/4  # Position of the 90 degree target
 LEFT_TARGET_POS = 3*NUMBER_OF_LEDS/4  # Position of the 270 degree target
 TRAIL_FADE_DURATION_S = 0.8  # Time for trail to fade out
 TRAIL_EASE = easing_functions.CircularEaseOut(start=1.0, end=0.0, duration=TRAIL_FADE_DURATION_S)
+
+# Target colors
+TARGET_COLORS = {
+    TargetType.RED: Color(255, 0, 0),
+    TargetType.BLUE: Color(0, 0, 255),
+    TargetType.GREEN: Color(0, 255, 0),
+    TargetType.YELLOW: Color(255, 255, 0)
+}
 
 # Score display constants
 HIGH_SCORE_THRESHOLD = 5  # Score threshold for exciting effects
@@ -145,12 +160,16 @@ class ButtonPressHandler:
         elif not self.is_in_valid_window(led_position):
             self.round_active = False  # End the current scoring round
     
-    def _check_and_score(self, button_key: str, key: int, keys_pressed: List[bool], score: float, color: str) -> Optional[Tuple[float, str]]:
-        """Helper method to check button press and update score if valid."""
-        if (keys_pressed[key] or ALWAYS_SCORE) and not self.button_states[button_key]:
-            self.button_states[button_key] = True
-            self.penalty_applied = False
-            return score + 0.25, color
+    def get_target_type(self, position: int) -> Optional[TargetType]:
+        """Determine which target window the position is in, if any."""
+        if position <= TARGET_WINDOW_SIZE or position >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE:
+            return TargetType.RED
+        elif abs(position - MID_TARGET_POS) <= TARGET_WINDOW_SIZE:
+            return TargetType.BLUE
+        elif abs(position - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE:
+            return TargetType.GREEN
+        elif abs(position - LEFT_TARGET_POS) <= TARGET_WINDOW_SIZE:
+            return TargetType.YELLOW
         return None
 
     def handle_keypress(self, led_position: int, score: float, current_time: int) -> Tuple[float, str]:
@@ -159,24 +178,15 @@ class ButtonPressHandler:
             return score, "none"
             
         keys_pressed = pygame.key.get_pressed()
+        target_type = self.get_target_type(led_position)
         
-        # Check each target window and corresponding button
-        if led_position <= TARGET_WINDOW_SIZE or led_position >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE:  # Red target
-            result = self._check_and_score("r", pygame.K_r, keys_pressed, score, "red")
-            if result:
-                return result
-        elif abs(led_position - MID_TARGET_POS) <= TARGET_WINDOW_SIZE:  # Blue target
-            result = self._check_and_score("b", pygame.K_b, keys_pressed, score, "blue")
-            if result:
-                return result
-        elif abs(led_position - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE:  # Green target
-            result = self._check_and_score("g", pygame.K_g, keys_pressed, score, "green")
-            if result:
-                return result
-        elif abs(led_position - LEFT_TARGET_POS) <= TARGET_WINDOW_SIZE:  # Yellow target
-            result = self._check_and_score("y", pygame.K_y, keys_pressed, score, "yellow")
-            if result:
-                return result
+        if target_type:
+            button_key = target_type.name[0].lower()  # First letter of color name
+            key = getattr(pygame, f"K_{button_key}")
+            if (keys_pressed[key] or ALWAYS_SCORE) and not self.button_states[button_key]:
+                self.button_states[button_key] = True
+                self.penalty_applied = False
+                return score + 0.25, target_type.name.lower()
         
         return score, "none"
 
@@ -311,15 +321,11 @@ class GameState:
                 self.hit_spacing = self.hit_spacing / 2
             
             # Add hit color to beginning of trail
-            # TODO: replace with map
-            if target_type == "red":
-                self.hit_colors.insert(0, Color(255, 0, 0))
-            elif target_type == "blue":
-                self.hit_colors.insert(0, Color(0, 0, 255))
-            elif target_type == "green":
-                self.hit_colors.insert(0, Color(0, 255, 0))
-            elif target_type == "yellow":
-                self.hit_colors.insert(0, Color(255, 255, 0))
+            try:
+                target_enum = TargetType[target_type.upper()]
+                self.hit_colors.insert(0, TARGET_COLORS[target_enum])
+            except KeyError:
+                pass  # Ignore invalid target types
         
         # Always update trail length based on new score
         max_trail_length = int(new_score * 4)
@@ -558,22 +564,9 @@ async def run_game() -> None:
                     
                     # Check if in target window and apply target color
                     if game_state.button_handler.is_in_valid_window(pos):
-                        
-                        # TODO: refactor to remove duplicated logic in is_in_valid_window.
-                        # Check which target window we're in
-                        near_end_target = pos <= TARGET_WINDOW_SIZE or pos >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE
-                        near_middle_target = abs(pos - MID_TARGET_POS) <= TARGET_WINDOW_SIZE
-                        near_right_target = abs(pos - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE
-                        near_left_target = abs(pos - LEFT_TARGET_POS) <= TARGET_WINDOW_SIZE
-                        
-                        if near_end_target:
-                            base_color = Color(255, 0, 0)  # Red
-                        elif near_middle_target:
-                            base_color = Color(0, 0, 255)  # Blue
-                        elif near_right_target:
-                            base_color = Color(0, 255, 0)  # Green
-                        elif near_left_target:
-                            base_color = Color(255, 255, 0)  # Yellow
+                        target_type = game_state.button_handler.get_target_type(pos)
+                        if target_type:
+                            base_color = TARGET_COLORS[target_type]
                     
                     faded_color = Color(
                         int(base_color[0] * brightness),
@@ -602,21 +595,9 @@ async def run_game() -> None:
             base_color = Color(255, 255, 255)
             # Apply target colors if in scoring window
             if game_state.button_handler.is_in_valid_window(led_position):
-                # TODO: refactor to remove duplicated logic in is_in_valid_window.
-                # Check which target window we're in
-                near_end_target = led_position <= TARGET_WINDOW_SIZE or led_position >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE
-                near_middle_target = abs(led_position - MID_TARGET_POS) <= TARGET_WINDOW_SIZE
-                near_right_target = abs(led_position - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE
-                near_left_target = abs(led_position - LEFT_TARGET_POS) <= TARGET_WINDOW_SIZE
-                
-                if near_end_target:
-                    base_color = Color(255, 0, 0)  # Red
-                elif near_middle_target:
-                    base_color = Color(0, 0, 255)  # Blue
-                elif near_right_target:
-                    base_color = Color(0, 255, 0)  # Green
-                elif near_left_target:
-                    base_color = Color(255, 255, 0)  # Yellow
+                target_type = game_state.button_handler.get_target_type(led_position)
+                if target_type:
+                    base_color = TARGET_COLORS[target_type]
             
             display.set_pixel(led_position, base_color)
 
