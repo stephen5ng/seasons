@@ -77,7 +77,7 @@ BEAT_PER_MS = 13.0 / 6000.0
 SECONDS_PER_MEASURE_S = 3.7
 
 # Debug settings
-ALWAYS_SCORE = True  # When True, automatically scores on every round
+ALWAYS_SCORE = False  # When True, automatically scores on every round
 
 # LED display constants
 TARGET_WINDOW_SIZE = NUMBER_OF_LEDS // 20  # Window size proportional to number of LEDs
@@ -106,7 +106,12 @@ class ButtonPressHandler:
     """Handles button press logic and scoring."""
     
     def __init__(self) -> None:
-        self.button_pressed: bool = False
+        self.button_states = {
+            "r": False,
+            "b": False,
+            "g": False,
+            "y": False
+        }
         self.penalty_applied: bool = False
         self.round_active: bool = False
     
@@ -121,7 +126,7 @@ class ButtonPressHandler:
     
     def apply_penalty(self, score: float) -> float:
         """Apply penalty if button wasn't pressed in valid window."""
-        if not self.button_pressed and not self.penalty_applied:
+        if not any(self.button_states.values()) and not self.penalty_applied:
             # Calculate score after 25% reduction
             reduced_score = score * 0.75
             # Make sure it's at least 0.25 less than original score
@@ -134,7 +139,7 @@ class ButtonPressHandler:
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position."""
         if self.is_in_valid_window(led_position) and not self.round_active:
-            self.button_pressed = False
+            self.button_states = {k: False for k in self.button_states}
             self.penalty_applied = False
             self.round_active = True  # Start a new scoring round
         elif not self.is_in_valid_window(led_position):
@@ -142,44 +147,33 @@ class ButtonPressHandler:
     
     def handle_keypress(self, led_position: int, score: float, current_time: int) -> Tuple[float, str]:
         """Handle keypress and update score if in valid window with correct key."""
-        if not self.button_pressed and self.is_in_valid_window(led_position):
-            # Check if near end targets (0 or NUMBER_OF_LEDS)
-            near_end_target = led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2
-            # Check if near middle target
-            near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
-            # Check if near right target (90 degrees)
-            near_right_target = abs(led_position - RIGHT_TARGET_POS) <= 2
-            # Check if near left target (270 degrees)
-            near_left_target = abs(led_position - LEFT_TARGET_POS) <= 2
-
-            # Check for either real key press or ALWAYS_SCORE
-            keys_pressed = pygame.key.get_pressed()
-            r_pressed = keys_pressed[pygame.K_r] or ALWAYS_SCORE
-            b_pressed = keys_pressed[pygame.K_b] or ALWAYS_SCORE
-            g_pressed = keys_pressed[pygame.K_g] or ALWAYS_SCORE
-            y_pressed = keys_pressed[pygame.K_y] or ALWAYS_SCORE
-
-            # Shouldn't allow scoring if button is pressed continuously.
-            if near_end_target and r_pressed:
-                score += 0.25
-                self.button_pressed = True
+        if not self.is_in_valid_window(led_position):
+            return score, "none"
+            
+        keys_pressed = pygame.key.get_pressed()
+        
+        # Check each target window and corresponding button
+        if led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2:  # Red target
+            if (keys_pressed[pygame.K_r] or ALWAYS_SCORE) and not self.button_states["r"]:
+                self.button_states["r"] = True
                 self.penalty_applied = False
-                return score, "red"
-            elif near_middle_target and b_pressed:
-                score += 0.25
-                self.button_pressed = True
+                return score + 0.25, "red"
+        elif abs(led_position - MID_TARGET_POS) <= 2:  # Blue target
+            if (keys_pressed[pygame.K_b] or ALWAYS_SCORE) and not self.button_states["b"]:
+                self.button_states["b"] = True
                 self.penalty_applied = False
-                return score, "blue"
-            elif near_right_target and g_pressed:
-                score += 0.25
-                self.button_pressed = True
+                return score + 0.25, "blue"
+        elif abs(led_position - RIGHT_TARGET_POS) <= 2:  # Green target
+            if (keys_pressed[pygame.K_g] or ALWAYS_SCORE) and not self.button_states["g"]:
+                self.button_states["g"] = True
                 self.penalty_applied = False
-                return score, "green"
-            elif near_left_target and y_pressed:
-                score += 0.25
-                self.button_pressed = True
+                return score + 0.25, "green"
+        elif abs(led_position - LEFT_TARGET_POS) <= 2:  # Yellow target
+            if (keys_pressed[pygame.K_y] or ALWAYS_SCORE) and not self.button_states["y"]:
+                self.button_states["y"] = True
                 self.penalty_applied = False
-                return score, "yellow"
+                return score + 0.25, "yellow"
+        
         return score, "none"
 
 class GameState:
@@ -362,7 +356,7 @@ class GameState:
         
         # Reset button state when entering new window
         if not was_in_window and self.in_scoring_window:
-            self.button_handler.button_pressed = False
+            self.button_handler.button_states = {k: False for k in self.button_handler.button_states}
             self.button_handler.penalty_applied = False
             self.button_handler.round_active = True
         elif was_in_window and not self.in_scoring_window:
