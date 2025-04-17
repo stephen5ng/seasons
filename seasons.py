@@ -145,6 +145,14 @@ class ButtonPressHandler:
         elif not self.is_in_valid_window(led_position):
             self.round_active = False  # End the current scoring round
     
+    def _check_and_score(self, button_key: str, key: int, keys_pressed: List[bool], score: float, color: str) -> Optional[Tuple[float, str]]:
+        """Helper method to check button press and update score if valid."""
+        if (keys_pressed[key] or ALWAYS_SCORE) and not self.button_states[button_key]:
+            self.button_states[button_key] = True
+            self.penalty_applied = False
+            return score + 0.25, color
+        return None
+
     def handle_keypress(self, led_position: int, score: float, current_time: int) -> Tuple[float, str]:
         """Handle keypress and update score if in valid window with correct key."""
         if not self.is_in_valid_window(led_position):
@@ -154,25 +162,21 @@ class ButtonPressHandler:
         
         # Check each target window and corresponding button
         if led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2:  # Red target
-            if (keys_pressed[pygame.K_r] or ALWAYS_SCORE) and not self.button_states["r"]:
-                self.button_states["r"] = True
-                self.penalty_applied = False
-                return score + 0.25, "red"
+            result = self._check_and_score("r", pygame.K_r, keys_pressed, score, "red")
+            if result:
+                return result
         elif abs(led_position - MID_TARGET_POS) <= 2:  # Blue target
-            if (keys_pressed[pygame.K_b] or ALWAYS_SCORE) and not self.button_states["b"]:
-                self.button_states["b"] = True
-                self.penalty_applied = False
-                return score + 0.25, "blue"
+            result = self._check_and_score("b", pygame.K_b, keys_pressed, score, "blue")
+            if result:
+                return result
         elif abs(led_position - RIGHT_TARGET_POS) <= 2:  # Green target
-            if (keys_pressed[pygame.K_g] or ALWAYS_SCORE) and not self.button_states["g"]:
-                self.button_states["g"] = True
-                self.penalty_applied = False
-                return score + 0.25, "green"
+            result = self._check_and_score("g", pygame.K_g, keys_pressed, score, "green")
+            if result:
+                return result
         elif abs(led_position - LEFT_TARGET_POS) <= 2:  # Yellow target
-            if (keys_pressed[pygame.K_y] or ALWAYS_SCORE) and not self.button_states["y"]:
-                self.button_states["y"] = True
-                self.penalty_applied = False
-                return score + 0.25, "yellow"
+            result = self._check_and_score("y", pygame.K_y, keys_pressed, score, "yellow")
+            if result:
+                return result
         
         return score, "none"
 
