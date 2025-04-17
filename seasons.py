@@ -197,11 +197,11 @@ class ButtonPressHandler:
                 else:  # YELLOW
                     window_pos = int(LEFT_TARGET_POS)
                 
-                # If we're not in this key's window, show error
+                # If we're not in this key's window, show error and apply penalty
                 if abs(led_position - window_pos) > TARGET_WINDOW_SIZE:
                     self.error_sound.play()
                     error_color = TARGET_COLORS[target_type]
-                    return score, "none", (window_pos, error_color)
+                    return max(0, score - 0.25), "none", (window_pos, error_color)
         
         # If we get here, either no keys were pressed or we're in a valid window
         target_type = self.get_target_type(led_position)
@@ -224,7 +224,7 @@ class ButtonPressHandler:
                     else:  # YELLOW
                         error_pos = int(LEFT_TARGET_POS)
                     error_color = TARGET_COLORS[wrong_target]
-                    return score, "none", (error_pos, error_color)
+                    return max(0, score - 0.25), "none", (error_pos, error_color)
             
             if (keys_pressed[key] or ALWAYS_SCORE) and not self.button_states[button_key]:
                 self.button_states[button_key] = True
