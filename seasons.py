@@ -41,7 +41,7 @@ def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='LED rhythm game')
     parser.add_argument('--leds', type=int, default=80,
-                      help='Number of LEDs in the strip (default: 40)')
+                      help='Number of LEDs in the strip (default: 80)')
     return parser.parse_args()
 
 args = parse_args()
@@ -61,6 +61,8 @@ if IS_RASPBERRY_PI:
     LED_INVERT = False  # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL = 0  # PWM channel
 
+# no music at the start?
+
 # Display constants
 SCALING_FACTOR = 9
 SCREEN_WIDTH = 128
@@ -75,14 +77,13 @@ BEAT_PER_MS = 13.0 / 6000.0
 SECONDS_PER_MEASURE_S = 3.7
 
 # Debug settings
-ALWAYS_SCORE = False  # When True, automatically scores on every round
+ALWAYS_SCORE = True  # When True, automatically scores on every round
 
 # LED display constants
-TARGET_WINDOW_SIZE = NUMBER_OF_LEDS // 10  # Window size proportional to number of LEDs
+TARGET_WINDOW_SIZE = NUMBER_OF_LEDS // 20  # Window size proportional to number of LEDs
 MID_TARGET_POS = NUMBER_OF_LEDS/2  # Position of the middle target
 RIGHT_TARGET_POS = NUMBER_OF_LEDS/4  # Position of the 90 degree target
 LEFT_TARGET_POS = 3*NUMBER_OF_LEDS/4  # Position of the 270 degree target
-TRAIL_LENGTH = 8  # Number of previous positions to remember
 TRAIL_FADE_DURATION_S = 0.8  # Time for trail to fade out
 TRAIL_EASE = easing_functions.CircularEaseOut(start=1.0, end=0.0, duration=TRAIL_FADE_DURATION_S)
 
@@ -96,7 +97,6 @@ SCORE_FLASH_DURATION_MS = 1000  # How long the score flash lasts
 SCORE_LINE_ANIMATION_TIME_MS = 100  # ms per line animation (slowed down from 50ms)
 
 # Create easing functions once
-CYAN_EASE = easing_functions.ExponentialEaseInOut(start=0, end=1, duration=1)
 SCORE_FLASH_EASE = easing_functions.ExponentialEaseOut(start=0, end=1, duration=1)  # Smooth animation for score flashes
 
 # Global state
@@ -112,11 +112,11 @@ class ButtonPressHandler:
     
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring."""
-        return_value = (led_position >= NUMBER_OF_LEDS - 2 or 
-                led_position <= 2 or
-                abs(led_position - MID_TARGET_POS) <= 2 or
-                abs(led_position - RIGHT_TARGET_POS) <= 2 or
-                abs(led_position - LEFT_TARGET_POS) <= 2)
+        return_value = (led_position >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE or 
+                led_position <= TARGET_WINDOW_SIZE or
+                abs(led_position - MID_TARGET_POS) <= TARGET_WINDOW_SIZE or
+                abs(led_position - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE or
+                abs(led_position - LEFT_TARGET_POS) <= TARGET_WINDOW_SIZE)
         return return_value
     
     def apply_penalty(self, score: float) -> float:
@@ -213,6 +213,7 @@ class GameState:
         
         # Hit trail state
         self.hit_colors = []  # List of colors for successful hits
+        self.hit_spacing = 8  # Current spacing between hit trail LEDs
         self.in_scoring_window = False  # Whether currently in a scoring window
     
     async def _send_wled_command_inner(self, url: str) -> None:
@@ -305,7 +306,14 @@ class GameState:
         if new_score > self.score:
             self.score_flash_start_beat = beat_float
             self.last_hit_target = target_type
+            
+            # Check if adding a new hit would exceed circle size
+            total_space_needed = (len(self.hit_colors) + 1) * self.hit_spacing
+            if total_space_needed >= NUMBER_OF_LEDS:
+                self.hit_spacing = self.hit_spacing / 2
+            
             # Add hit color to beginning of trail
+            # TODO: replace with map
             if target_type == "red":
                 self.hit_colors.insert(0, Color(255, 0, 0))
             elif target_type == "blue":
@@ -378,15 +386,6 @@ def get_led_position_inner(i: int) -> Tuple[int, int]:
 def get_led_position_outer(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
     return get_led_position_at_radius(i, CIRCLE_RADIUS + 2)
-
-def get_window_color(base_color: Color) -> Color:
-    """Add a yellow tint to the base color in the valid window."""
-    return Color(
-        min(255, int(base_color[0] + (255 - base_color[0]) * LED_COLOR_INTENSITY)),
-        min(255, int(base_color[1] + (255 - base_color[1]) * LED_COLOR_INTENSITY)),
-        min(255, int(base_color[2] + (255 - base_color[2]) * LED_COLOR_INTENSITY)),
-        base_color[3]
-    )
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
@@ -561,11 +560,13 @@ async def run_game() -> None:
                     
                     # Check if in target window and apply target color
                     if game_state.button_handler.is_in_valid_window(pos):
+                        
+                        # TODO: refactor to remove duplicated logic in is_in_valid_window.
                         # Check which target window we're in
-                        near_end_target = pos <= 2 or pos >= NUMBER_OF_LEDS - 2
-                        near_middle_target = abs(pos - MID_TARGET_POS) <= 2
-                        near_right_target = abs(pos - RIGHT_TARGET_POS) <= 2
-                        near_left_target = abs(pos - LEFT_TARGET_POS) <= 2
+                        near_end_target = pos <= TARGET_WINDOW_SIZE or pos >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE
+                        near_middle_target = abs(pos - MID_TARGET_POS) <= TARGET_WINDOW_SIZE
+                        near_right_target = abs(pos - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE
+                        near_left_target = abs(pos - LEFT_TARGET_POS) <= TARGET_WINDOW_SIZE
                         
                         if near_end_target:
                             base_color = Color(255, 0, 0)  # Red
@@ -591,7 +592,7 @@ async def run_game() -> None:
             
             # Draw hit trail in outer circle
             for i, color in enumerate(game_state.hit_colors):
-                trail_pos = (led_position - (i + 1) * 8) % NUMBER_OF_LEDS
+                trail_pos = int((led_position - (i + 1) * game_state.hit_spacing) % NUMBER_OF_LEDS)
                 display.set_outer_pixel(trail_pos, color)
             
             # Draw score lines with flash effect (only in Pygame mode)
@@ -600,9 +601,10 @@ async def run_game() -> None:
                 draw_score_lines(display.pygame_surface, game_state.score, current_time_ms, flash_intensity, game_state.last_hit_target)
             
             # Draw current LED in white
-            base_color = Color(255, 255, 255)  # White
+            base_color = Color(255, 255, 255)
             # Apply target colors if in scoring window
             if game_state.button_handler.is_in_valid_window(led_position):
+                # TODO: refactor to remove duplicated logic in is_in_valid_window.
                 # Check which target window we're in
                 near_end_target = led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2
                 near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
