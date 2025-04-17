@@ -184,9 +184,9 @@ class ButtonPressHandler:
         any_key_pressed = any(keys_pressed[key] for key in [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y])
         
         # Check for any key press outside its window
-        for color, full_color in [('r', 'RED'), ('b', 'BLUE'), ('g', 'GREEN'), ('y', 'YELLOW')]:
+        for target_type in TargetType:
+            color = target_type.name[0].lower()  # First letter of color name
             if keys_pressed[getattr(pygame, f"K_{color}")]:
-                target_type = TargetType[full_color]
                 # Get the center position of this key's window
                 if target_type == TargetType.RED:
                     window_pos = 0
@@ -210,21 +210,22 @@ class ButtonPressHandler:
             button_key = target_type.name[0].lower()  # First letter of color name
             key = getattr(pygame, f"K_{button_key}")
             # Check if wrong button was pressed in this window
-            for color, full_color in [('r', 'RED'), ('b', 'BLUE'), ('g', 'GREEN'), ('y', 'YELLOW')]:
-                if color != button_key and keys_pressed[getattr(pygame, f"K_{color}")]:
-                    self.error_sound.play()
-                    # Get the center position of the wrong key's window
-                    wrong_target = TargetType[full_color]
-                    if wrong_target == TargetType.RED:
-                        error_pos = 0
-                    elif wrong_target == TargetType.BLUE:
-                        error_pos = int(MID_TARGET_POS)
-                    elif wrong_target == TargetType.GREEN:
-                        error_pos = int(RIGHT_TARGET_POS)
-                    else:  # YELLOW
-                        error_pos = int(LEFT_TARGET_POS)
-                    error_color = TARGET_COLORS[wrong_target]
-                    return max(0, score - 0.25), "none", (error_pos, error_color)
+            for wrong_target in TargetType:
+                if wrong_target != target_type:
+                    color = wrong_target.name[0].lower()
+                    if keys_pressed[getattr(pygame, f"K_{color}")]:
+                        self.error_sound.play()
+                        # Get the center position of the wrong key's window
+                        if wrong_target == TargetType.RED:
+                            error_pos = 0
+                        elif wrong_target == TargetType.BLUE:
+                            error_pos = int(MID_TARGET_POS)
+                        elif wrong_target == TargetType.GREEN:
+                            error_pos = int(RIGHT_TARGET_POS)
+                        else:  # YELLOW
+                            error_pos = int(LEFT_TARGET_POS)
+                        error_color = TARGET_COLORS[wrong_target]
+                        return max(0, score - 0.25), "none", (error_pos, error_color)
             
             if (keys_pressed[key] or ALWAYS_SCORE) and not self.button_states[button_key]:
                 self.button_states[button_key] = True
