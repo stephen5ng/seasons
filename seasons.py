@@ -161,19 +161,19 @@ class ButtonPressHandler:
         keys_pressed = pygame.key.get_pressed()
         
         # Check each target window and corresponding button
-        if led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2:  # Red target
+        if led_position <= TARGET_WINDOW_SIZE or led_position >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE:  # Red target
             result = self._check_and_score("r", pygame.K_r, keys_pressed, score, "red")
             if result:
                 return result
-        elif abs(led_position - MID_TARGET_POS) <= 2:  # Blue target
+        elif abs(led_position - MID_TARGET_POS) <= TARGET_WINDOW_SIZE:  # Blue target
             result = self._check_and_score("b", pygame.K_b, keys_pressed, score, "blue")
             if result:
                 return result
-        elif abs(led_position - RIGHT_TARGET_POS) <= 2:  # Green target
+        elif abs(led_position - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE:  # Green target
             result = self._check_and_score("g", pygame.K_g, keys_pressed, score, "green")
             if result:
                 return result
-        elif abs(led_position - LEFT_TARGET_POS) <= 2:  # Yellow target
+        elif abs(led_position - LEFT_TARGET_POS) <= TARGET_WINDOW_SIZE:  # Yellow target
             result = self._check_and_score("y", pygame.K_y, keys_pressed, score, "yellow")
             if result:
                 return result
@@ -604,10 +604,10 @@ async def run_game() -> None:
             if game_state.button_handler.is_in_valid_window(led_position):
                 # TODO: refactor to remove duplicated logic in is_in_valid_window.
                 # Check which target window we're in
-                near_end_target = led_position <= 2 or led_position >= NUMBER_OF_LEDS - 2
-                near_middle_target = abs(led_position - MID_TARGET_POS) <= 2
-                near_right_target = abs(led_position - RIGHT_TARGET_POS) <= 2
-                near_left_target = abs(led_position - LEFT_TARGET_POS) <= 2
+                near_end_target = led_position <= TARGET_WINDOW_SIZE or led_position >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE
+                near_middle_target = abs(led_position - MID_TARGET_POS) <= TARGET_WINDOW_SIZE
+                near_right_target = abs(led_position - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE
+                near_left_target = abs(led_position - LEFT_TARGET_POS) <= TARGET_WINDOW_SIZE
                 
                 if near_end_target:
                     base_color = Color(255, 0, 0)  # Red
