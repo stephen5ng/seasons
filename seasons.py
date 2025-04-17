@@ -80,6 +80,9 @@ SECONDS_PER_MEASURE_S = 3.7
 # Debug settings
 ALWAYS_SCORE = False  # When True, automatically scores on every round
 
+# Sound settings
+ERROR_SOUND = "music/error.mp3"  # Path to error sound effect
+
 class TargetType(Enum):
     RED = auto()
     BLUE = auto()
@@ -120,7 +123,7 @@ quit_app = False
 class ButtonPressHandler:
     """Handles button press logic and scoring."""
     
-    def __init__(self) -> None:
+    def __init__(self, error_sound) -> None:
         self.button_states = {
             "r": False,
             "b": False,
@@ -129,6 +132,7 @@ class ButtonPressHandler:
         }
         self.penalty_applied: bool = False
         self.round_active: bool = False
+        self.error_sound = error_sound
     
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring."""
@@ -172,23 +176,62 @@ class ButtonPressHandler:
             return TargetType.YELLOW
         return None
 
-    def handle_keypress(self, led_position: int, score: float, current_time: int) -> Tuple[float, str]:
-        """Handle keypress and update score if in valid window with correct key."""
-        if not self.is_in_valid_window(led_position):
-            return score, "none"
-            
+    def handle_keypress(self, led_position: int, score: float, current_time: int) -> Tuple[float, str, Optional[Tuple[int, Color]]]:
+        """Handle keypress and update score if in valid window with correct key.
+        Returns (score, target_type, (error_position, error_color)) where error_position is the center of the target window 
+        and error_color is the color of the wrong key that was pressed."""
         keys_pressed = pygame.key.get_pressed()
+        any_key_pressed = any(keys_pressed[key] for key in [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y])
+        
+        # Check for any key press outside its window
+        for color, full_color in [('r', 'RED'), ('b', 'BLUE'), ('g', 'GREEN'), ('y', 'YELLOW')]:
+            if keys_pressed[getattr(pygame, f"K_{color}")]:
+                target_type = TargetType[full_color]
+                # Get the center position of this key's window
+                if target_type == TargetType.RED:
+                    window_pos = 0
+                elif target_type == TargetType.BLUE:
+                    window_pos = int(MID_TARGET_POS)
+                elif target_type == TargetType.GREEN:
+                    window_pos = int(RIGHT_TARGET_POS)
+                else:  # YELLOW
+                    window_pos = int(LEFT_TARGET_POS)
+                
+                # If we're not in this key's window, show error
+                if abs(led_position - window_pos) > TARGET_WINDOW_SIZE:
+                    self.error_sound.play()
+                    error_color = TARGET_COLORS[target_type]
+                    return score, "none", (window_pos, error_color)
+        
+        # If we get here, either no keys were pressed or we're in a valid window
         target_type = self.get_target_type(led_position)
         
         if target_type:
             button_key = target_type.name[0].lower()  # First letter of color name
             key = getattr(pygame, f"K_{button_key}")
+            # Check if wrong button was pressed in this window
+            for color, full_color in [('r', 'RED'), ('b', 'BLUE'), ('g', 'GREEN'), ('y', 'YELLOW')]:
+                if color != button_key and keys_pressed[getattr(pygame, f"K_{color}")]:
+                    self.error_sound.play()
+                    # Get the center position of the wrong key's window
+                    wrong_target = TargetType[full_color]
+                    if wrong_target == TargetType.RED:
+                        error_pos = 0
+                    elif wrong_target == TargetType.BLUE:
+                        error_pos = int(MID_TARGET_POS)
+                    elif wrong_target == TargetType.GREEN:
+                        error_pos = int(RIGHT_TARGET_POS)
+                    else:  # YELLOW
+                        error_pos = int(LEFT_TARGET_POS)
+                    error_color = TARGET_COLORS[wrong_target]
+                    return score, "none", (error_pos, error_color)
+            
             if (keys_pressed[key] or ALWAYS_SCORE) and not self.button_states[button_key]:
                 self.button_states[button_key] = True
                 self.penalty_applied = False
-                return score + 0.25, target_type.name.lower()
+                return score + 0.25, target_type.name.lower(), None
         
-        return score, "none"
+        return score, "none", None
 
 class GameState:
     """Manages game state and timing."""
@@ -202,7 +245,8 @@ class GameState:
         self.last_hit_target = "none"  # Track which target was hit: "red", "blue", or "none"
         self.next_loop = 1
         self.loop_count = 0
-        self.button_handler = ButtonPressHandler()
+        self.error_sound = pygame.mixer.Sound(ERROR_SOUND)
+        self.button_handler = ButtonPressHandler(self.error_sound)
         self.trail_length = 0 
         self.beat_start_time_ms = 0
         self.last_music_start_time_s = 0.0  # Track when we last started playing music
@@ -539,7 +583,7 @@ async def run_game() -> None:
             game_state.reset_flags(led_position)
             
             # Check for scoring (both manual and auto)
-            new_score, target_hit = game_state.button_handler.handle_keypress(
+            new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
                 led_position, game_state.score, current_time_ms)
             if new_score != game_state.score:
                 print(f"New score: {new_score}, target hit: {target_hit}")
@@ -600,6 +644,11 @@ async def run_game() -> None:
                     base_color = TARGET_COLORS[target_type]
             
             display.set_pixel(led_position, base_color)
+
+            # Draw error feedback if wrong key was pressed
+            if error_feedback is not None:
+                error_pos, error_color = error_feedback
+                display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
 
             # Handle input (only for quit)
             for key, keydown in get_key():
