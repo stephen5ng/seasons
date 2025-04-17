@@ -417,24 +417,16 @@ class GameState:
         elif was_in_window and not self.in_scoring_window:
             self.button_handler.round_active = False
 
-def get_led_position_at_radius(i: int, radius: int) -> Tuple[int, int]:
+def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
     angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
     x = CIRCLE_CENTER_X + int(radius * math.cos(angle))
     y = CIRCLE_CENTER_Y + int(radius * math.sin(angle))
     return (x, y)
 
-def get_led_position(i: int) -> Tuple[int, int]:
-    """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
-    return get_led_position_at_radius(i, CIRCLE_RADIUS)
-
-def get_led_position_inner(i: int) -> Tuple[int, int]:
-    """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
-    return get_led_position_at_radius(i, CIRCLE_RADIUS - 2)
-
-def get_led_position_outer(i: int) -> Tuple[int, int]:
-    """Convert LED index to x,y coordinates in a circular pattern, starting at 12 o'clock."""
-    return get_led_position_at_radius(i, CIRCLE_RADIUS + 2)
+def get_hit_trail_position(i: int) -> Tuple[int, int]:
+    """Convert LED index to x,y coordinates in the hit trail ring, starting at 12 o'clock."""
+    return get_target_ring_position(i, CIRCLE_RADIUS + 4)
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
@@ -520,19 +512,19 @@ class LEDDisplay:
             self.pygame_surface.fill((0, 0, 0))
     
     def set_pixel(self, pos: int, color: Color):
-        """Set pixel color at position."""
+        """Set pixel color at position in target ring."""
         if IS_RASPBERRY_PI:
             # Convert Pygame color to WS281x color (RGB order)
             ws_color = LEDColor(color.r, color.g, color.b)
             self.strip.setPixelColor(pos, ws_color)
         else:
-            x, y = get_led_position(pos)
+            x, y = get_target_ring_position(pos, CIRCLE_RADIUS)
             self.pygame_surface.set_at((x, y), color)
     
-    def set_outer_pixel(self, pos: int, color: Color):
-        """Set pixel color at position in outer circle."""
+    def set_hit_trail_pixel(self, pos: int, color: Color):
+        """Set pixel color at position in hit trail ring."""
         if not IS_RASPBERRY_PI:
-            x, y = get_led_position_outer(pos)
+            x, y = get_hit_trail_position(pos)
             self.pygame_surface.set_at((x, y), color)
     
     def update(self):
@@ -629,7 +621,7 @@ async def run_game() -> None:
             # Draw hit trail in outer circle
             for i, color in enumerate(game_state.hit_colors):
                 trail_pos = int((led_position - (i + 1) * game_state.hit_spacing) % NUMBER_OF_LEDS)
-                display.set_outer_pixel(trail_pos, color)
+                display.set_hit_trail_pixel(trail_pos, color)
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
