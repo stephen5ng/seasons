@@ -77,7 +77,7 @@ BEAT_PER_MS = 13.0 / 6000.0
 SECONDS_PER_MEASURE_S = 3.7
 
 # Debug settings
-ALWAYS_SCORE = False  # When True, automatically scores on every round
+ALWAYS_SCORE = True  # When True, automatically scores on every round
 
 # Sound settings
 ERROR_SOUND = "music/error.mp3"  # Path to error sound effect
@@ -86,6 +86,8 @@ ERROR_SOUND = "music/error.mp3"  # Path to error sound effect
 INITIAL_HIT_SPACING = 16  # Initial spacing between hit trail LEDs
 HIT_TRAIL_RADIUS = CIRCLE_RADIUS - 4  # Radius for hit trail (inner circle)
 TARGET_TRAIL_RADIUS = CIRCLE_RADIUS + 4  # Radius for target trail (outer circle)
+BONUS_TRAIL_RADIUS = HIT_TRAIL_RADIUS - 2  # Radius for bonus trail (outermost circle)
+BONUS_TRAIL_COLOR = Color(255, 165, 0)  # Orange color for bonus trail
 
 class TargetType(Enum):
     RED = auto()
@@ -100,6 +102,8 @@ RIGHT_TARGET_POS = NUMBER_OF_LEDS/4  # Position of the 90 degree target
 LEFT_TARGET_POS = 3*NUMBER_OF_LEDS/4  # Position of the 270 degree target
 TRAIL_FADE_DURATION_S = 0.8  # Time for trail to fade out
 TRAIL_EASE = easing_functions.CircularEaseOut(start=1.0, end=0.0, duration=TRAIL_FADE_DURATION_S)
+BONUS_TRAIL_FADE_DURATION_S = 0.2  # Time for bonus trail to fade out
+BONUS_TRAIL_EASE = easing_functions.CircularEaseOut(start=1.0, end=0.0, duration=BONUS_TRAIL_FADE_DURATION_S)
 
 # Target colors
 TARGET_COLORS = {
@@ -299,6 +303,10 @@ class GameState:
         self.hit_colors = []  # List of colors for successful hits
         self.hit_spacing = INITIAL_HIT_SPACING  # Current spacing between hit trail LEDs
         self.in_scoring_window = False  # Whether currently in a scoring window
+        self.hit_trail_cleared = False  # Track if hit trail has been cleared at least once
+        
+        # Bonus trail state
+        self.bonus_trail_positions = {}  # Maps LED position to timestamp when it was lit
     
     async def _send_wled_command_inner(self, url: str) -> None:
         """Internal method to send WLED command."""
@@ -394,10 +402,11 @@ class GameState:
             # Check if adding a new hit would exceed circle size
             total_space_needed = (len(self.hit_colors) + 1) * self.hit_spacing
             if total_space_needed >= NUMBER_OF_LEDS:
-                if self.hit_spacing <= 1:
+                if self.hit_spacing <= 4:
                     # Clear hit trail if we've hit minimum spacing
                     self.hit_colors = []
                     self.hit_spacing = INITIAL_HIT_SPACING  # Reset to initial spacing
+                    self.hit_trail_cleared = True  # Mark that hit trail has been cleared
                     print("*********** Hit trail cleared, resetting spacing")
                 else:
                     self.hit_spacing = max(self.hit_spacing / 2, 1)
@@ -466,6 +475,10 @@ def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
 def get_hit_trail_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in the hit trail ring, starting at 12 o'clock."""
     return get_target_ring_position(i, HIT_TRAIL_RADIUS)
+
+def get_bonus_trail_position(i: int) -> Tuple[int, int]:
+    """Convert LED index to x,y coordinates in the bonus trail ring, starting at 12 o'clock."""
+    return get_target_ring_position(i, BONUS_TRAIL_RADIUS)
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
@@ -566,6 +579,12 @@ class LEDDisplay:
             x, y = get_hit_trail_position(pos)
             self.pygame_surface.set_at((x, y), color)
     
+    def set_bonus_trail_pixel(self, pos: int, color: Color):
+        """Set pixel color at position in bonus trail ring."""
+        if not IS_RASPBERRY_PI:
+            x, y = get_bonus_trail_position(pos)
+            self.pygame_surface.set_at((x, y), color)
+    
     def update(self):
         """Update the display."""
         if IS_RASPBERRY_PI:
@@ -627,6 +646,8 @@ async def run_game() -> None:
                 # Store the timestamp and base white color for the new position
                 game_state.lit_positions[led_position] = current_time_s
                 game_state.lit_colors[led_position] = Color(255, 255, 255)  # White
+                # Store bonus trail position
+                game_state.bonus_trail_positions[led_position] = current_time_s
             
             # Draw trail using temporal easing
             positions_to_remove = []
@@ -656,6 +677,29 @@ async def run_game() -> None:
             for pos in positions_to_remove:
                 del game_state.lit_positions[pos]
                 del game_state.lit_colors[pos]
+            
+            # Draw bonus trail using temporal easing
+            if game_state.hit_trail_cleared:  # Only show bonus trail after hit trail has been cleared
+                bonus_positions_to_remove = []
+                for pos, lit_time in game_state.bonus_trail_positions.items():
+                    elapsed_s = current_time_s - lit_time
+                    if elapsed_s > BONUS_TRAIL_FADE_DURATION_S:
+                        bonus_positions_to_remove.append(pos)
+                    else:
+                        brightness = BONUS_TRAIL_EASE.ease(elapsed_s)
+                        # Invert position to move in opposite direction
+                        inverted_pos = (NUMBER_OF_LEDS - pos) % NUMBER_OF_LEDS
+                        faded_color = Color(
+                            int(BONUS_TRAIL_COLOR[0] * brightness),
+                            int(BONUS_TRAIL_COLOR[1] * brightness),
+                            int(BONUS_TRAIL_COLOR[2] * brightness),
+                            BONUS_TRAIL_COLOR[3]
+                        )
+                        display.set_bonus_trail_pixel(inverted_pos, faded_color)
+                
+                # Clean up old bonus trail positions
+                for pos in bonus_positions_to_remove:
+                    del game_state.bonus_trail_positions[pos]
             
             # Draw hit trail in outer circle
             for i, color in enumerate(game_state.hit_colors):
