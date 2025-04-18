@@ -84,6 +84,8 @@ ERROR_SOUND = "music/error.mp3"  # Path to error sound effect
 
 # Hit trail settings
 INITIAL_HIT_SPACING = 16  # Initial spacing between hit trail LEDs
+HIT_TRAIL_RADIUS = CIRCLE_RADIUS - 4  # Radius for hit trail (inner circle)
+TARGET_TRAIL_RADIUS = CIRCLE_RADIUS + 4  # Radius for target trail (outer circle)
 
 class TargetType(Enum):
     RED = auto()
@@ -463,7 +465,7 @@ def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
 
 def get_hit_trail_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in the hit trail ring, starting at 12 o'clock."""
-    return get_target_ring_position(i, CIRCLE_RADIUS + 4)
+    return get_target_ring_position(i, HIT_TRAIL_RADIUS)
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
@@ -555,7 +557,7 @@ class LEDDisplay:
             ws_color = LEDColor(color.r, color.g, color.b)
             self.strip.setPixelColor(pos, ws_color)
         else:
-            x, y = get_target_ring_position(pos, CIRCLE_RADIUS)
+            x, y = get_target_ring_position(pos, TARGET_TRAIL_RADIUS)
             self.pygame_surface.set_at((x, y), color)
     
     def set_hit_trail_pixel(self, pos: int, color: Color):
