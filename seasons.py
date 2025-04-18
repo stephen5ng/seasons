@@ -20,8 +20,7 @@ from get_key import get_key
 import my_inputs
 
 # Constants
-SPB = 3.69230769  # Seconds per beat
-SPB = 1.84615385
+SPB = 1.84615385  # Seconds per beat
 WLED_IP = "192.168.0.121"
 WLED_SETTINGS = {
     0: "FX=2&FP=67&SX=32",  # BREATHE / BLINK RED 
@@ -181,12 +180,23 @@ class ButtonPressHandler:
         Returns (score, target_type, (error_position, error_color)) where error_position is the center of the target window 
         and error_color is the color of the wrong key that was pressed."""
         keys_pressed = pygame.key.get_pressed()
-        any_key_pressed = any(keys_pressed[key] for key in [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y])
+        # Check both letter keys and arrow keys
+        any_key_pressed = any(keys_pressed[key] for key in [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y, 
+                                                          pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT])
         
         # Check for any key press outside its window
         for target_type in TargetType:
-            color = target_type.name[0].lower()  # First letter of color name
-            if keys_pressed[getattr(pygame, f"K_{color}")]:
+            # Check both letter and arrow keys for this target
+            if target_type == TargetType.RED:
+                keys = [pygame.K_r, pygame.K_UP]
+            elif target_type == TargetType.BLUE:
+                keys = [pygame.K_b, pygame.K_DOWN]
+            elif target_type == TargetType.GREEN:
+                keys = [pygame.K_g, pygame.K_RIGHT]
+            else:  # YELLOW
+                keys = [pygame.K_y, pygame.K_LEFT]
+            
+            if any(keys_pressed[key] for key in keys):
                 # Get the center position of this key's window
                 if target_type == TargetType.RED:
                     window_pos = 0
@@ -207,13 +217,29 @@ class ButtonPressHandler:
         target_type = self.get_target_type(led_position)
         
         if target_type:
-            button_key = target_type.name[0].lower()  # First letter of color name
-            key = getattr(pygame, f"K_{button_key}")
+            # Check both letter and arrow keys for this target
+            if target_type == TargetType.RED:
+                keys = [pygame.K_r, pygame.K_UP]
+            elif target_type == TargetType.BLUE:
+                keys = [pygame.K_b, pygame.K_DOWN]
+            elif target_type == TargetType.GREEN:
+                keys = [pygame.K_g, pygame.K_RIGHT]
+            else:  # YELLOW
+                keys = [pygame.K_y, pygame.K_LEFT]
+            
             # Check if wrong button was pressed in this window
             for wrong_target in TargetType:
                 if wrong_target != target_type:
-                    color = wrong_target.name[0].lower()
-                    if keys_pressed[getattr(pygame, f"K_{color}")]:
+                    if wrong_target == TargetType.RED:
+                        wrong_keys = [pygame.K_r, pygame.K_UP]
+                    elif wrong_target == TargetType.BLUE:
+                        wrong_keys = [pygame.K_b, pygame.K_DOWN]
+                    elif wrong_target == TargetType.GREEN:
+                        wrong_keys = [pygame.K_g, pygame.K_RIGHT]
+                    else:  # YELLOW
+                        wrong_keys = [pygame.K_y, pygame.K_LEFT]
+                    
+                    if any(keys_pressed[key] for key in wrong_keys):
                         self.error_sound.play()
                         # Get the center position of the wrong key's window
                         if wrong_target == TargetType.RED:
@@ -227,8 +253,8 @@ class ButtonPressHandler:
                         error_color = TARGET_COLORS[wrong_target]
                         return max(0, score - 0.25), "none", (error_pos, error_color)
             
-            if (keys_pressed[key] or ALWAYS_SCORE) and not self.button_states[button_key]:
-                self.button_states[button_key] = True
+            if (any(keys_pressed[key] for key in keys) or ALWAYS_SCORE) and not self.button_states[target_type.name[0].lower()]:
+                self.button_states[target_type.name[0].lower()] = True
                 self.penalty_applied = False
                 return score + 0.25, target_type.name.lower(), None
         
@@ -266,7 +292,7 @@ class GameState:
         
         # Hit trail state
         self.hit_colors = []  # List of colors for successful hits
-        self.hit_spacing = 8  # Current spacing between hit trail LEDs
+        self.hit_spacing = 16  # Current spacing between hit trail LEDs
         self.in_scoring_window = False  # Whether currently in a scoring window
     
     async def _send_wled_command_inner(self, url: str) -> None:
@@ -362,8 +388,9 @@ class GameState:
             
             # Check if adding a new hit would exceed circle size
             total_space_needed = (len(self.hit_colors) + 1) * self.hit_spacing
-            if total_space_needed >= NUMBER_OF_LEDS:
-                self.hit_spacing = self.hit_spacing / 2
+            if total_space_needed >= NUMBER_OF_LEDS * 0.75:
+                self.hit_spacing = max(self.hit_spacing / 2, 1)
+                print(f"*********** Hit spacing: {self.hit_spacing}")
             
             # Add hit color to beginning of trail
             try:
