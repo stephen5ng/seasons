@@ -82,6 +82,9 @@ ALWAYS_SCORE = False  # When True, automatically scores on every round
 # Sound settings
 ERROR_SOUND = "music/error.mp3"  # Path to error sound effect
 
+# Hit trail settings
+INITIAL_HIT_SPACING = 16  # Initial spacing between hit trail LEDs
+
 class TargetType(Enum):
     RED = auto()
     BLUE = auto()
@@ -292,7 +295,7 @@ class GameState:
         
         # Hit trail state
         self.hit_colors = []  # List of colors for successful hits
-        self.hit_spacing = 16  # Current spacing between hit trail LEDs
+        self.hit_spacing = INITIAL_HIT_SPACING  # Current spacing between hit trail LEDs
         self.in_scoring_window = False  # Whether currently in a scoring window
     
     async def _send_wled_command_inner(self, url: str) -> None:
@@ -388,14 +391,21 @@ class GameState:
             
             # Check if adding a new hit would exceed circle size
             total_space_needed = (len(self.hit_colors) + 1) * self.hit_spacing
-            if total_space_needed >= NUMBER_OF_LEDS * 0.75:
-                self.hit_spacing = max(self.hit_spacing / 2, 1)
-                print(f"*********** Hit spacing: {self.hit_spacing}")
+            if total_space_needed >= NUMBER_OF_LEDS:
+                if self.hit_spacing <= 1:
+                    # Clear hit trail if we've hit minimum spacing
+                    self.hit_colors = []
+                    self.hit_spacing = INITIAL_HIT_SPACING  # Reset to initial spacing
+                    print("*********** Hit trail cleared, resetting spacing")
+                else:
+                    self.hit_spacing = max(self.hit_spacing / 2, 1)
+                    print(f"*********** Hit spacing: {self.hit_spacing}")
             
             # Add hit color to beginning of trail
             try:
                 target_enum = TargetType[target_type.upper()]
                 self.hit_colors.insert(0, TARGET_COLORS[target_enum])
+                print(f"Hit colors: {len(self.hit_colors)}")
             except KeyError:
                 pass  # Ignore invalid target types
         
