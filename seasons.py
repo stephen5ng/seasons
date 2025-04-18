@@ -342,11 +342,14 @@ class GameState:
 
     def _get_bonus_trail_color(self, brightness: float) -> Color:
         """Get color for bonus trail with brightness."""
+        current_time_ms = pygame.time.get_ticks()
+        # Use a different offset for bonus trail to create a different rainbow pattern
+        rainbow_color = get_rainbow_color(current_time_ms, 10)  # Using 10 as offset to differentiate from score lines
         return Color(
-            int(BONUS_TRAIL_COLOR[0] * brightness),
-            int(BONUS_TRAIL_COLOR[1] * brightness),
-            int(BONUS_TRAIL_COLOR[2] * brightness),
-            BONUS_TRAIL_COLOR[3]
+            int(rainbow_color[0] * brightness),
+            int(rainbow_color[1] * brightness),
+            int(rainbow_color[2] * brightness),
+            rainbow_color[3]
         )
 
     async def _send_wled_command_inner(self, url: str) -> None:
