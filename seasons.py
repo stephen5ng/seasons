@@ -307,7 +307,48 @@ class GameState:
         
         # Bonus trail state
         self.bonus_trail_positions = {}  # Maps LED position to timestamp when it was lit
-    
+
+    def _draw_trail_with_easing(self, positions: dict, fade_duration: float, ease_func, 
+                              color_func, display_func) -> List[int]:
+        """Helper method to draw a trail with temporal easing.
+        Returns list of positions to remove."""
+        current_time_s = pygame.time.get_ticks() / 1000.0
+        positions_to_remove = []
+        
+        for pos, lit_time in positions.items():
+            elapsed_s = current_time_s - lit_time
+            if elapsed_s > fade_duration:
+                positions_to_remove.append(pos)
+            else:
+                brightness = ease_func.ease(elapsed_s)
+                color = color_func(brightness)
+                display_func(pos, color)
+        
+        return positions_to_remove
+
+    def _get_target_trail_color(self, pos: int, brightness: float) -> Color:
+        """Get color for target trail with brightness."""
+        base_color = self.lit_colors[pos]
+        if self.button_handler.is_in_valid_window(pos):
+            target_type = self.button_handler.get_target_type(pos)
+            if target_type:
+                base_color = TARGET_COLORS[target_type]
+        return Color(
+            int(base_color[0] * brightness),
+            int(base_color[1] * brightness),
+            int(base_color[2] * brightness),
+            base_color[3]
+        )
+
+    def _get_bonus_trail_color(self, brightness: float) -> Color:
+        """Get color for bonus trail with brightness."""
+        return Color(
+            int(BONUS_TRAIL_COLOR[0] * brightness),
+            int(BONUS_TRAIL_COLOR[1] * brightness),
+            int(BONUS_TRAIL_COLOR[2] * brightness),
+            BONUS_TRAIL_COLOR[3]
+        )
+
     async def _send_wled_command_inner(self, url: str) -> None:
         """Internal method to send WLED command."""
         try:
@@ -649,53 +690,29 @@ async def run_game() -> None:
                 # Store bonus trail position
                 game_state.bonus_trail_positions[led_position] = current_time_s
             
-            # Draw trail using temporal easing
-            positions_to_remove = []
-            for pos, lit_time in game_state.lit_positions.items():
-                elapsed_s = current_time_s - lit_time
-                if elapsed_s > TRAIL_FADE_DURATION_S:
-                    positions_to_remove.append(pos)
-                else:
-                    brightness = TRAIL_EASE.ease(elapsed_s)
-                    base_color = game_state.lit_colors[pos]
-                    
-                    # Check if in target window and apply target color
-                    if game_state.button_handler.is_in_valid_window(pos):
-                        target_type = game_state.button_handler.get_target_type(pos)
-                        if target_type:
-                            base_color = TARGET_COLORS[target_type]
-                    
-                    faded_color = Color(
-                        int(base_color[0] * brightness),
-                        int(base_color[1] * brightness),
-                        int(base_color[2] * brightness),
-                        base_color[3]
-                    )
-                    display.set_pixel(pos, faded_color)
+            # Draw target trail
+            positions_to_remove = game_state._draw_trail_with_easing(
+                game_state.lit_positions,
+                TRAIL_FADE_DURATION_S,
+                TRAIL_EASE,
+                lambda b, p=led_position: game_state._get_target_trail_color(p, b),
+                display.set_pixel
+            )
             
             # Clean up old trail positions
             for pos in positions_to_remove:
                 del game_state.lit_positions[pos]
                 del game_state.lit_colors[pos]
             
-            # Draw bonus trail using temporal easing
-            if game_state.hit_trail_cleared:  # Only show bonus trail after hit trail has been cleared
-                bonus_positions_to_remove = []
-                for pos, lit_time in game_state.bonus_trail_positions.items():
-                    elapsed_s = current_time_s - lit_time
-                    if elapsed_s > BONUS_TRAIL_FADE_DURATION_S:
-                        bonus_positions_to_remove.append(pos)
-                    else:
-                        brightness = BONUS_TRAIL_EASE.ease(elapsed_s)
-                        # Invert position to move in opposite direction
-                        inverted_pos = (NUMBER_OF_LEDS - pos) % NUMBER_OF_LEDS
-                        faded_color = Color(
-                            int(BONUS_TRAIL_COLOR[0] * brightness),
-                            int(BONUS_TRAIL_COLOR[1] * brightness),
-                            int(BONUS_TRAIL_COLOR[2] * brightness),
-                            BONUS_TRAIL_COLOR[3]
-                        )
-                        display.set_bonus_trail_pixel(inverted_pos, faded_color)
+            # Draw bonus trail if hit trail has been cleared
+            if game_state.hit_trail_cleared:
+                bonus_positions_to_remove = game_state._draw_trail_with_easing(
+                    game_state.bonus_trail_positions,
+                    BONUS_TRAIL_FADE_DURATION_S,
+                    BONUS_TRAIL_EASE,
+                    game_state._get_bonus_trail_color,
+                    lambda p, c: display.set_bonus_trail_pixel((NUMBER_OF_LEDS - p) % NUMBER_OF_LEDS, c)
+                )
                 
                 # Clean up old bonus trail positions
                 for pos in bonus_positions_to_remove:
