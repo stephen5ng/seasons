@@ -23,18 +23,34 @@ class TrailRenderer:
                 display_func(pos, color)
         return positions_to_remove
 
-    def get_target_trail_color(self, pos: int, brightness: float, lit_colors: Dict[int, Color], button_handler) -> Color:
-        """Get color for target trail with brightness."""
-        base_color: Color = lit_colors[pos]
-        if button_handler.is_in_valid_window(pos):
-            target_type: Optional[TargetType] = button_handler.get_target_type(pos)
-            if target_type:
-                base_color = TARGET_COLORS[target_type]
+    def get_target_trail_color(self, pos: int = None, brightness: float = 1.0, lit_colors: Dict[int, Color] = None, button_handler = None, target_type: TargetType = None) -> Color:
+        """Get color for target trail with brightness.
+        
+        This method can be called in two ways:
+        1. With pos, brightness, lit_colors, and button_handler (original way)
+        2. With brightness and target_type (new way for more flexibility)
+        """
+        base_color: Color = None
+        
+        # Handle the case where target_type is directly provided
+        if target_type is not None:
+            base_color = TARGET_COLORS[target_type]
+        # Handle the original case with position and button handler
+        elif pos is not None and lit_colors is not None and button_handler is not None:
+            base_color = lit_colors[pos]
+            if button_handler.is_in_valid_window(pos):
+                pos_target_type: Optional[TargetType] = button_handler.get_target_type(pos)
+                if pos_target_type:
+                    base_color = TARGET_COLORS[pos_target_type]
+        else:
+            # Default to white if no color source is provided
+            base_color = Color(255, 255, 255)
+            
         return Color(
             int(base_color[0] * brightness),
             int(base_color[1] * brightness),
             int(base_color[2] * brightness),
-            base_color[3]
+            base_color[3] if len(base_color) > 3 else 255
         )
 
     def get_bonus_trail_color(self, brightness: float) -> Color:

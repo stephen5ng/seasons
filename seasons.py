@@ -25,6 +25,7 @@ from led_position import LEDPosition
 from music_timing import MusicTiming
 from hit_trail import HitTrail
 from wled_controller import WLEDController
+from display_manager import DisplayManager
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
@@ -308,102 +309,44 @@ def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: 
             base_color[3]
         )
 
-def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float, flash_type: str) -> None:
-    """Draw horizontal lines representing the score with top-to-bottom animation."""
-    num_lines: int = int(score*2)
-    current_line: int = num_lines  # Default to all lines unlit
-    
-    if flash_intensity > 0:
-        # Calculate which line should be lit based on time since flash started
-        time_since_flash: float = SCORE_FLASH_DURATION_MS * (1 - flash_intensity)
-        current_line = int(time_since_flash / SCORE_LINE_ANIMATION_TIME_MS)
-        # Ensure we start from the top (line 0) and move downward
-        current_line = min(current_line, num_lines - 1)
-    
-    for i in range(num_lines):
-        y: int = SCREEN_HEIGHT - 1 - ((num_lines - 1 - i) * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
-        if y >= 0:  # Only draw if we haven't gone off the top of the screen
-            # Only use rainbow effect when not flashing
-            base_color: Color
-            line_color: Color
-            if flash_intensity > 0 and i <= current_line:
-                # During flash animation, use base green color for flash effect
-                base_color = SCORE_LINE_COLOR
-                line_color = get_score_line_color(base_color, flash_intensity, flash_type)
-            elif flash_intensity == 0:
-                # When not flashing, use rainbow effect for high scores
-                base_color = get_rainbow_color(current_time, i) if score > HIGH_SCORE_THRESHOLD else SCORE_LINE_COLOR
-                line_color = base_color
-                
-            pygame.draw.line(screen, line_color, (0, y), (10, y))
+def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: str) -> Color:
+    """Get the color for score lines during flash effect."""
+    if flash_type == "blue":
+        return Color(
+            int(base_color[0] * (1 - flash_intensity)),
+            int(base_color[1] * (1 - flash_intensity)),
+            min(255, int(255 * flash_intensity + base_color[2] * (1 - flash_intensity))),
+            base_color[3]
+        )
+    else:  # Default to red flash
+        return Color(
+            min(255, int(255 * flash_intensity + base_color[0] * (1 - flash_intensity))),
+            int(base_color[1] * (1 - flash_intensity)),
+            int(base_color[2] * (1 - flash_intensity)),
+            base_color[3]
+        )
 
-class LEDDisplay:
-    """Handles LED display output for both Pygame and WS281x."""
-    
-    def __init__(self) -> None:
-        if IS_RASPBERRY_PI:
-            self.strip: PixelStrip = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
-            self.strip.begin()
-            self.pygame_surface: Optional[pygame.Surface] = None
-            self.display_surface: Optional[pygame.Surface] = None
-        else:
-            self.strip: Optional[PixelStrip] = None
-            self.display_surface: pygame.Surface = pygame.display.set_mode((SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR))
-            self.pygame_surface: pygame.Surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-    
-    def clear(self) -> None:
-        """Clear the display."""
-        if IS_RASPBERRY_PI:
-            for i in range(self.strip.numPixels()):
-                self.strip.setPixelColor(i, 0)
-        else:
-            self.pygame_surface.fill((0, 0, 0))
-    
-    def set_pixel(self, pos: int, color: Color) -> None:
-        """Set pixel color at position in target ring."""
-        if IS_RASPBERRY_PI:
-            # Convert Pygame color to WS281x color (RGB order)
-            ws_color: LEDColor = LEDColor(color.r, color.g, color.b)
-            self.strip.setPixelColor(pos, ws_color)
-        else:
-            x: int
-            y: int
-            x, y = get_target_ring_position(pos, TARGET_TRAIL_RADIUS)
-            self.pygame_surface.set_at((x, y), color)
-    
-    def set_hit_trail_pixel(self, pos: int, color: Color) -> None:
-        """Set pixel color at position in hit trail ring."""
-        if not IS_RASPBERRY_PI:
-            x: int
-            y: int
-            x, y = get_hit_trail_position(pos)
-            self.pygame_surface.set_at((x, y), color)
-    
-    def set_bonus_trail_pixel(self, pos: int, color: Color) -> None:
-        """Set pixel color at position in bonus trail ring."""
-        if not IS_RASPBERRY_PI:
-            x: int
-            y: int
-            x, y = get_bonus_trail_position(pos)
-            self.pygame_surface.set_at((x, y), color)
-    
-    def update(self) -> None:
-        """Update the display."""
-        if IS_RASPBERRY_PI:
-            self.strip.show()
-        else:
-            pygame.transform.scale(self.pygame_surface, 
-                (SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR), 
-                self.display_surface)
-            pygame.display.update()
+
 
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
     global quit_app
 
-    # Initialize display
+    # Initialize display and clock
+    pygame.init()
     clock: Clock = Clock()
-    display: LEDDisplay = LEDDisplay()
+    display = DisplayManager(
+        screen_width=SCREEN_WIDTH,
+        screen_height=SCREEN_HEIGHT,
+        scaling_factor=SCALING_FACTOR,
+        led_count=game_constants.NUMBER_OF_LEDS,
+        led_pin=18,  # Default GPIO pin
+        led_freq_hz=800000,  # Default frequency
+        led_dma=10,  # Default DMA channel
+        led_invert=False,  # Default invert setting
+        led_brightness=255,  # Default brightness
+        led_channel=0  # Default channel
+    )
     
     # Initialize game state
     game_state: GameState = GameState()
@@ -465,7 +408,7 @@ async def run_game() -> None:
                 TRAIL_EASE,
                 lambda brightness, pos: game_state.trail_renderer.get_target_trail_color(
                     pos, brightness, game_state.lit_colors, game_state.button_handler),
-                display.set_pixel
+                lambda pos, color: display.set_pixel(pos, color)
             )
             
             # Clean up old trail positions
@@ -497,7 +440,20 @@ async def run_game() -> None:
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
                 flash_intensity: float = game_state.get_score_flash_intensity(beat_float)
-                draw_score_lines(display.pygame_surface, game_state.score, current_time_ms, flash_intensity, game_state.last_hit_target)
+                display.draw_score_lines(
+                    score=game_state.score,
+                    current_time=current_time_ms,
+                    flash_intensity=flash_intensity,
+                    flash_type=game_state.last_hit_target,
+                    score_line_color=SCORE_LINE_COLOR,
+                    high_score_threshold=HIGH_SCORE_THRESHOLD,
+                    score_flash_duration_ms=SCORE_FLASH_DURATION_MS,
+                    score_line_animation_time_ms=SCORE_LINE_ANIMATION_TIME_MS,
+                    score_line_height=SCORE_LINE_HEIGHT,
+                    score_line_spacing=SCORE_LINE_SPACING,
+                    get_rainbow_color_func=get_rainbow_color,
+                    get_score_line_color_func=get_score_line_color
+                )
             
             # Draw current LED in white
             base_color: Color = Color(255, 255, 255)
