@@ -6,7 +6,7 @@ import os
 import platform
 import sys
 import argparse
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict, Callable
 from enum import Enum, auto
 
 import aiomqtt
@@ -131,8 +131,8 @@ quit_app = False
 class ButtonPressHandler:
     """Handles button press logic and scoring."""
     
-    def __init__(self, error_sound) -> None:
-        self.button_states = {
+    def __init__(self, error_sound: pygame.mixer.Sound) -> None:
+        self.button_states: Dict[str, bool] = {
             "r": False,
             "b": False,
             "g": False,
@@ -140,11 +140,11 @@ class ButtonPressHandler:
         }
         self.penalty_applied: bool = False
         self.round_active: bool = False
-        self.error_sound = error_sound
+        self.error_sound: pygame.mixer.Sound = error_sound
     
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring."""
-        return_value = (led_position >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE or 
+        return_value: bool = (led_position >= NUMBER_OF_LEDS - TARGET_WINDOW_SIZE or 
                 led_position <= TARGET_WINDOW_SIZE or
                 abs(led_position - MID_TARGET_POS) <= TARGET_WINDOW_SIZE or
                 abs(led_position - RIGHT_TARGET_POS) <= TARGET_WINDOW_SIZE or
@@ -155,7 +155,7 @@ class ButtonPressHandler:
         """Apply penalty if button wasn't pressed in valid window."""
         if not any(self.button_states.values()) and not self.penalty_applied:
             # Calculate score after 25% reduction
-            reduced_score = score * 0.75
+            reduced_score: float = score * 0.75
             # Make sure it's at least 0.25 less than original score
             reduced_score = min(reduced_score, score - 0.25)
             # Round to nearest 0.25 and ensure score doesn't go below 0
@@ -188,14 +188,15 @@ class ButtonPressHandler:
         """Handle keypress and update score if in valid window with correct key.
         Returns (score, target_type, (error_position, error_color)) where error_position is the center of the target window 
         and error_color is the color of the wrong key that was pressed."""
-        keys_pressed = pygame.key.get_pressed()
+        keys_pressed: Dict[int, bool] = pygame.key.get_pressed()
         # Check both letter keys and arrow keys
-        any_key_pressed = any(keys_pressed[key] for key in [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y, 
+        any_key_pressed: bool = any(keys_pressed[key] for key in [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y, 
                                                           pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT])
         
         # Check for any key press outside its window
         for target_type in TargetType:
             # Check both letter and arrow keys for this target
+            keys: List[int]
             if target_type == TargetType.RED:
                 keys = [pygame.K_r, pygame.K_UP]
             elif target_type == TargetType.BLUE:
@@ -207,6 +208,7 @@ class ButtonPressHandler:
             
             if any(keys_pressed[key] for key in keys):
                 # Get the center position of this key's window
+                window_pos: int
                 if target_type == TargetType.RED:
                     window_pos = 0
                 elif target_type == TargetType.BLUE:
@@ -219,14 +221,15 @@ class ButtonPressHandler:
                 # If we're not in this key's window, show error and apply penalty
                 if abs(led_position - window_pos) > TARGET_WINDOW_SIZE:
                     self.error_sound.play()
-                    error_color = TARGET_COLORS[target_type]
+                    error_color: Color = TARGET_COLORS[target_type]
                     return max(0, score - 0.25), "none", (window_pos, error_color)
         
         # If we get here, either no keys were pressed or we're in a valid window
-        target_type = self.get_target_type(led_position)
+        target_type: Optional[TargetType] = self.get_target_type(led_position)
         
         if target_type:
             # Check both letter and arrow keys for this target
+            keys: List[int]
             if target_type == TargetType.RED:
                 keys = [pygame.K_r, pygame.K_UP]
             elif target_type == TargetType.BLUE:
@@ -239,6 +242,7 @@ class ButtonPressHandler:
             # Check if wrong button was pressed in this window
             for wrong_target in TargetType:
                 if wrong_target != target_type:
+                    wrong_keys: List[int]
                     if wrong_target == TargetType.RED:
                         wrong_keys = [pygame.K_r, pygame.K_UP]
                     elif wrong_target == TargetType.BLUE:
@@ -251,6 +255,7 @@ class ButtonPressHandler:
                     if any(keys_pressed[key] for key in wrong_keys):
                         self.error_sound.play()
                         # Get the center position of the wrong key's window
+                        error_pos: int
                         if wrong_target == TargetType.RED:
                             error_pos = 0
                         elif wrong_target == TargetType.BLUE:
@@ -259,7 +264,7 @@ class ButtonPressHandler:
                             error_pos = int(RIGHT_TARGET_POS)
                         else:  # YELLOW
                             error_pos = int(LEFT_TARGET_POS)
-                        error_color = TARGET_COLORS[wrong_target]
+                        error_color: Color = TARGET_COLORS[wrong_target]
                         return max(0, score - 0.25), "none", (error_pos, error_color)
             
             if (any(keys_pressed[key] for key in keys) or ALWAYS_SCORE) and not self.button_states[target_type.name[0].lower()]:
@@ -273,64 +278,64 @@ class GameState:
     """Manages game state and timing."""
     
     def __init__(self) -> None:
-        self.start_ticks_ms = pygame.time.get_ticks()
-        self.last_beat_in_measure = 0
-        self.score = 0
-        self.previous_score = 0  # Track previous score to detect changes
+        self.start_ticks_ms: int = pygame.time.get_ticks()
+        self.last_beat_in_measure: int = 0
+        self.score: float = 0
+        self.previous_score: float = 0  # Track previous score to detect changes
         self.score_flash_start_beat: Optional[float] = None  # When the score last changed (in beats)
-        self.last_hit_target = "none"  # Track which target was hit: "red", "blue", or "none"
-        self.next_loop = 1
-        self.loop_count = 0
-        self.error_sound = pygame.mixer.Sound(ERROR_SOUND)
-        self.button_handler = ButtonPressHandler(self.error_sound)
-        self.trail_length = 0 
-        self.beat_start_time_ms = 0
-        self.last_music_start_time_s = 0.0  # Track when we last started playing music
-        self.last_music_start_pos_s = 0.0   # Track from what position we started playing
-        self.total_beats = 0  # Track total beats in song
-        self.last_beat = -1  # Track last beat for increment
-        self.last_wled_measure = -1
-        self.last_wled_score = -1
-        self.http_session = aiohttp.ClientSession()  # Create a single session for all HTTP requests
+        self.last_hit_target: str = "none"  # Track which target was hit: "red", "blue", or "none"
+        self.next_loop: int = 1
+        self.loop_count: int = 0
+        self.error_sound: pygame.mixer.Sound = pygame.mixer.Sound(ERROR_SOUND)
+        self.button_handler: ButtonPressHandler = ButtonPressHandler(self.error_sound)
+        self.trail_length: int = 0 
+        self.beat_start_time_ms: int = 0
+        self.last_music_start_time_s: float = 0.0  # Track when we last started playing music
+        self.last_music_start_pos_s: float = 0.0   # Track from what position we started playing
+        self.total_beats: int = 0  # Track total beats in song
+        self.last_beat: int = -1  # Track last beat for increment
+        self.last_wled_measure: int = -1
+        self.last_wled_score: int = -1
+        self.http_session: aiohttp.ClientSession = aiohttp.ClientSession()  # Create a single session for all HTTP requests
         self.current_http_task: Optional[asyncio.Task] = None
-        self.current_led_position = None  # Track current LED position
+        self.current_led_position: Optional[int] = None  # Track current LED position
         
         # Trail state
-        self.lit_positions = {}  # Maps LED position to timestamp when it was lit
-        self.lit_colors = {}    # Maps LED position to base color when it was lit
+        self.lit_positions: Dict[int, float] = {}  # Maps LED position to timestamp when it was lit
+        self.lit_colors: Dict[int, Color] = {}    # Maps LED position to base color when it was lit
         
         # Hit trail state
-        self.hit_colors = []  # List of colors for successful hits
-        self.hit_spacing = INITIAL_HIT_SPACING  # Current spacing between hit trail LEDs
-        self.in_scoring_window = False  # Whether currently in a scoring window
-        self.hit_trail_cleared = False  # Track if hit trail has been cleared at least once
+        self.hit_colors: List[Color] = []  # List of colors for successful hits
+        self.hit_spacing: int = INITIAL_HIT_SPACING  # Current spacing between hit trail LEDs
+        self.in_scoring_window: bool = False  # Whether currently in a scoring window
+        self.hit_trail_cleared: bool = False  # Track if hit trail has been cleared at least once
         
         # Bonus trail state
-        self.bonus_trail_positions = {}  # Maps LED position to timestamp when it was lit
+        self.bonus_trail_positions: Dict[int, float] = {}  # Maps LED position to timestamp when it was lit
 
-    def _draw_trail_with_easing(self, positions: dict, fade_duration: float, ease_func, 
-                              color_func, display_func) -> List[int]:
+    def _draw_trail_with_easing(self, positions: Dict[int, float], fade_duration: float, ease_func: easing_functions.CircularEaseOut, 
+                              color_func: Callable[[float], Color], display_func: Callable[[int, Color], None]) -> List[int]:
         """Helper method to draw a trail with temporal easing.
         Returns list of positions to remove."""
-        current_time_s = pygame.time.get_ticks() / 1000.0
-        positions_to_remove = []
+        current_time_s: float = pygame.time.get_ticks() / 1000.0
+        positions_to_remove: List[int] = []
         
         for pos, lit_time in positions.items():
-            elapsed_s = current_time_s - lit_time
+            elapsed_s: float = current_time_s - lit_time
             if elapsed_s > fade_duration:
                 positions_to_remove.append(pos)
             else:
-                brightness = ease_func.ease(elapsed_s)
-                color = color_func(brightness)
+                brightness: float = ease_func.ease(elapsed_s)
+                color: Color = color_func(brightness)
                 display_func(pos, color)
         
         return positions_to_remove
 
     def _get_target_trail_color(self, pos: int, brightness: float) -> Color:
         """Get color for target trail with brightness."""
-        base_color = self.lit_colors[pos]
+        base_color: Color = self.lit_colors[pos]
         if self.button_handler.is_in_valid_window(pos):
-            target_type = self.button_handler.get_target_type(pos)
+            target_type: Optional[TargetType] = self.button_handler.get_target_type(pos)
             if target_type:
                 base_color = TARGET_COLORS[target_type]
         return Color(
@@ -342,9 +347,9 @@ class GameState:
 
     def _get_bonus_trail_color(self, brightness: float) -> Color:
         """Get color for bonus trail with brightness."""
-        current_time_ms = pygame.time.get_ticks()
+        current_time_ms: int = pygame.time.get_ticks()
         # Use a different offset for bonus trail to create a different rainbow pattern
-        rainbow_color = get_rainbow_color(current_time_ms, 10)  # Using 10 as offset to differentiate from score lines
+        rainbow_color: Color = get_rainbow_color(current_time_ms, 10)  # Using 10 as offset to differentiate from score lines
         return Color(
             int(rainbow_color[0] * brightness),
             int(rainbow_color[1] * brightness),
@@ -368,7 +373,7 @@ class GameState:
 
     async def send_wled_command(self, wled_command: str) -> None:
         """Send a command to the WLED device, canceling any outstanding request."""
-        url = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
+        url: str = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
         
         # Don't send multiple requests at once.
         if self.current_http_task and not self.current_http_task.done():
@@ -379,11 +384,11 @@ class GameState:
 
     async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
-        duration_ms = pygame.time.get_ticks() - self.start_ticks_ms
-        beat_float = duration_ms * BEAT_PER_MS
-        beat = int(beat_float)
-        beat_in_measure = beat % BEATS_PER_MEASURE
-        fractional_beat = beat_float % 1
+        duration_ms: int = pygame.time.get_ticks() - self.start_ticks_ms
+        beat_float: float = duration_ms * BEAT_PER_MS
+        beat: int = int(beat_float)
+        beat_in_measure: int = beat % BEATS_PER_MEASURE
+        fractional_beat: float = beat_float % 1
         
         # Update total beats when we cross a beat boundary
         if beat > self.last_beat:
@@ -392,13 +397,13 @@ class GameState:
             print(f"Total beats in song: {self.total_beats}")
             
             # Check WLED_SETTINGS for current beat
-            wled_measure = self.total_beats//BEATS_PER_MEASURE
+            wled_measure: int = self.total_beats//BEATS_PER_MEASURE
             if self.score != self.last_wled_score or self.last_wled_measure != wled_measure:
                 if self.last_wled_measure != wled_measure:
                     print(f"NEW MEASURE {wled_measure}")
                     if wled_measure in WLED_SETTINGS:
                         self.last_wled_measure = wled_measure
-                wled_command = WLED_SETTINGS[self.last_wled_measure]
+                wled_command: str = WLED_SETTINGS[self.last_wled_measure]
                 await self.send_wled_command(wled_command)
                 self.last_wled_score = self.score
                 print(f"score {self.score}")
@@ -417,12 +422,12 @@ class GameState:
         if beat_in_measure != 0:
             return
         
-        current_time_ms = pygame.time.get_ticks()
-        measure_offset_s = (current_time_ms - self.beat_start_time_ms) / 1000.0
-        target_time_s = int(self.score) * SECONDS_PER_MEASURE_S + measure_offset_s
+        current_time_ms: int = pygame.time.get_ticks()
+        measure_offset_s: float = (current_time_ms - self.beat_start_time_ms) / 1000.0
+        target_time_s: float = int(self.score) * SECONDS_PER_MEASURE_S + measure_offset_s
         
         # Get current music position in seconds, accounting for start position
-        current_music_pos_s = self.last_music_start_pos_s + (pygame.mixer.music.get_pos() / 1000.0)
+        current_music_pos_s: float = self.last_music_start_pos_s + (pygame.mixer.music.get_pos() / 1000.0)
         
         print(f"Current music position: {current_music_pos_s}, Score: {self.score}")
         print(f"Target time: {target_time_s}")
@@ -432,7 +437,7 @@ class GameState:
             print(f"Starting music at {target_time_s} seconds")
             self.last_music_start_pos_s = target_time_s
             # Update total beats based on new target time
-            target_beats = int(target_time_s * (1000 * BEAT_PER_MS))
+            target_beats: int = int(target_time_s * (1000 * BEAT_PER_MS))
             self.total_beats = target_beats
             self.last_beat = target_beats - 1
             pygame.mixer.music.play(start=target_time_s)
@@ -444,7 +449,7 @@ class GameState:
             self.last_hit_target = target_type
             
             # Check if adding a new hit would exceed circle size
-            total_space_needed = (len(self.hit_colors) + 1) * self.hit_spacing
+            total_space_needed: int = (len(self.hit_colors) + 1) * self.hit_spacing
             if total_space_needed >= NUMBER_OF_LEDS:
                 if self.hit_spacing <= 4:
                     # Clear hit trail if we've hit minimum spacing
@@ -458,14 +463,14 @@ class GameState:
             
             # Add hit color to beginning of trail
             try:
-                target_enum = TargetType[target_type.upper()]
+                target_enum: TargetType = TargetType[target_type.upper()]
                 self.hit_colors.insert(0, TARGET_COLORS[target_enum])
                 print(f"Hit colors: {len(self.hit_colors)}")
             except KeyError:
                 pass  # Ignore invalid target types
         
         # Always update trail length based on new score
-        max_trail_length = int(new_score * 4)
+        max_trail_length: int = int(new_score * 4)
         if len(self.hit_colors) > max_trail_length:
             self.hit_colors = self.hit_colors[:max_trail_length]
                 
@@ -477,7 +482,7 @@ class GameState:
         if self.score_flash_start_beat is None:
             return 0.0
         
-        beats_since_flash = beat_float - self.score_flash_start_beat
+        beats_since_flash: float = beat_float - self.score_flash_start_beat
         if beats_since_flash >= 2.0:  # Flash lasts for 2 beats
             return 0.0
         
@@ -485,7 +490,7 @@ class GameState:
 
     def calculate_led_position(self, beat_in_measure: int, fractional_beat: float) -> int:
         """Calculate the current LED position based on beat timing."""
-        percent_of_measure = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
+        percent_of_measure: float = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
         return int(percent_of_measure * NUMBER_OF_LEDS)
     
     def update_loop_count(self, percent_of_measure: float) -> None:
@@ -498,7 +503,7 @@ class GameState:
 
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position."""
-        was_in_window = self.in_scoring_window
+        was_in_window: bool = self.in_scoring_window
         self.in_scoring_window = self.button_handler.is_in_valid_window(led_position)
         
         # Reset button state when entering new window
@@ -511,9 +516,9 @@ class GameState:
 
 def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
-    angle = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
-    x = CIRCLE_CENTER_X + int(radius * math.cos(angle))
-    y = CIRCLE_CENTER_Y + int(radius * math.sin(angle))
+    angle: float = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
+    x: int = CIRCLE_CENTER_X + int(radius * math.cos(angle))
+    y: int = CIRCLE_CENTER_Y + int(radius * math.sin(angle))
     return (x, y)
 
 def get_hit_trail_position(i: int) -> Tuple[int, int]:
@@ -526,7 +531,7 @@ def get_bonus_trail_position(i: int) -> Tuple[int, int]:
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
-    hue = (time_ms / COLOR_CYCLE_TIME_MS + line_index * 0.1) % 1.0
+    hue: float = (time_ms / COLOR_CYCLE_TIME_MS + line_index * 0.1) % 1.0
     
     if hue < 1/6:  # Red to Yellow
         return Color(255, int(255 * (hue * 6)), 0)
@@ -560,20 +565,22 @@ def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: 
 
 def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, flash_intensity: float, flash_type: str) -> None:
     """Draw horizontal lines representing the score with top-to-bottom animation."""
-    num_lines = int(score*2)
-    current_line = num_lines  # Default to all lines unlit
+    num_lines: int = int(score*2)
+    current_line: int = num_lines  # Default to all lines unlit
     
     if flash_intensity > 0:
         # Calculate which line should be lit based on time since flash started
-        time_since_flash = SCORE_FLASH_DURATION_MS * (1 - flash_intensity)
+        time_since_flash: float = SCORE_FLASH_DURATION_MS * (1 - flash_intensity)
         current_line = int(time_since_flash / SCORE_LINE_ANIMATION_TIME_MS)
         # Ensure we start from the top (line 0) and move downward
         current_line = min(current_line, num_lines - 1)
     
     for i in range(num_lines):
-        y = SCREEN_HEIGHT - 1 - ((num_lines - 1 - i) * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
+        y: int = SCREEN_HEIGHT - 1 - ((num_lines - 1 - i) * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING))
         if y >= 0:  # Only draw if we haven't gone off the top of the screen
             # Only use rainbow effect when not flashing
+            base_color: Color
+            line_color: Color
             if flash_intensity > 0 and i <= current_line:
                 # During flash animation, use base green color for flash effect
                 base_color = SCORE_LINE_COLOR
@@ -588,18 +595,18 @@ def draw_score_lines(screen: pygame.Surface, score: float, current_time: int, fl
 class LEDDisplay:
     """Handles LED display output for both Pygame and WS281x."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         if IS_RASPBERRY_PI:
-            self.strip = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+            self.strip: PixelStrip = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
             self.strip.begin()
-            self.pygame_surface = None
-            self.display_surface = None
+            self.pygame_surface: Optional[pygame.Surface] = None
+            self.display_surface: Optional[pygame.Surface] = None
         else:
-            self.strip = None
-            self.display_surface = pygame.display.set_mode((SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR))
-            self.pygame_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            self.strip: Optional[PixelStrip] = None
+            self.display_surface: pygame.Surface = pygame.display.set_mode((SCREEN_WIDTH * SCALING_FACTOR, SCREEN_HEIGHT * SCALING_FACTOR))
+            self.pygame_surface: pygame.Surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
     
-    def clear(self):
+    def clear(self) -> None:
         """Clear the display."""
         if IS_RASPBERRY_PI:
             for i in range(self.strip.numPixels()):
@@ -607,29 +614,35 @@ class LEDDisplay:
         else:
             self.pygame_surface.fill((0, 0, 0))
     
-    def set_pixel(self, pos: int, color: Color):
+    def set_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in target ring."""
         if IS_RASPBERRY_PI:
             # Convert Pygame color to WS281x color (RGB order)
-            ws_color = LEDColor(color.r, color.g, color.b)
+            ws_color: LEDColor = LEDColor(color.r, color.g, color.b)
             self.strip.setPixelColor(pos, ws_color)
         else:
+            x: int
+            y: int
             x, y = get_target_ring_position(pos, TARGET_TRAIL_RADIUS)
             self.pygame_surface.set_at((x, y), color)
     
-    def set_hit_trail_pixel(self, pos: int, color: Color):
+    def set_hit_trail_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in hit trail ring."""
         if not IS_RASPBERRY_PI:
+            x: int
+            y: int
             x, y = get_hit_trail_position(pos)
             self.pygame_surface.set_at((x, y), color)
     
-    def set_bonus_trail_pixel(self, pos: int, color: Color):
+    def set_bonus_trail_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in bonus trail ring."""
         if not IS_RASPBERRY_PI:
+            x: int
+            y: int
             x, y = get_bonus_trail_position(pos)
             self.pygame_surface.set_at((x, y), color)
     
-    def update(self):
+    def update(self) -> None:
         """Update the display."""
         if IS_RASPBERRY_PI:
             self.strip.show()
@@ -644,11 +657,11 @@ async def run_game() -> None:
     global quit_app
 
     # Initialize display
-    clock = Clock()
-    display = LEDDisplay()
+    clock: Clock = Clock()
+    display: LEDDisplay = LEDDisplay()
     
     # Initialize game state
-    game_state = GameState()
+    game_state: GameState = GameState()
     
     try:
         # Initialize music
@@ -659,25 +672,32 @@ async def run_game() -> None:
             display.clear()
 
             # Update timing and music
+            beat: int
+            beat_in_measure: int
+            beat_float: float
+            fractional_beat: float
             beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
             game_state.handle_music_loop(beat_in_measure)
 
-            current_time_ms = pygame.time.get_ticks()
-            current_time_s = current_time_ms / 1000.0
+            current_time_ms: int = pygame.time.get_ticks()
+            current_time_s: float = current_time_ms / 1000.0
             
             # Calculate LED position and update loop count
-            led_position = game_state.calculate_led_position(beat_in_measure, fractional_beat)
+            led_position: int = game_state.calculate_led_position(beat_in_measure, fractional_beat)
             game_state.update_loop_count(led_position / NUMBER_OF_LEDS)
 
             # Handle scoring and penalties
             if not game_state.button_handler.is_in_valid_window(led_position):
-                new_score = game_state.button_handler.apply_penalty(game_state.score)
+                new_score: float = game_state.button_handler.apply_penalty(game_state.score)
                 if new_score != game_state.score:
                     print(f"New score: {new_score}, target hit: none")
                     game_state.update_score(new_score, "none", beat_float)
             game_state.reset_flags(led_position)
             
             # Check for scoring (both manual and auto)
+            new_score: float
+            target_hit: str
+            error_feedback: Optional[Tuple[int, Color]]
             new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
                 led_position, game_state.score, current_time_ms)
             if new_score != game_state.score:
@@ -694,7 +714,7 @@ async def run_game() -> None:
                 game_state.bonus_trail_positions[led_position] = current_time_s
             
             # Draw target trail
-            positions_to_remove = game_state._draw_trail_with_easing(
+            positions_to_remove: List[int] = game_state._draw_trail_with_easing(
                 game_state.lit_positions,
                 TRAIL_FADE_DURATION_S,
                 TRAIL_EASE,
@@ -709,7 +729,7 @@ async def run_game() -> None:
             
             # Draw bonus trail if hit trail has been cleared
             if game_state.hit_trail_cleared:
-                bonus_positions_to_remove = game_state._draw_trail_with_easing(
+                bonus_positions_to_remove: List[int] = game_state._draw_trail_with_easing(
                     game_state.bonus_trail_positions,
                     BONUS_TRAIL_FADE_DURATION_S,
                     BONUS_TRAIL_EASE,
@@ -723,19 +743,19 @@ async def run_game() -> None:
             
             # Draw hit trail in outer circle
             for i, color in enumerate(game_state.hit_colors):
-                trail_pos = int((led_position - (i + 1) * game_state.hit_spacing) % NUMBER_OF_LEDS)
+                trail_pos: int = int((led_position - (i + 1) * game_state.hit_spacing) % NUMBER_OF_LEDS)
                 display.set_hit_trail_pixel(trail_pos, color)
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
-                flash_intensity = game_state.get_score_flash_intensity(beat_float)
+                flash_intensity: float = game_state.get_score_flash_intensity(beat_float)
                 draw_score_lines(display.pygame_surface, game_state.score, current_time_ms, flash_intensity, game_state.last_hit_target)
             
             # Draw current LED in white
-            base_color = Color(255, 255, 255)
+            base_color: Color = Color(255, 255, 255)
             # Apply target colors if in scoring window
             if game_state.button_handler.is_in_valid_window(led_position):
-                target_type = game_state.button_handler.get_target_type(led_position)
+                target_type: Optional[TargetType] = game_state.button_handler.get_target_type(led_position)
                 if target_type:
                     base_color = TARGET_COLORS[target_type]
             
@@ -743,6 +763,8 @@ async def run_game() -> None:
 
             # Draw error feedback if wrong key was pressed
             if error_feedback is not None:
+                error_pos: int
+                error_color: Color
                 error_pos, error_color = error_feedback
                 display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
 
