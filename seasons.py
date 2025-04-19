@@ -28,6 +28,7 @@ from wled_controller import WLEDController
 from display_manager import DisplayManager
 from score_manager import ScoreManager
 from audio_manager import AudioManager
+from trail_state_manager import TrailStateManager
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
@@ -119,13 +120,9 @@ class GameState:
         self.audio_manager = AudioManager()
         self.audio_manager.load_sound_effect("error", ERROR_SOUND)
         
-        # Trail state
-        self.lit_positions: Dict[int, float] = {}  # Maps LED position to timestamp when it was lit
-        self.lit_colors: Dict[int, Color] = {}    # Maps LED position to base color when it was lit
+        # Trail state manager (replaces individual trail state variables)
+        self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
         
-        # Bonus trail state
-        self.bonus_trail_positions: Dict[int, float] = {}  # Maps LED position to timestamp when it was lit
-
         # Trail renderer (extracts trail/color logic)
         self.trail_renderer = TrailRenderer(get_rainbow_color_func=get_rainbow_color)
         
@@ -281,6 +278,8 @@ def get_bonus_trail_position(i: int) -> Tuple[int, int]:
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
+    from game_constants import COLOR_CYCLE_TIME_MS
+    
     hue: float = (time_ms / COLOR_CYCLE_TIME_MS + line_index * 0.1) % 1.0
     
     if hue < 1/6:  # Red to Yellow
@@ -370,39 +369,24 @@ async def run_game() -> None:
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
-                game_state.lit_positions[led_position] = current_time_s
-                game_state.lit_colors[led_position] = Color(255, 255, 255)  # White
-                # Store bonus trail position
-                game_state.bonus_trail_positions[led_position] = current_time_s
+                game_state.trail_state_manager.update_position(led_position, current_time_s)
             
             # Draw target trail
-            positions_to_remove: List[int] = game_state.trail_renderer.draw_trail_with_easing(
-                game_state.lit_positions,
+            game_state.trail_state_manager.draw_main_trail(
                 TRAIL_FADE_DURATION_S,
                 TRAIL_EASE,
-                lambda brightness, pos: game_state.trail_renderer.get_target_trail_color(
-                    pos, brightness, game_state.lit_colors, game_state.button_handler),
+                game_state.button_handler,
                 lambda pos, color: display.set_pixel(pos, color)
             )
             
-            # Clean up old trail positions
-            for pos in positions_to_remove:
-                del game_state.lit_positions[pos]
-                del game_state.lit_colors[pos]
-            
             # Draw bonus trail if hit trail has been cleared
             if game_state.hit_trail_cleared:
-                bonus_positions_to_remove: List[int] = game_state.trail_renderer.draw_trail_with_easing(
-                    game_state.bonus_trail_positions,
+                game_state.trail_state_manager.draw_bonus_trail(
                     BONUS_TRAIL_FADE_DURATION_S,
                     BONUS_TRAIL_EASE,
-                    lambda brightness, pos: game_state.trail_renderer.get_bonus_trail_color(brightness),
-                    lambda p, c: display.set_bonus_trail_pixel((NUMBER_OF_LEDS - p) % NUMBER_OF_LEDS, c)
+                    lambda pos, color: display.set_bonus_trail_pixel(pos, color),
+                    lambda pos: (NUMBER_OF_LEDS - pos) % NUMBER_OF_LEDS
                 )
-                
-                # Clean up old bonus trail positions
-                for pos in bonus_positions_to_remove:
-                    del game_state.bonus_trail_positions[pos]
             
             # Draw hit trail in outer circle
             trail_positions = ScoreManager.calculate_trail_positions(
