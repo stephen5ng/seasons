@@ -24,24 +24,11 @@ from score_effects import ScoreEffects
 from led_position import LEDPosition
 from music_timing import MusicTiming
 from hit_trail import HitTrail
+from wled_controller import WLEDController
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
-WLED_IP = "192.168.0.121"
-WLED_SETTINGS = {
-    0: "FX=2&FP=67&SX=32",  # BREATHE / BLINK RED 
-    4: "FX=54&FP=57&SX=48",  # CHASE 3 / CANDY
-    8: "FX=19&FP=10&SX=255",  # DISSOLVE RND / FOREST
-    12: "FX=66&FP=41&SX=128",  # FIRE 2012 / MAGRED
-    16: "FX=9&FP=20&SX=128",  # RAINBOW / PASTEL
-    20: "FX=92&FP=45&SX=192",  # SINELON / CLOUD
-    24: "FX=13&FP=27&SX=96",  # SUNSET / SHERBET
-    32: "FX=3&FP=43&SX=128",  # WIPE / YELBLU
-    35: "FX=34&FP=19&SX=32",  # COLORFUL / TEMPERATURE
-    38: "FX=108&FP=9&SX=128",  # SINE / OCEAN
-    45: "FX=173&FP=34&SX=128",  # TARTAN / TERTIARY
-    48: "FX=34&FP=19&SX=32",  # BREATHE / SPLASH
-}
+from game_constants import WLED_IP, WLED_SETTINGS
 
 def parse_args():
     """Parse command line arguments."""
@@ -126,8 +113,8 @@ class GameState:
         self.last_beat: int = -1  # Track last beat for increment
         self.last_wled_measure: int = -1
         self.last_wled_score: int = -1
-        self.http_session: aiohttp.ClientSession = aiohttp.ClientSession()  # Create a single session for all HTTP requests
-        self.current_http_task: Optional[asyncio.Task] = None
+        self.http_session = aiohttp.ClientSession()  # Create a single session for all HTTP requests
+        self.wled_controller = WLEDController(WLED_IP, self.http_session)
         self.current_led_position: Optional[int] = None  # Track current LED position
         
         # Trail state
@@ -147,30 +134,9 @@ class GameState:
         self.trail_renderer = TrailRenderer(get_rainbow_color_func=get_rainbow_color)
 
 
-    async def _send_wled_command_inner(self, url: str) -> None:
-        """Internal method to send WLED command."""
-        try:
-            async with self.http_session.get(url, timeout=1.0) as response:
-                if response.status != 200:
-                    print(f"Error: HTTP {response.status} for {url}")
-                await response.text()
-        except asyncio.TimeoutError:
-            print(f"Error: Timeout connecting to WLED at {url}")
-        except aiohttp.ClientError as e:
-            print(f"Error: Failed to connect to WLED: {e}")
-        except Exception as e:
-            print(f"Error: Unexpected error connecting to WLED: {e}")
-
     async def send_wled_command(self, wled_command: str) -> None:
-        """Send a command to the WLED device, canceling any outstanding request."""
-        url: str = f"http://{WLED_IP}/win&{wled_command}&S2={2+int(self.score*6)}"
-        
-        # Don't send multiple requests at once.
-        if self.current_http_task and not self.current_http_task.done():
-            return
-       
-        # Start new request
-        self.current_http_task = asyncio.create_task(self._send_wled_command_inner(url))
+        """Send a command to the WLED device."""
+        await self.wled_controller.send_command(wled_command, self.score)
 
     async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
@@ -190,10 +156,10 @@ class GameState:
             if self.score != self.last_wled_score or self.last_wled_measure != wled_measure:
                 if self.last_wled_measure != wled_measure:
                     print(f"NEW MEASURE {wled_measure}")
-                    if wled_measure in WLED_SETTINGS:
+                    wled_command = WLEDController.get_command_for_measure(wled_measure, WLED_SETTINGS)
+                    if wled_command:
                         self.last_wled_measure = wled_measure
-                wled_command: str = WLED_SETTINGS[self.last_wled_measure]
-                await self.send_wled_command(wled_command)
+                        await self.send_wled_command(wled_command)
                 self.last_wled_score = self.score
                 print(f"score {self.score}")
             
