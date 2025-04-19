@@ -23,6 +23,7 @@ from trail_renderer import TrailRenderer
 from score_effects import ScoreEffects
 from led_position import LEDPosition
 from music_timing import MusicTiming
+from hit_trail import HitTrail
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
@@ -238,30 +239,29 @@ class GameState:
             self.last_hit_target = target_type
             
             # Check if adding a new hit would exceed circle size
-            total_space_needed: int = (len(self.hit_colors) + 1) * self.hit_spacing
-            if total_space_needed >= NUMBER_OF_LEDS:
-                if self.hit_spacing <= 4:
+            if HitTrail.should_adjust_spacing(self.hit_colors, self.hit_spacing, NUMBER_OF_LEDS):
+                new_spacing = HitTrail.get_new_spacing(self.hit_spacing)
+                if new_spacing == 0:  # Signal to clear trail
                     # Clear hit trail if we've hit minimum spacing
                     self.hit_colors = []
                     self.hit_spacing = INITIAL_HIT_SPACING  # Reset to initial spacing
                     self.hit_trail_cleared = True  # Mark that hit trail has been cleared
                     print("*********** Hit trail cleared, resetting spacing")
                 else:
-                    self.hit_spacing = max(self.hit_spacing / 2, 1)
+                    self.hit_spacing = new_spacing
                     print(f"*********** Hit spacing: {self.hit_spacing}")
             
             # Add hit color to beginning of trail
             try:
                 target_enum: TargetType = TargetType[target_type.upper()]
-                self.hit_colors.insert(0, TARGET_COLORS[target_enum])
+                self.hit_colors = HitTrail.add_hit_color(self.hit_colors, TARGET_COLORS[target_enum])
                 print(f"Hit colors: {len(self.hit_colors)}")
             except KeyError:
                 pass  # Ignore invalid target types
         
         # Always update trail length based on new score
         max_trail_length: int = int(new_score * 4)
-        if len(self.hit_colors) > max_trail_length:
-            self.hit_colors = self.hit_colors[:max_trail_length]
+        self.hit_colors = HitTrail.limit_trail_length(self.hit_colors, max_trail_length)
                 
         self.previous_score = self.score
         self.score = new_score
@@ -522,9 +522,11 @@ async def run_game() -> None:
                     del game_state.bonus_trail_positions[pos]
             
             # Draw hit trail in outer circle
-            for i, color in enumerate(game_state.hit_colors):
-                trail_pos: int = int((led_position - (i + 1) * game_state.hit_spacing) % NUMBER_OF_LEDS)
-                display.set_hit_trail_pixel(trail_pos, color)
+            trail_positions = HitTrail.calculate_trail_positions(
+                led_position, game_state.hit_colors, game_state.hit_spacing, NUMBER_OF_LEDS
+            )
+            for pos, color in trail_positions.items():
+                display.set_hit_trail_pixel(pos, color)
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
