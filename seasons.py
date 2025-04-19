@@ -19,7 +19,6 @@ from pygameasync import Clock
 from get_key import get_key
 import my_inputs
 from button_handler import ButtonHandler
-from trail_renderer import TrailRenderer
 from score_effects import ScoreEffects
 from led_position import LEDPosition
 from music_timing import MusicTiming
@@ -122,9 +121,6 @@ class GameState:
         
         # Trail state manager (replaces individual trail state variables)
         self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
-        
-        # Trail renderer (extracts trail/color logic)
-        self.trail_renderer = TrailRenderer(get_rainbow_color_func=get_rainbow_color)
         
     @property
     def score(self) -> float:
