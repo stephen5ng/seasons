@@ -27,6 +27,7 @@ from hit_trail import HitTrail
 from wled_controller import WLEDController
 from display_manager import DisplayManager
 from score_manager import ScoreManager
+from audio_manager import AudioManager
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
@@ -105,8 +106,6 @@ class GameState:
         self.button_handler = ButtonHandler(self.error_sound)
         self.trail_length: int = 0 
         self.beat_start_time_ms: int = 0
-        self.last_music_start_time_s: float = 0.0  # Track when we last started playing music
-        self.last_music_start_pos_s: float = 0.0   # Track from what position we started playing
         self.total_beats: int = 0  # Track total beats in song
         self.last_beat: int = -1  # Track last beat for increment
         self.last_wled_measure: int = -1
@@ -115,8 +114,10 @@ class GameState:
         self.wled_controller = WLEDController(WLED_IP, self.http_session)
         self.current_led_position: Optional[int] = None  # Track current LED position
         
-        # Score and trail management
+        # Component managers
         self.score_manager = ScoreManager()
+        self.audio_manager = AudioManager()
+        self.audio_manager.load_sound_effect("error", ERROR_SOUND)
         
         # Trail state
         self.lit_positions: Dict[int, float] = {}  # Maps LED position to timestamp when it was lit
@@ -216,27 +217,34 @@ class GameState:
         
         if beat_in_measure != 0:
             return
-        
+            
+        self.beat_start_time_ms = pygame.time.get_ticks()
         current_time_ms: int = pygame.time.get_ticks()
-        target_time_s: float = MusicTiming.calculate_target_music_time(
-            self.score_manager.score, self.beat_start_time_ms, current_time_ms, SECONDS_PER_MEASURE_S
+        
+        # Calculate target music time
+        target_time_s: float = self.audio_manager.get_target_music_time(
+            self.score_manager.score,
+            self.beat_start_time_ms,
+            current_time_ms,
+            SECONDS_PER_MEASURE_S
         )
         
-        # Get current music position in seconds, accounting for start position
-        current_music_pos_s: float = self.last_music_start_pos_s + (pygame.mixer.music.get_pos() / 1000.0)
-        
+        # Get current music position for logging
+        current_music_pos_s: float = self.audio_manager.get_current_music_position()
         print(f"Current music position: {current_music_pos_s}, Score: {self.score_manager.score}")
         print(f"Target time: {target_time_s}")
 
-        if MusicTiming.should_sync_music(current_music_pos_s, target_time_s):
+        # Check if we need to synchronize music
+        if self.audio_manager.should_sync_music(current_music_pos_s, target_time_s):
             print(f"difference {abs(current_music_pos_s - target_time_s)}")
-            print(f"Starting music at {target_time_s} seconds")
-            self.last_music_start_pos_s = target_time_s
+            
             # Update total beats based on new target time
-            target_beats: int = MusicTiming.calculate_target_beats(target_time_s, BEAT_PER_MS)
+            target_beats: int = self.audio_manager.calculate_target_beats(target_time_s, BEAT_PER_MS)
             self.total_beats = target_beats
             self.last_beat = target_beats - 1
-            pygame.mixer.music.play(start=target_time_s)
+            
+            # Play music from the target position
+            self.audio_manager.play_music(start_pos_s=target_time_s)
 
     def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
         """Update score and trigger flash effect if score increased."""
@@ -319,8 +327,8 @@ async def run_game() -> None:
     
     try:
         # Initialize music
-        pygame.mixer.music.load("music/Rise Up 3.mp3")
-        pygame.mixer.music.play(start=0)
+        game_state.audio_manager.load_music("music/Rise Up 3.mp3")
+        game_state.audio_manager.play_music(start_pos_s=0.0)
 
         while True:
             display.clear()
