@@ -38,7 +38,44 @@ def parse_args():
     parser = argparse.ArgumentParser(description='LED rhythm game')
     parser.add_argument('--leds', type=int, default=80,
                       help='Number of LEDs in the strip (default: 80)')
-    return parser.parse_args()
+    
+    # Display mode options
+    display_group = parser.add_argument_group('Display options')
+    display_group.add_argument('--show-bonus-trails', action='store_true',
+                      help='Display bonus trails')
+    display_group.add_argument('--show-main-trail', action='store_true',
+                      help='Display main trail')
+    display_group.add_argument('--show-hit-trail', action='store_true',
+                      help='Display hit trail')
+    
+    # Debug options
+    debug_group = parser.add_argument_group('Debug options')
+    debug_group.add_argument('--score', type=float, default=0.0,
+                      help='Set initial score value for debug modes')
+    debug_group.add_argument('--max-bonus-trails', type=int, default=5,
+                      help='Maximum number of bonus trails to create (default: 5)')
+    debug_group.add_argument('--one-loop', action='store_true',
+                      help='Run for one loop and exit')
+    
+    # Positional shortcut
+    parser.add_argument('trails', type=int, nargs='?', default=0,
+                      help='Number of bonus trails to display (shortcut for --show-bonus-trails --max-bonus-trails N)')
+    
+    args = parser.parse_args()
+    
+    # Handle the positional argument for bonus trails
+    if args.trails > 0:
+        args.show_bonus_trails = True
+        args.max_bonus_trails = args.trails
+        print(f"Debug mode: Showing {args.trails} bonus trails")
+    
+    # If no display modes specified, enable all by default
+    if not args.show_bonus_trails and not args.show_main_trail and not args.show_hit_trail:
+        args.show_bonus_trails = True
+        args.show_main_trail = True
+        args.show_hit_trail = True
+        
+    return args
 
 args = parse_args()
 
@@ -185,17 +222,19 @@ class GameState:
             self.last_beat = beat
             print(f"Total beats in song: {self.total_beats}")
             
-            # Check WLED_SETTINGS for current beat
-            wled_measure: int = self.total_beats//BEATS_PER_MEASURE
-            if self.score_manager.score != self.last_wled_score or self.last_wled_measure != wled_measure:
-                if self.last_wled_measure != wled_measure:
-                    print(f"NEW MEASURE {wled_measure}")
-                    wled_command = WLEDController.get_command_for_measure(wled_measure, WLED_SETTINGS)
-                    if wled_command:
-                        self.last_wled_measure = wled_measure
-                        await self.send_wled_command(wled_command)
-                self.last_wled_score = self.score_manager.score
-                print(f"score {self.score_manager.score}")
+            # Skip WLED communication if in debug mode
+            if not hasattr(args, 'score') or args.score is None:
+                # Check WLED_SETTINGS for current beat
+                wled_measure: int = self.total_beats//BEATS_PER_MEASURE
+                if self.score_manager.score != self.last_wled_score or self.last_wled_measure != wled_measure:
+                    if self.last_wled_measure != wled_measure:
+                        print(f"NEW MEASURE {wled_measure}")
+                        wled_command = WLEDController.get_command_for_measure(wled_measure, WLED_SETTINGS)
+                        if wled_command:
+                            self.last_wled_measure = wled_measure
+                            await self.send_wled_command(wled_command)
+                    self.last_wled_score = self.score_manager.score
+                    print(f"score {self.score_manager.score}")
             
         if beat_in_measure == 0:
             self.beat_start_time_ms = pygame.time.get_ticks()
@@ -214,6 +253,10 @@ class GameState:
         self.beat_start_time_ms = pygame.time.get_ticks()
         current_time_ms: int = pygame.time.get_ticks()
         
+        # Skip music handling if in debug mode
+        if hasattr(args, 'score') and args.score is not None:
+            return
+            
         # Calculate target music time
         target_time_s: float = self.audio_manager.get_target_music_time(
             self.score_manager.score,
@@ -320,10 +363,49 @@ async def run_game() -> None:
     # Initialize game state
     game_state: GameState = GameState()
     
+    # Debug display modes
+    show_main_trail = args.show_main_trail
+    show_hit_trail = args.show_hit_trail
+    show_bonus_trails = args.show_bonus_trails
+    debug_mode = args.one_loop
+    run_one_loop = args.one_loop
+    
+    # Set initial score for debug modes
+    if args.score > 0:
+        print(f"Setting initial score to {args.score}")
+        game_state.score_manager.score = args.score
+    
+    # Debug setup for different display modes
+    if show_main_trail:
+        print(f"Showing main trail")
+    if show_hit_trail:
+        print(f"Showing hit trail")
+        
+        # Set up hit colors based on score (simulate multiple hits)
+        # Add different colors based on the score level
+        hit_colors_count = int(game_state.score * 4)  # 4 colors per score point
+        for i in range(min(hit_colors_count, 40)):  # Max 40 colors
+            if i % 4 == 0:
+                game_state.score_manager.hit_colors.append(TARGET_COLORS[TargetType.RED])
+            elif i % 4 == 1:
+                game_state.score_manager.hit_colors.append(TARGET_COLORS[TargetType.GREEN])
+            elif i % 4 == 2:
+                game_state.score_manager.hit_colors.append(TARGET_COLORS[TargetType.BLUE])
+            else:
+                game_state.score_manager.hit_colors.append(TARGET_COLORS[TargetType.YELLOW])
+                
+        print(f"Created hit trail with {len(game_state.score_manager.hit_colors)} colors")
+    if show_bonus_trails:
+        print(f"Showing bonus trails")
+    
     try:
         # Initialize music
         game_state.audio_manager.load_music("music/Rise Up 3.mp3")
         game_state.audio_manager.play_music(start_pos_s=0.0)
+
+        # Variables for tracking if we've completed one full loop in debug mode
+        debug_loop_started = True  # Start tracking immediately
+        previous_led_position = -1
 
         while True:
             display.clear()
@@ -343,23 +425,41 @@ async def run_game() -> None:
             led_position: int = game_state.calculate_led_position(beat_in_measure, fractional_beat)
             game_state.update_loop_count(led_position / NUMBER_OF_LEDS)
 
-            # Handle scoring and penalties
-            if not game_state.button_handler.is_in_valid_window(led_position):
-                new_score: float = game_state.button_handler.apply_penalty(game_state.score_manager.score)
-                if new_score != game_state.score_manager.score:
-                    print(f"New score: {new_score}, target hit: none")
-                    game_state.update_score(new_score, "none", beat_float)
-            game_state.reset_flags(led_position)
+            # For debug mode, track when we've completed one loop
+            if run_one_loop:
+                # Initialize the first position
+                if previous_led_position == -1:
+                    previous_led_position = led_position
+                    print(f"Debug: Started tracking at position {led_position}")
+                
+                # If we've gone from a high position to a low position, we've completed a loop
+                elif previous_led_position > 70 and led_position < 10:
+                    print(f"Debug: Completed one full loop, exiting.")
+                    return
+                
+                previous_led_position = led_position
             
-            # Check for scoring (both manual and auto)
-            new_score: float
-            target_hit: str
-            error_feedback: Optional[Tuple[int, Color]]
-            new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
-                led_position, game_state.score_manager.score, current_time_ms)
-            if new_score != game_state.score:
-                print(f"New score: {new_score}, target hit: {target_hit}")
-                game_state.update_score(new_score, target_hit, beat_float)
+            # Handle scoring and penalties (skip if in debug mode)
+            if not debug_mode:
+                if not game_state.button_handler.is_in_valid_window(led_position):
+                    new_score: float = game_state.button_handler.apply_penalty(game_state.score_manager.score)
+                    if new_score != game_state.score_manager.score:
+                        print(f"New score: {new_score}, target hit: none")
+                        game_state.update_score(new_score, "none", beat_float)
+                game_state.reset_flags(led_position)
+                
+                # Check for scoring (both manual and auto)
+                new_score: float
+                target_hit: str
+                error_feedback: Optional[Tuple[int, Color]]
+                new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
+                    led_position, game_state.score_manager.score, current_time_ms)
+                if new_score != game_state.score:
+                    print(f"New score: {new_score}, target hit: {target_hit}")
+                    game_state.update_score(new_score, target_hit, beat_float)
+            else:
+                game_state.reset_flags(led_position)
+                error_feedback = None
             
             # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
@@ -368,31 +468,32 @@ async def run_game() -> None:
                 game_state.trail_state_manager.update_position(led_position, current_time_s)
             
             # Draw target trail
-            game_state.trail_state_manager.draw_main_trail(
-                TRAIL_FADE_DURATION_S,
-                TRAIL_EASE,
-                game_state.button_handler,
-                lambda pos, color: display.set_pixel(pos, color)
-            )
+            if show_main_trail:
+                game_state.trail_state_manager.draw_main_trail(
+                    TRAIL_FADE_DURATION_S,
+                    TRAIL_EASE,
+                    game_state.button_handler,
+                    lambda pos, color: display.set_pixel(pos, color)
+                )
             
-            # Draw bonus trail if hit trail has been cleared
-            if game_state.hit_trail_cleared:
+            # Draw bonus trail if hit trail has been cleared (skip in debug modes)
+            if game_state.hit_trail_cleared and show_bonus_trails and not debug_mode:
                 game_state.trail_state_manager.draw_bonus_trail(
                     BONUS_TRAIL_FADE_DURATION_S,
                     BONUS_TRAIL_EASE,
-                    lambda pos, color: display.set_bonus_trail_pixel(pos, color),
-                    lambda pos: (NUMBER_OF_LEDS - pos) % NUMBER_OF_LEDS
+                    lambda pos, color: display.set_bonus_trail_pixel(pos, color)
                 )
             
             # Draw hit trail in outer circle
-            trail_positions = ScoreManager.calculate_trail_positions(
-                led_position, game_state.score_manager.hit_colors, game_state.score_manager.hit_spacing, NUMBER_OF_LEDS
-            )
-            for pos, color in trail_positions.items():
-                display.set_hit_trail_pixel(pos, color)
+            if show_hit_trail:
+                trail_positions = ScoreManager.calculate_trail_positions(
+                    led_position, game_state.score_manager.hit_colors, game_state.score_manager.hit_spacing, NUMBER_OF_LEDS
+                )
+                for pos, color in trail_positions.items():
+                    display.set_hit_trail_pixel(pos, color)
             
-            # Draw score lines with flash effect (only in Pygame mode)
-            if not IS_RASPBERRY_PI:
+            # Draw score lines with flash effect (only in Pygame mode and not in debug mode)
+            if not IS_RASPBERRY_PI and not debug_mode:
                 flash_intensity: float = game_state.get_score_flash_intensity(beat_float)
                 display.draw_score_lines(
                     score=game_state.score_manager.score,
@@ -409,22 +510,23 @@ async def run_game() -> None:
                     get_score_line_color_func=get_score_line_color
                 )
             
-            # Draw current LED in white
-            base_color: Color = Color(255, 255, 255)
-            # Apply target colors if in scoring window
-            if game_state.button_handler.is_in_valid_window(led_position):
-                target_type: Optional[TargetType] = game_state.button_handler.get_target_type(led_position)
-                if target_type:
-                    base_color = TARGET_COLORS[target_type]
-            
-            display.set_pixel(led_position, base_color)
+            # Draw current LED in white (unless hit-trail-only mode)
+            if show_main_trail:
+                base_color: Color = Color(255, 255, 255)
+                # Apply target colors if in scoring window
+                if game_state.button_handler.is_in_valid_window(led_position):
+                    target_type: Optional[TargetType] = game_state.button_handler.get_target_type(led_position)
+                    if target_type:
+                        base_color = TARGET_COLORS[target_type]
+                
+                display.set_pixel(led_position, base_color)
 
-            # Draw error feedback if wrong key was pressed
-            if error_feedback is not None:
-                error_pos: int
-                error_color: Color
-                error_pos, error_color = error_feedback
-                display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
+                # Draw error feedback if wrong key was pressed
+                if error_feedback is not None:
+                    error_pos: int
+                    error_color: Color
+                    error_pos, error_color = error_feedback
+                    display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
 
             # Handle input (only for quit)
             for key, keydown in get_key():
