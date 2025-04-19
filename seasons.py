@@ -19,6 +19,7 @@ from pygameasync import Clock
 from get_key import get_key
 import my_inputs
 from button_handler import ButtonPressHandler
+from trail_renderer import TrailRenderer
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
@@ -138,49 +139,9 @@ class GameState:
         # Bonus trail state
         self.bonus_trail_positions: Dict[int, float] = {}  # Maps LED position to timestamp when it was lit
 
-    def _draw_trail_with_easing(self, positions: Dict[int, float], fade_duration: float, ease_func: easing_functions.CircularEaseOut, 
-                              color_func: Callable[[float], Color], display_func: Callable[[int, Color], None]) -> List[int]:
-        """Helper method to draw a trail with temporal easing.
-        Returns list of positions to remove."""
-        current_time_s: float = pygame.time.get_ticks() / 1000.0
-        positions_to_remove: List[int] = []
-        
-        for pos, lit_time in positions.items():
-            elapsed_s: float = current_time_s - lit_time
-            if elapsed_s > fade_duration:
-                positions_to_remove.append(pos)
-            else:
-                brightness: float = ease_func.ease(elapsed_s)
-                color: Color = color_func(brightness)
-                display_func(pos, color)
-        
-        return positions_to_remove
+        # Trail renderer (extracts trail/color logic)
+        self.trail_renderer = TrailRenderer(get_rainbow_color_func=get_rainbow_color)
 
-    def _get_target_trail_color(self, pos: int, brightness: float) -> Color:
-        """Get color for target trail with brightness."""
-        base_color: Color = self.lit_colors[pos]
-        if self.button_handler.is_in_valid_window(pos):
-            target_type: Optional[TargetType] = self.button_handler.get_target_type(pos)
-            if target_type:
-                base_color = TARGET_COLORS[target_type]
-        return Color(
-            int(base_color[0] * brightness),
-            int(base_color[1] * brightness),
-            int(base_color[2] * brightness),
-            base_color[3]
-        )
-
-    def _get_bonus_trail_color(self, brightness: float) -> Color:
-        """Get color for bonus trail with brightness."""
-        current_time_ms: int = pygame.time.get_ticks()
-        # Use a different offset for bonus trail to create a different rainbow pattern
-        rainbow_color: Color = get_rainbow_color(current_time_ms, 10)  # Using 10 as offset to differentiate from score lines
-        return Color(
-            int(rainbow_color[0] * brightness),
-            int(rainbow_color[1] * brightness),
-            int(rainbow_color[2] * brightness),
-            rainbow_color[3]
-        )
 
     async def _send_wled_command_inner(self, url: str) -> None:
         """Internal method to send WLED command."""
@@ -539,11 +500,12 @@ async def run_game() -> None:
                 game_state.bonus_trail_positions[led_position] = current_time_s
             
             # Draw target trail
-            positions_to_remove: List[int] = game_state._draw_trail_with_easing(
+            positions_to_remove: List[int] = game_state.trail_renderer.draw_trail_with_easing(
                 game_state.lit_positions,
                 TRAIL_FADE_DURATION_S,
                 TRAIL_EASE,
-                lambda b, p=led_position: game_state._get_target_trail_color(p, b),
+                lambda brightness, pos: game_state.trail_renderer.get_target_trail_color(
+                    pos, brightness, game_state.lit_colors, game_state.button_handler),
                 display.set_pixel
             )
             
@@ -554,11 +516,11 @@ async def run_game() -> None:
             
             # Draw bonus trail if hit trail has been cleared
             if game_state.hit_trail_cleared:
-                bonus_positions_to_remove: List[int] = game_state._draw_trail_with_easing(
+                bonus_positions_to_remove: List[int] = game_state.trail_renderer.draw_trail_with_easing(
                     game_state.bonus_trail_positions,
                     BONUS_TRAIL_FADE_DURATION_S,
                     BONUS_TRAIL_EASE,
-                    game_state._get_bonus_trail_color,
+                    lambda brightness, pos: game_state.trail_renderer.get_bonus_trail_color(brightness),
                     lambda p, c: display.set_bonus_trail_pixel((NUMBER_OF_LEDS - p) % NUMBER_OF_LEDS, c)
                 )
                 
