@@ -22,6 +22,7 @@ from button_handler import ButtonPressHandler
 from trail_renderer import TrailRenderer
 from score_effects import ScoreEffects
 from led_position import LEDPosition
+from music_timing import MusicTiming
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
@@ -172,11 +173,10 @@ class GameState:
 
     async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
-        duration_ms: int = pygame.time.get_ticks() - self.start_ticks_ms
-        beat_float: float = duration_ms * BEAT_PER_MS
-        beat: int = int(beat_float)
-        beat_in_measure: int = beat % BEATS_PER_MEASURE
-        fractional_beat: float = beat_float % 1
+        current_time_ms: int = pygame.time.get_ticks()
+        beat, beat_in_measure, beat_float, fractional_beat = MusicTiming.calculate_beat_timing(
+            current_time_ms, self.start_ticks_ms, BEAT_PER_MS, BEATS_PER_MEASURE
+        )
         
         # Update total beats when we cross a beat boundary
         if beat > self.last_beat:
@@ -211,8 +211,9 @@ class GameState:
             return
         
         current_time_ms: int = pygame.time.get_ticks()
-        measure_offset_s: float = (current_time_ms - self.beat_start_time_ms) / 1000.0
-        target_time_s: float = int(self.score) * SECONDS_PER_MEASURE_S + measure_offset_s
+        target_time_s: float = MusicTiming.calculate_target_music_time(
+            self.score, self.beat_start_time_ms, current_time_ms, SECONDS_PER_MEASURE_S
+        )
         
         # Get current music position in seconds, accounting for start position
         current_music_pos_s: float = self.last_music_start_pos_s + (pygame.mixer.music.get_pos() / 1000.0)
@@ -220,12 +221,12 @@ class GameState:
         print(f"Current music position: {current_music_pos_s}, Score: {self.score}")
         print(f"Target time: {target_time_s}")
 
-        if abs(current_music_pos_s - target_time_s) > 0.2:
+        if MusicTiming.should_sync_music(current_music_pos_s, target_time_s):
             print(f"difference {abs(current_music_pos_s - target_time_s)}")
             print(f"Starting music at {target_time_s} seconds")
             self.last_music_start_pos_s = target_time_s
             # Update total beats based on new target time
-            target_beats: int = int(target_time_s * (1000 * BEAT_PER_MS))
+            target_beats: int = MusicTiming.calculate_target_beats(target_time_s, BEAT_PER_MS)
             self.total_beats = target_beats
             self.last_beat = target_beats - 1
             pygame.mixer.music.play(start=target_time_s)
