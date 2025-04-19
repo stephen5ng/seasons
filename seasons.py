@@ -21,6 +21,7 @@ import my_inputs
 from button_handler import ButtonPressHandler
 from trail_renderer import TrailRenderer
 from score_effects import ScoreEffects
+from led_position import LEDPosition
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
@@ -270,8 +271,7 @@ class GameState:
 
     def calculate_led_position(self, beat_in_measure: int, fractional_beat: float) -> int:
         """Calculate the current LED position based on beat timing."""
-        percent_of_measure: float = (fractional_beat / BEATS_PER_MEASURE) + (beat_in_measure / BEATS_PER_MEASURE)
-        return int(percent_of_measure * NUMBER_OF_LEDS)
+        return LEDPosition.calculate_position(beat_in_measure, fractional_beat, BEATS_PER_MEASURE, NUMBER_OF_LEDS)
     
     def update_loop_count(self, percent_of_measure: float) -> None:
         """Update the loop count based on measure progress."""
@@ -296,10 +296,8 @@ class GameState:
 
 def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
-    angle: float = 3 * math.pi / 2 + (2 * math.pi * i) / NUMBER_OF_LEDS
-    x: int = CIRCLE_CENTER_X + int(radius * math.cos(angle))
-    y: int = CIRCLE_CENTER_Y + int(radius * math.sin(angle))
-    return (x, y)
+    x, y = LEDPosition.get_ring_position(i, radius, NUMBER_OF_LEDS)
+    return (CIRCLE_CENTER_X + x, CIRCLE_CENTER_Y + y)
 
 def get_hit_trail_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in the hit trail ring, starting at 12 o'clock."""
