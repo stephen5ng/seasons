@@ -1,5 +1,6 @@
 """Score visual effects calculations."""
-from typing import Optional
+from typing import Optional, Tuple
+from pygame import Color
 
 class ScoreEffects:
     """Handles score-related visual effects calculations."""
@@ -23,3 +24,35 @@ class ScoreEffects:
             return 0.0
         
         return 1.0 - (beats_since_flash / 2.0)
+    
+    @staticmethod
+    def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: str) -> Color:
+        """Create a flash effect for score lines based on which target was hit.
+        
+        Args:
+            base_color: Base color for score lines
+            flash_intensity: Intensity of flash effect (0.0 to 1.0)
+            flash_type: Type of flash effect (e.g., "red", "blue")
+            
+        Returns:
+            Modified color for score lines
+        """
+        if flash_intensity <= 0:
+            return base_color
+            
+        # Create different flash colors based on target type
+        r: int = base_color.r
+        g: int = base_color.g
+        b: int = base_color.b
+        
+        if flash_type == "red":
+            r = min(255, int(r + (255 - r) * flash_intensity))
+        elif flash_type == "blue":
+            b = min(255, int(b + (255 - b) * flash_intensity))
+        elif flash_type == "green":
+            g = min(255, int(g + (255 - g) * flash_intensity))
+        elif flash_type == "yellow":
+            r = min(255, int(r + (255 - r) * flash_intensity))
+            g = min(255, int(g + (255 - g) * flash_intensity))
+            
+        return Color(r, g, b)
