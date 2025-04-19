@@ -20,6 +20,7 @@ from get_key import get_key
 import my_inputs
 from button_handler import ButtonPressHandler
 from trail_renderer import TrailRenderer
+from score_effects import ScoreEffects
 
 # Constants
 SPB = 1.84615385  # Seconds per beat
@@ -265,14 +266,7 @@ class GameState:
     
     def get_score_flash_intensity(self, beat_float: float) -> float:
         """Calculate the intensity of the score flash effect based on musical beats."""
-        if self.score_flash_start_beat is None:
-            return 0.0
-        
-        beats_since_flash: float = beat_float - self.score_flash_start_beat
-        if beats_since_flash >= 2.0:  # Flash lasts for 2 beats
-            return 0.0
-        
-        return 1.0 - (beats_since_flash / 2.0)
+        return ScoreEffects.get_flash_intensity(beat_float, self.score_flash_start_beat)
 
     def calculate_led_position(self, beat_in_measure: int, fractional_beat: float) -> int:
         """Calculate the current LED position based on beat timing."""
