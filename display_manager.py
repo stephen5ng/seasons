@@ -75,22 +75,37 @@ class DisplayManager:
             ws_color: LEDColor = LEDColor(color.r, color.g, color.b)
             self.strip.setPixelColor(pos, ws_color)
         else:
-            from seasons import get_target_ring_position, TARGET_TRAIL_RADIUS
-            x, y = get_target_ring_position(pos, TARGET_TRAIL_RADIUS)
+            # Avoid circular import
+            import game_constants
+            x, y = self._get_ring_position(pos, 
+                                         self.screen_width // 2, 
+                                         self.screen_height // 2, 
+                                         game_constants.TARGET_TRAIL_RADIUS, 
+                                         game_constants.NUMBER_OF_LEDS)
             self.pygame_surface.set_at((x, y), color)
     
     def set_hit_trail_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in hit trail ring."""
         if not IS_RASPBERRY_PI:
-            from seasons import get_hit_trail_position
-            x, y = get_hit_trail_position(pos)
+            # Avoid circular import
+            import game_constants
+            x, y = self._get_ring_position(pos, 
+                                         self.screen_width // 2, 
+                                         self.screen_height // 2, 
+                                         game_constants.HIT_TRAIL_RADIUS, 
+                                         game_constants.NUMBER_OF_LEDS)
             self.pygame_surface.set_at((x, y), color)
     
     def set_bonus_trail_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in bonus trail ring."""
         if not IS_RASPBERRY_PI:
-            from seasons import get_bonus_trail_position
-            x, y = get_bonus_trail_position(pos)
+            # Avoid circular import
+            import game_constants
+            x, y = self._get_ring_position(pos, 
+                                         self.screen_width // 2, 
+                                         self.screen_height // 2, 
+                                         game_constants.BONUS_TRAIL_RADIUS, 
+                                         game_constants.NUMBER_OF_LEDS)
             self.pygame_surface.set_at((x, y), color)
     
     # New-style methods
