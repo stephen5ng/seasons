@@ -15,7 +15,7 @@ from get_key import get_key
 from button_handler import ButtonHandler
 from led_position import LEDPosition
 from music_timing import MusicTiming
-from wled_controller import WLEDController
+from wled_manager import WLEDManager
 from display_manager import DisplayManager
 from score_manager import ScoreManager
 from audio_manager import AudioManager
@@ -133,19 +133,17 @@ class GameState:
         self.beat_start_time_ms: int = 0
         self.total_beats: int = 0  # Track total beats in song
         self.last_beat: int = -1  # Track last beat for increment
-        self.last_wled_measure: int = -1
-        self.last_wled_score: int = -1
         self.http_session = aiohttp.ClientSession()  # Create a single session for all HTTP requests
-        self.wled_controller = WLEDController(WLED_IP, self.http_session)
-        self.current_led_position: Optional[int] = None  # Track current LED position
         
         # Component managers
         self.score_manager = ScoreManager()
         self.audio_manager = AudioManager()
         self.audio_manager.load_sound_effect("error", ERROR_SOUND)
+        self.wled_manager = WLEDManager(WLED_IP, self.http_session, WLED_SETTINGS)
         
         # Trail state manager (replaces individual trail state variables)
         self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
+        self.current_led_position: Optional[int] = None  # Track current LED position
         
     @property
     def score(self) -> float:
@@ -192,11 +190,6 @@ class GameState:
         if is_in_window and not was_in_window:
             print(f"Entered scoring window at position {led_position}")
 
-
-    async def send_wled_command(self, wled_command: str) -> None:
-        """Send a command to the WLED device."""
-        await self.wled_controller.send_command(wled_command, self.score_manager.score)
-
     async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
         current_time_ms: int = pygame.time.get_ticks()
@@ -210,19 +203,11 @@ class GameState:
             self.last_beat = beat
             print(f"Total beats in song: {self.total_beats}")
             
-            # Skip WLED communication if in debug mode
-            if not hasattr(args, 'score') or args.score is None:
-                # Check WLED_SETTINGS for current beat
-                wled_measure: int = self.total_beats//BEATS_PER_MEASURE
-                if self.score_manager.score != self.last_wled_score or self.last_wled_measure != wled_measure:
-                    if self.last_wled_measure != wled_measure:
-                        print(f"NEW MEASURE {wled_measure}")
-                        wled_command = WLEDController.get_command_for_measure(wled_measure, WLED_SETTINGS)
-                        if wled_command:
-                            self.last_wled_measure = wled_measure
-                            await self.send_wled_command(wled_command)
-                    self.last_wled_score = self.score_manager.score
-                    print(f"score {self.score_manager.score}")
+            # Update WLED based on current measure and score
+            # Check if we're in debug mode
+            debug_mode = hasattr(args, 'score') and args.score is not None
+            wled_measure: int = self.total_beats // BEATS_PER_MEASURE
+            await self.wled_manager.update_wled(wled_measure, self.score_manager.score, debug_mode)
             
         if beat_in_measure == 0:
             self.beat_start_time_ms = pygame.time.get_ticks()
