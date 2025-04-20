@@ -228,8 +228,8 @@ class GameState:
         self.beat_start_time_ms = pygame.time.get_ticks()
         current_time_ms: int = pygame.time.get_ticks()
         
-        # Skip music handling if in debug mode
-        if hasattr(args, 'score') and args.score is not None:
+        # Skip music handling if in debug mode with a score set
+        if args.score > 0:
             return
             
         # Calculate target music time
