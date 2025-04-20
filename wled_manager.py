@@ -24,7 +24,7 @@ class WLEDManager:
         self.last_wled_measure: int = -1
         self.last_wled_score: float = -1.0
         
-    async def update_wled(self, current_measure: int, score: float, debug_mode: bool = False) -> None:
+    async def update_wled(self, current_measure: int, score: float) -> None:
         """Update WLED device based on current measure and score.
         
         Checks if the measure or score has changed significantly enough to warrant
@@ -33,11 +33,7 @@ class WLEDManager:
         Args:
             current_measure: Current measure number
             score: Current game score
-            debug_mode: Whether the game is in debug mode (skips WLED updates if True)
         """
-        if debug_mode:
-            return
-            
         # Check if we need to update WLED based on measure or score change
         if score != self.last_wled_score or self.last_wled_measure != current_measure:
             # If measure changed, check for a new command

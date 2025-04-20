@@ -59,6 +59,8 @@ def parse_args():
                       help='Maximum number of bonus trails to create (default: 5)')
     debug_group.add_argument('--one-loop', action='store_true',
                       help='Run for one loop and exit')
+    debug_group.add_argument('--disable-wled', action='store_true',
+                      help='Disable all WLED light commands')
     
     # Positional shortcut
     parser.add_argument('trails', type=int, nargs='?', default=0,
@@ -204,10 +206,10 @@ class GameState:
             print(f"Total beats in song: {self.total_beats}")
             
             # Update WLED based on current measure and score
-            # Check if we're in debug mode
-            debug_mode = hasattr(args, 'score') and args.score is not None
-            wled_measure: int = self.total_beats // BEATS_PER_MEASURE
-            await self.wled_manager.update_wled(wled_measure, self.score_manager.score, debug_mode)
+            # Skip if WLED is disabled
+            if not args.disable_wled:
+                wled_measure: int = self.total_beats // BEATS_PER_MEASURE
+                await self.wled_manager.update_wled(wled_measure, self.score_manager.score)
             
         if beat_in_measure == 0:
             self.beat_start_time_ms = pygame.time.get_ticks()
