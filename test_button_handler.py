@@ -13,15 +13,27 @@ class TestButtonHandler(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.error_sound = MagicMock()
-        self.button_handler = ButtonHandler(self.error_sound)
+        # Mock sound
+        self.mock_sound = MagicMock()
         
         # Mock constants for testing
         self.led_count = 80
         self.window_size = 4
-        self.mid_pos = 40
-        self.right_pos = 20
-        self.left_pos = 60
+        self.mid_pos = 40  # 50% of led_count
+        self.right_pos = 20  # 25% of led_count
+        self.left_pos = 60  # 75% of led_count
+        
+        # Create button handler with our test values
+        self.button_handler = ButtonHandler(
+            self.mock_sound,
+            number_of_leds=self.led_count,
+            target_window_size=self.window_size
+        )
+        
+        # Override the calculated target positions for testing
+        self.button_handler.blue_target_pos = self.mid_pos
+        self.button_handler.green_target_pos = self.right_pos
+        self.button_handler.yellow_target_pos = self.left_pos
     
     def test_is_position_in_valid_window(self):
         """Test the is_position_in_valid_window static method."""
@@ -106,15 +118,12 @@ class TestButtonHandler(unittest.TestCase):
         self.assertEqual(ButtonHandler.get_keys_for_target(TargetType.YELLOW), [pygame.K_y, pygame.K_LEFT])
     
     def test_get_window_position_for_target(self):
-        """Test the get_window_position_for_target static method."""
-        # Test window positions for each target type
-        with patch('button_handler.MID_TARGET_POS', self.mid_pos), \
-             patch('button_handler.RIGHT_TARGET_POS', self.right_pos), \
-             patch('button_handler.LEFT_TARGET_POS', self.left_pos):
-            self.assertEqual(ButtonHandler.get_window_position_for_target(TargetType.RED), 0)
-            self.assertEqual(ButtonHandler.get_window_position_for_target(TargetType.BLUE), int(self.mid_pos))
-            self.assertEqual(ButtonHandler.get_window_position_for_target(TargetType.GREEN), int(self.right_pos))
-            self.assertEqual(ButtonHandler.get_window_position_for_target(TargetType.YELLOW), int(self.left_pos))
+        """Test the get_window_position_for_target instance method."""
+        # Test window positions for each target type using the instance method
+        self.assertEqual(self.button_handler.get_window_position_for_target(TargetType.RED), 0)
+        self.assertEqual(self.button_handler.get_window_position_for_target(TargetType.BLUE), int(self.mid_pos))
+        self.assertEqual(self.button_handler.get_window_position_for_target(TargetType.GREEN), int(self.right_pos))
+        self.assertEqual(self.button_handler.get_window_position_for_target(TargetType.YELLOW), int(self.left_pos))
     
     @patch('pygame.key.get_pressed')
     def test_handle_keypress_correct_key(self, mock_get_pressed):
@@ -143,7 +152,7 @@ class TestButtonHandler(unittest.TestCase):
             self.assertEqual(score, 0.75)
             self.assertEqual(target_hit, "none")
             self.assertIsNotNone(error_feedback)
-            self.assertEqual(error_feedback[0], ButtonHandler.get_window_position_for_target(TargetType.BLUE))
+            self.assertEqual(error_feedback[0], self.button_handler.get_window_position_for_target(TargetType.BLUE))
     
     @patch('pygame.key.get_pressed')
     def test_handle_keypress_out_of_window(self, mock_get_pressed):

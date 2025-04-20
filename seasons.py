@@ -4,6 +4,7 @@ import asyncio
 import os
 import platform
 import argparse
+import sys
 from typing import List, Optional, Tuple, Dict
 
 import aiohttp
@@ -82,7 +83,25 @@ def parse_args():
         
     return args
 
-args = parse_args()
+# Define default values to use when the script is imported (not run directly)
+default_args = argparse.Namespace(
+    leds=80,
+    show_bonus_trails=True,
+    show_main_trail=True,
+    show_hit_trail=True,
+    score=0.0,
+    max_bonus_trails=5,
+    one_loop=False,
+    disable_wled=False,
+    trails=0
+)
+
+# Only parse arguments when the script is run directly
+if __name__ == "__main__":
+    args = parse_args()
+else:
+    # Use default values when the script is imported
+    args = default_args
 
 # Update shared constants in game_constants for runtime values
 game_constants.NUMBER_OF_LEDS = args.leds
