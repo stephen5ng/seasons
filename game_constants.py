@@ -5,13 +5,16 @@ from pygame import Color
 import easing_functions
 
 # Global game constants
-NUMBER_OF_LEDS = 80  # Default number of LEDs
+NUMBER_OF_LEDS = 80  # Default number of LEDs - will be overridden by command line
 
-# Target constants
+# Target constants - will be calculated at runtime based on actual LED count
 TARGET_WINDOW_SIZE = NUMBER_OF_LEDS // 20  # Window size proportional to number of LEDs
-MID_TARGET_POS = NUMBER_OF_LEDS / 2  # Position of the middle target
-RIGHT_TARGET_POS = NUMBER_OF_LEDS / 4  # Position of the 90 degree target
-LEFT_TARGET_POS = 3 * NUMBER_OF_LEDS / 4  # Position of the 270 degree target
+
+# Target positions as fixed percentages (clock positions)
+RED_TARGET_PERCENT = 0.0    # 12 o'clock (0%)
+GREEN_TARGET_PERCENT = 0.25 # 3 o'clock (25%)
+BLUE_TARGET_PERCENT = 0.5   # 6 o'clock (50%)
+YELLOW_TARGET_PERCENT = 0.75 # 9 o'clock (75%)
 
 # Display constants
 SCALING_FACTOR = 9

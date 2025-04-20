@@ -4,8 +4,8 @@ from typing import Dict, List, Optional, Tuple, Callable, Any
 import pygame
 from pygame import Color
 
-# Import constants needed by ButtonHandler
-from game_constants import NUMBER_OF_LEDS, TARGET_WINDOW_SIZE, MID_TARGET_POS, RIGHT_TARGET_POS, LEFT_TARGET_POS, TARGET_COLORS, TargetType
+# Import only the enum and colors, but not the position constants
+from game_constants import TARGET_COLORS, TargetType
 
 # Game settings
 ALWAYS_SCORE = True  # When True, automatically scores on every round
@@ -17,11 +17,14 @@ class ButtonHandler:
     in the correct window, and updating the score accordingly.
     """
     
-    def __init__(self, error_sound: Optional[pygame.mixer.Sound] = None) -> None:
+    def __init__(self, error_sound: Optional[pygame.mixer.Sound] = None,
+                number_of_leds: int = 80, target_window_size: int = 4) -> None:
         """Initialize the button handler.
         
         Args:
             error_sound: Sound to play when an error occurs
+            number_of_leds: Number of LEDs in the strip (default: 80)
+            target_window_size: Size of target windows (default: 4)
         """
         self.button_states: Dict[str, bool] = {
             "r": False,
@@ -32,6 +35,16 @@ class ButtonHandler:
         self.penalty_applied: bool = False
         self.round_active: bool = False
         self.error_sound: Optional[pygame.mixer.Sound] = error_sound
+        
+        # Store LED configuration
+        self.number_of_leds = number_of_leds
+        self.target_window_size = target_window_size
+        
+        # Calculate target positions using percentages
+        self.red_target_pos = 0
+        self.blue_target_pos = int(number_of_leds * 0.5)   # 6 o'clock (50%)
+        self.green_target_pos = int(number_of_leds * 0.25) # 3 o'clock (25%)
+        self.yellow_target_pos = int(number_of_leds * 0.75) # 9 o'clock (75%)
     
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
@@ -42,8 +55,8 @@ class ButtonHandler:
         Returns:
             True if the position is in a valid scoring window
         """
-        return ButtonHandler.is_position_in_valid_window(led_position, NUMBER_OF_LEDS, TARGET_WINDOW_SIZE, 
-                                                       MID_TARGET_POS, RIGHT_TARGET_POS, LEFT_TARGET_POS)
+        return ButtonHandler.is_position_in_valid_window(led_position, self.number_of_leds, self.target_window_size, 
+                                                       self.blue_target_pos, self.green_target_pos, self.yellow_target_pos)
     
     def apply_penalty(self, score: float) -> float:
         """Apply penalty if button wasn't pressed in valid window.
@@ -81,8 +94,8 @@ class ButtonHandler:
         Returns:
             TargetType if position is in a target window, None otherwise
         """
-        return ButtonHandler.get_target_type_for_position(position, NUMBER_OF_LEDS, TARGET_WINDOW_SIZE, 
-                                                        MID_TARGET_POS, RIGHT_TARGET_POS, LEFT_TARGET_POS)
+        return ButtonHandler.get_target_type_for_position(position, self.number_of_leds, self.target_window_size, 
+                                                        self.blue_target_pos, self.green_target_pos, self.yellow_target_pos)
 
     def handle_keypress(self, led_position: int, score: float, current_time: int) -> Tuple[float, str, Optional[Tuple[int, Color]]]:
         """Handle keypress and update score if in valid window with correct key.
@@ -135,10 +148,10 @@ class ButtonHandler:
         for target_type in TargetType:
             keys = ButtonHandler.get_keys_for_target(target_type)
             if any(keys_pressed[key] for key in keys):
-                window_pos = ButtonHandler.get_window_position_for_target(target_type)
+                window_pos = self.get_window_position_for_target(target_type)
                 
                 # If we're not in this key's window, show error and apply penalty
-                if abs(led_position - window_pos) > TARGET_WINDOW_SIZE:
+                if abs(led_position - window_pos) > self.target_window_size:
                     if self.error_sound:
                         self.error_sound.play()
                     error_color: Color = TARGET_COLORS[target_type]
@@ -165,10 +178,28 @@ class ButtonHandler:
                 if any(keys_pressed[key] for key in wrong_keys):
                     if self.error_sound:
                         self.error_sound.play()
-                    error_pos = ButtonHandler.get_window_position_for_target(wrong_target)
+                    error_pos = self.get_window_position_for_target(wrong_target)
                     error_color: Color = TARGET_COLORS[wrong_target]
                     return max(0, score - 0.25), "none", (error_pos, error_color)
         return None
+    
+    def get_window_position_for_target(self, target_type: TargetType) -> int:
+        """Get the center position of a target window.
+        
+        Args:
+            target_type: Target type to get position for
+            
+        Returns:
+            Center position of the target window
+        """
+        if target_type == TargetType.RED:
+            return self.red_target_pos
+        elif target_type == TargetType.BLUE:
+            return self.blue_target_pos
+        elif target_type == TargetType.GREEN:
+            return self.green_target_pos
+        else:  # YELLOW
+            return self.yellow_target_pos
     
     @staticmethod
     def is_position_in_valid_window(led_position: int, led_count: int, window_size: int,
@@ -225,13 +256,27 @@ class ButtonHandler:
         Returns:
             TargetType if position is in a target window, None otherwise
         """
-        if position <= window_size or position >= led_count - window_size:
+        # Convert position to percentage around the ring (0-1)
+        position_percent = position / led_count
+        
+        # Get fixed target positions by percentage
+        red_percent = 0.0      # 12 o'clock (0%)
+        green_percent = 0.25   # 3 o'clock (25%)
+        blue_percent = 0.5     # 6 o'clock (50%)
+        yellow_percent = 0.75  # 9 o'clock (75%)
+        
+        # Calculate window size as percentage
+        window_percent = window_size / led_count
+        
+        # Check if position is near a target, with wrapping for the red target
+        if (position_percent <= window_percent or 
+            position_percent >= (1.0 - window_percent)):
             return TargetType.RED
-        elif abs(position - mid_pos) <= window_size:
+        elif abs(position_percent - blue_percent) <= window_percent:
             return TargetType.BLUE
-        elif abs(position - right_pos) <= window_size:
+        elif abs(position_percent - green_percent) <= window_percent:
             return TargetType.GREEN
-        elif abs(position - left_pos) <= window_size:
+        elif abs(position_percent - yellow_percent) <= window_percent:
             return TargetType.YELLOW
         return None
     
@@ -253,25 +298,6 @@ class ButtonHandler:
             return [pygame.K_g, pygame.K_RIGHT]
         else:  # YELLOW
             return [pygame.K_y, pygame.K_LEFT]
-    
-    @staticmethod
-    def get_window_position_for_target(target_type: TargetType) -> int:
-        """Get the center position of a target window.
-        
-        Args:
-            target_type: Target type to get position for
-            
-        Returns:
-            Center position of the target window
-        """
-        if target_type == TargetType.RED:
-            return 0
-        elif target_type == TargetType.BLUE:
-            return int(MID_TARGET_POS)
-        elif target_type == TargetType.GREEN:
-            return int(RIGHT_TARGET_POS)
-        else:  # YELLOW
-            return int(LEFT_TARGET_POS)
 
 # For backward compatibility
 ButtonPressHandler = ButtonHandler

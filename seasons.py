@@ -84,18 +84,18 @@ args = parse_args()
 
 # Update shared constants in game_constants for runtime values
 game_constants.NUMBER_OF_LEDS = args.leds
+
 # Update dependent constants
 game_constants.TARGET_WINDOW_SIZE = game_constants.NUMBER_OF_LEDS // 20
-game_constants.MID_TARGET_POS = game_constants.NUMBER_OF_LEDS / 2
-game_constants.RIGHT_TARGET_POS = game_constants.NUMBER_OF_LEDS / 4
-game_constants.LEFT_TARGET_POS = 3 * game_constants.NUMBER_OF_LEDS / 4
+
+# Calculate target positions based on percentages
+MID_TARGET_POS = int(game_constants.NUMBER_OF_LEDS * game_constants.BLUE_TARGET_PERCENT)
+RIGHT_TARGET_POS = int(game_constants.NUMBER_OF_LEDS * game_constants.GREEN_TARGET_PERCENT)
+LEFT_TARGET_POS = int(game_constants.NUMBER_OF_LEDS * game_constants.YELLOW_TARGET_PERCENT)
 
 # For convenience, reference frequently used constants directly
 NUMBER_OF_LEDS = game_constants.NUMBER_OF_LEDS
 TARGET_WINDOW_SIZE = game_constants.TARGET_WINDOW_SIZE
-MID_TARGET_POS = game_constants.MID_TARGET_POS
-RIGHT_TARGET_POS = game_constants.RIGHT_TARGET_POS
-LEFT_TARGET_POS = game_constants.LEFT_TARGET_POS
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
@@ -124,7 +124,11 @@ class GameState:
         self.next_loop: int = 1
         self.loop_count: int = 0
         self.error_sound: pygame.mixer.Sound = pygame.mixer.Sound(ERROR_SOUND)
-        self.button_handler = ButtonHandler(self.error_sound)
+        self.button_handler = ButtonHandler(
+            self.error_sound,
+            number_of_leds=NUMBER_OF_LEDS,
+            target_window_size=TARGET_WINDOW_SIZE
+        )
         self.trail_length: int = 0 
         self.beat_start_time_ms: int = 0
         self.total_beats: int = 0  # Track total beats in song
