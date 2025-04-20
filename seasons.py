@@ -1,37 +1,40 @@
 #!/usr/bin/env python3
 
 import asyncio
-import math
 import os
 import platform
-import sys
 import argparse
-from typing import List, Optional, Tuple, Union, Dict, Callable
-from enum import Enum, auto
+from typing import List, Optional, Tuple, Dict
 
-import aiomqtt
 import aiohttp
-import easing_functions
 import pygame
-from pygame import Color, K_r, K_b
+from pygame import Color
 from pygameasync import Clock
 
 from get_key import get_key
-import my_inputs
 from button_handler import ButtonHandler
-from score_effects import ScoreEffects
 from led_position import LEDPosition
 from music_timing import MusicTiming
-from hit_trail import HitTrail
 from wled_controller import WLEDController
 from display_manager import DisplayManager
 from score_manager import ScoreManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
 
-# Constants
-SPB = 1.84615385  # Seconds per beat
-from game_constants import WLED_IP, WLED_SETTINGS
+# Import game constants - import specific constants first
+from game_constants import (
+    WLED_IP, WLED_SETTINGS, SCALING_FACTOR, SCREEN_WIDTH, SCREEN_HEIGHT, 
+    CIRCLE_CENTER_X, CIRCLE_CENTER_Y, BEATS_PER_MEASURE, 
+    BEAT_PER_MS, SECONDS_PER_MEASURE_S, ERROR_SOUND, HIT_TRAIL_RADIUS,
+    BONUS_TRAIL_RADIUS, TRAIL_FADE_DURATION_S, TRAIL_EASE,
+    BONUS_TRAIL_FADE_DURATION_S, BONUS_TRAIL_EASE, HIGH_SCORE_THRESHOLD,
+    SCORE_FLASH_DURATION_MS, SCORE_LINE_ANIMATION_TIME_MS, SCORE_LINE_HEIGHT,
+    SCORE_LINE_SPACING, SCORE_LINE_COLOR, TargetType, TARGET_COLORS
+)
+
+# Import remaining constants
+import game_constants
+from game_constants import *
 
 def parse_args():
     """Parse command line arguments."""
@@ -80,15 +83,14 @@ def parse_args():
 args = parse_args()
 
 # Update shared constants in game_constants for runtime values
-import game_constants
-
 game_constants.NUMBER_OF_LEDS = args.leds
 # Update dependent constants
-# (If you want to update more, add them here)
 game_constants.TARGET_WINDOW_SIZE = game_constants.NUMBER_OF_LEDS // 20
 game_constants.MID_TARGET_POS = game_constants.NUMBER_OF_LEDS / 2
 game_constants.RIGHT_TARGET_POS = game_constants.NUMBER_OF_LEDS / 4
 game_constants.LEFT_TARGET_POS = 3 * game_constants.NUMBER_OF_LEDS / 4
+
+# For convenience, reference frequently used constants directly
 NUMBER_OF_LEDS = game_constants.NUMBER_OF_LEDS
 TARGET_WINDOW_SIZE = game_constants.TARGET_WINDOW_SIZE
 MID_TARGET_POS = game_constants.MID_TARGET_POS
@@ -108,24 +110,6 @@ if IS_RASPBERRY_PI:
     LED_BRIGHTNESS = 255  # Set to 0 for darkest and 255 for brightest
     LED_INVERT = False  # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL = 0  # PWM channel
-
-# no music at the start?
-
-# Display constants
-SCALING_FACTOR = 9
-SCREEN_WIDTH = 128
-SCREEN_HEIGHT = 96
-CIRCLE_RADIUS = 30
-CIRCLE_CENTER_X = SCREEN_WIDTH // 2
-CIRCLE_CENTER_Y = SCREEN_HEIGHT // 2
-
-# Game timing constants
-BEATS_PER_MEASURE = 8
-BEAT_PER_MS = 13.0 / 6000.0
-SECONDS_PER_MEASURE_S = 3.7
-
-# Debug settings
-from game_constants import *
 
 # Global state
 quit_app = False
