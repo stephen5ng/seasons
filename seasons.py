@@ -80,7 +80,7 @@ def parse_args():
         args.show_bonus_trails = True
         args.show_main_trail = True
         args.show_hit_trail = True
-        
+    
     return args
 
 # Define default values to use when the script is imported (not run directly)
@@ -361,7 +361,6 @@ async def run_game() -> None:
     show_main_trail = args.show_main_trail
     show_hit_trail = args.show_hit_trail
     show_bonus_trails = args.show_bonus_trails
-    debug_mode = args.one_loop
     run_one_loop = args.one_loop
     
     # Set initial score for debug modes
@@ -433,27 +432,25 @@ async def run_game() -> None:
                 
                 previous_led_position = led_position
             
-            # Handle scoring and penalties (skip if in debug mode)
-            if not debug_mode:
-                if not game_state.button_handler.is_in_valid_window(led_position):
-                    new_score: float = game_state.button_handler.apply_penalty(game_state.score_manager.score)
-                    if new_score != game_state.score_manager.score:
-                        print(f"New score: {new_score}, target hit: none")
-                        game_state.update_score(new_score, "none", beat_float)
-                game_state.reset_flags(led_position)
-                
-                # Check for scoring (both manual and auto)
-                new_score: float
-                target_hit: str
-                error_feedback: Optional[Tuple[int, Color]]
-                new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
-                    led_position, game_state.score_manager.score, current_time_ms)
-                if new_score != game_state.score:
-                    print(f"New score: {new_score}, target hit: {target_hit}")
-                    game_state.update_score(new_score, target_hit, beat_float)
-            else:
-                game_state.reset_flags(led_position)
-                error_feedback = None
+            # Handle scoring and penalties
+            if not game_state.button_handler.is_in_valid_window(led_position):
+                new_score: float = game_state.button_handler.apply_penalty(game_state.score_manager.score)
+                if new_score != game_state.score_manager.score:
+                    print(f"New score: {new_score}, target hit: none")
+                    game_state.update_score(new_score, "none", beat_float)
+            
+            # Always reset flags
+            game_state.reset_flags(led_position)
+            
+            # Check for scoring (both manual and auto)
+            new_score: float
+            target_hit: str
+            error_feedback: Optional[Tuple[int, Color]] = None
+            new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
+                led_position, game_state.score_manager.score, current_time_ms)
+            if new_score != game_state.score:
+                print(f"New score: {new_score}, target hit: {target_hit}")
+                game_state.update_score(new_score, target_hit, beat_float)
             
             # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
@@ -470,8 +467,8 @@ async def run_game() -> None:
                     lambda pos, color: display.set_pixel(pos, color)
                 )
             
-            # Draw bonus trail if hit trail has been cleared (skip in debug modes)
-            if game_state.hit_trail_cleared and show_bonus_trails and not debug_mode:
+            # Draw bonus trail if hit trail has been cleared
+            if game_state.hit_trail_cleared and show_bonus_trails:
                 game_state.trail_state_manager.draw_bonus_trail(
                     BONUS_TRAIL_FADE_DURATION_S,
                     BONUS_TRAIL_EASE,
@@ -486,8 +483,8 @@ async def run_game() -> None:
                 for pos, color in trail_positions.items():
                     display.set_hit_trail_pixel(pos, color)
             
-            # Draw score lines with flash effect (only in Pygame mode and not in debug mode)
-            if not IS_RASPBERRY_PI and not debug_mode:
+            # Draw score lines with flash effect (only in Pygame mode)
+            if not IS_RASPBERRY_PI:
                 flash_intensity: float = game_state.get_score_flash_intensity(beat_float)
                 display.draw_score_lines(
                     score=game_state.score_manager.score,
