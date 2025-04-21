@@ -21,6 +21,7 @@ from display_manager import DisplayManager
 from score_manager import ScoreManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
+from trail_visualization import HitTrailVisualizer
 
 # Import game constants - import specific constants first
 from game_constants import (
@@ -357,6 +358,17 @@ async def run_game() -> None:
     # Initialize game state
     game_state: GameState = GameState()
     
+    # Initialize hit trail visualizer for hit trail rendering
+    hit_trail_visualizer = HitTrailVisualizer(
+        led_count=game_constants.NUMBER_OF_LEDS,
+        initial_score=args.score,
+        auto_mode=False,  # No auto mode in main game
+        speed=1,  # Speed is controlled by the game
+        hit_spacing=game_constants.INITIAL_HIT_SPACING
+    )
+    # No need to connect score_manager anymore since HitTrailVisualizer manages its own state
+    hit_trail_visualizer.display = display
+    
     # Debug display modes
     show_main_trail = args.show_main_trail
     show_hit_trail = args.show_hit_trail
@@ -367,6 +379,7 @@ async def run_game() -> None:
     if args.score > 0:
         print(f"Setting initial score to {args.score}")
         game_state.score_manager.score = args.score
+        hit_trail_visualizer.score = args.score  # Also set score in visualizer
     
     # Debug setup for different display modes
     if show_main_trail:
@@ -379,15 +392,15 @@ async def run_game() -> None:
         hit_colors_count = int(game_state.score * 4)  # 4 colors per score point
         for i in range(min(hit_colors_count, 40)):  # Max 40 colors
             if i % 4 == 0:
-                game_state.score_manager.hit_colors.append(TARGET_COLORS[TargetType.RED])
+                hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.RED])
             elif i % 4 == 1:
-                game_state.score_manager.hit_colors.append(TARGET_COLORS[TargetType.GREEN])
+                hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.GREEN])
             elif i % 4 == 2:
-                game_state.score_manager.hit_colors.append(TARGET_COLORS[TargetType.BLUE])
+                hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.BLUE])
             else:
-                game_state.score_manager.hit_colors.append(TARGET_COLORS[TargetType.YELLOW])
+                hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.YELLOW])
                 
-        print(f"Created hit trail with {len(game_state.score_manager.hit_colors)} colors")
+        print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     if show_bonus_trails:
         print(f"Showing bonus trails")
     
@@ -451,6 +464,21 @@ async def run_game() -> None:
             if new_score != game_state.score:
                 print(f"New score: {new_score}, target hit: {target_hit}")
                 game_state.update_score(new_score, target_hit, beat_float)
+                
+                # If the score increased and we're showing hit trail, update hit_trail_visualizer
+                if new_score > game_state.score and show_hit_trail:
+                    try:
+                        if target_hit != "none":
+                            target_enum = TargetType[target_hit.upper()]
+                            hit_trail_visualizer.score = new_score
+                            # Add the hit to the visualizer's trail
+                            hit_trail_visualizer.add_hit(target_enum)
+                    except KeyError:
+                        pass  # Ignore invalid target types
+                        
+            # Handle hit trail cleared state synchronization 
+            if game_state.hit_trail_cleared and show_hit_trail:
+                hit_trail_visualizer.hit_trail_cleared = True
             
             # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
@@ -475,13 +503,11 @@ async def run_game() -> None:
                     lambda pos, color: display.set_bonus_trail_pixel(pos, color)
                 )
             
-            # Draw hit trail in outer circle
+            # Draw hit trail in outer circle using the visualizer
             if show_hit_trail:
-                trail_positions = ScoreManager.calculate_trail_positions(
-                    led_position, game_state.score_manager.hit_colors, game_state.score_manager.hit_spacing, NUMBER_OF_LEDS
-                )
-                for pos, color in trail_positions.items():
-                    display.set_hit_trail_pixel(pos, color)
+                # Update visualizer position and draw hit trail
+                hit_trail_visualizer.current_position = led_position
+                hit_trail_visualizer.draw_hit_trail()
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
