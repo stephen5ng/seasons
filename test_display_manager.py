@@ -44,12 +44,24 @@ class DisplayManagerTest(unittest.TestCase):
         """Test clearing the display."""
         # Set some pixels
         test_color = Color(255, 0, 0)
-        self.display_manager.set_pixel(5, test_color)
-        self.assertEqual(self.display_manager.pygame_surface.get_at((5, 5)), test_color)
+        center_x = 50
+        center_y = 50
+        radius = 10
+        led_count = 60
+        pos = 5
+        
+        # Calculate expected position
+        expected_x, expected_y = self.display_manager._get_ring_position(
+            pos, center_x, center_y, radius, led_count
+        )
+        
+        # Set pixel and verify it was set
+        self.display_manager.set_target_pixel(pos, test_color, center_x, center_y, radius, led_count)
+        self.assertEqual(self.display_manager.pygame_surface.get_at((expected_x, expected_y)), test_color)
         
         # Clear the display
         self.display_manager.clear()
-        self.assertEqual(self.display_manager.pygame_surface.get_at((5, 5)), Color(0, 0, 0))
+        self.assertEqual(self.display_manager.pygame_surface.get_at((expected_x, expected_y)), Color(0, 0, 0))
     
     def test_set_target_pixel(self):
         """Test setting a pixel in the target ring."""
