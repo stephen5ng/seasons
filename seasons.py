@@ -23,9 +23,7 @@ from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
 from trail_visualization import (
     HitTrailVisualizer,
-    SimpleTrailVisualizer,
-    print_hit_trail_instructions,
-    parse_hit_trail_args
+    SimpleTrailVisualizer
 )
 from simple_hit_trail import SimpleHitTrail
 
@@ -415,18 +413,7 @@ async def run_game() -> None:
         
         # Set up hit colors based on score (simulate multiple hits) - only for normal strategy
         if not use_simple_hit_trail:
-            # Add different colors based on the score level
-            hit_colors_count = int(game_state.score * 4)  # 4 colors per score point
-            for i in range(min(hit_colors_count, 40)):  # Max 40 colors
-                if i % 4 == 0:
-                    hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.RED])
-                elif i % 4 == 1:
-                    hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.GREEN])
-                elif i % 4 == 2:
-                    hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.BLUE])
-                else:
-                    hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.YELLOW])
-                    
+            hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
             print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     if show_bonus_trails:
         print(f"Showing bonus trails")
