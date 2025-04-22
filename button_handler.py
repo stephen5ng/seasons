@@ -7,9 +7,6 @@ from pygame import Color
 # Import only the enum and colors, but not the position constants
 from game_constants import TARGET_COLORS, TargetType
 
-# Game settings
-ALWAYS_SCORE = True  # When True, automatically scores on every round
-
 class ButtonHandler:
     """Handles button press logic and scoring.
     
@@ -18,13 +15,15 @@ class ButtonHandler:
     """
     
     def __init__(self, error_sound: Optional[pygame.mixer.Sound] = None,
-                number_of_leds: int = 80, target_window_size: int = 4) -> None:
+                number_of_leds: int = 80, target_window_size: int = 4,
+                auto_score: bool = False) -> None:
         """Initialize the button handler.
         
         Args:
             error_sound: Sound to play when an error occurs
             number_of_leds: Number of LEDs in the strip (default: 80)
             target_window_size: Size of target windows (default: 4)
+            auto_score: When True, automatically scores on every round
         """
         self.button_states: Dict[str, bool] = {
             "r": False,
@@ -35,6 +34,7 @@ class ButtonHandler:
         self.penalty_applied: bool = False
         self.round_active: bool = False
         self.error_sound: Optional[pygame.mixer.Sound] = error_sound
+        self.auto_score: bool = auto_score
         
         # Store LED configuration
         self.number_of_leds = number_of_leds
@@ -127,7 +127,7 @@ class ButtonHandler:
                 
             # Check for correct key press
             keys = ButtonHandler.get_keys_for_target(target_type)
-            if (any(keys_pressed[key] for key in keys) or ALWAYS_SCORE) and not self.button_states[target_type.name[0].lower()]:
+            if (any(keys_pressed[key] for key in keys) or self.auto_score) and not self.button_states[target_type.name[0].lower()]:
                 self.button_states[target_type.name[0].lower()] = True
                 self.penalty_applied = False
                 return score + 0.25, target_type.name.lower(), None

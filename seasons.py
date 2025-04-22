@@ -71,6 +71,8 @@ def parse_args():
                       help='Run for one loop and exit')
     debug_group.add_argument('--disable-wled', action='store_true',
                       help='Disable all WLED light commands')
+    debug_group.add_argument('--auto-score', action='store_true',
+                      help='Automatically score points when in valid windows')
     
     # Positional shortcut
     parser.add_argument('trails', type=int, nargs='?', default=0,
@@ -103,6 +105,7 @@ default_args = argparse.Namespace(
     max_bonus_trails=5,
     one_loop=False,
     disable_wled=False,
+    auto_score=False,
     trails=0
 )
 
@@ -158,7 +161,8 @@ class GameState:
         self.button_handler = ButtonHandler(
             self.error_sound,
             number_of_leds=NUMBER_OF_LEDS,
-            target_window_size=TARGET_WINDOW_SIZE
+            target_window_size=TARGET_WINDOW_SIZE,
+            auto_score=args.auto_score
         )
         self.trail_length: int = 0 
         self.beat_start_time_ms: int = 0
