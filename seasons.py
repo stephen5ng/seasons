@@ -545,7 +545,10 @@ async def run_game() -> None:
                     hit_trail_visualizer.current_position = led_position
                     hit_trail_visualizer.draw_hit_trail()
                 # Log hit trail behavior to file
-                logger.info(f"Hit trail drawn at position {led_position}, colors={hit_trail_visualizer.hit_colors}")
+                if not use_simple_hit_trail:
+                    logger.info(f"Hit trail drawn at position {led_position}, colors={hit_trail_visualizer.hit_colors}")
+                else:
+                    logger.info(f"Hit trail drawn at position {led_position}")
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
