@@ -42,6 +42,8 @@ from game_constants import (
 import game_constants
 from game_constants import *
 
+import logging
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='LED rhythm game')
@@ -348,6 +350,9 @@ def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: 
 
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
+    # Configure file logging for hit trail behavior
+    logging.basicConfig(filename='hit_trail.log', filemode='w', level=logging.INFO, format='%(asctime)s %(message)s')
+    logger = logging.getLogger('hit_trail')
     global quit_app
 
     # Initialize display and clock
@@ -539,6 +544,8 @@ async def run_game() -> None:
                     # Update visualizer position and draw hit trail
                     hit_trail_visualizer.current_position = led_position
                     hit_trail_visualizer.draw_hit_trail()
+                # Log hit trail behavior to file
+                logger.info(f"Hit trail drawn at position {led_position}, colors={hit_trail_visualizer.hit_colors}")
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
