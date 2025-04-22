@@ -10,6 +10,7 @@ import asyncio
 import pygame
 from trail_visualization import (
     HitTrailVisualizer,
+    SimpleTrailVisualizer,
     print_hit_trail_instructions,
     parse_hit_trail_args
 )
@@ -19,7 +20,25 @@ async def main() -> None:
     args = parse_hit_trail_args()
     print_hit_trail_instructions()
     
-    visualizer = HitTrailVisualizer(**args)
+    # Choose visualizer based on strategy
+    if args['strategy'] == 'simple':
+        print(f"Using SIMPLE hit trail strategy with {args['fade_duration']}ms fade duration")
+        visualizer = SimpleTrailVisualizer(
+            led_count=args['led_count'],
+            auto_mode=args['auto_mode'],
+            speed=args['speed'],
+            fade_duration_ms=args['fade_duration']
+        )
+    else:
+        print(f"Using NORMAL hit trail strategy with {args['hit_spacing']} hit spacing")
+        visualizer = HitTrailVisualizer(
+            led_count=args['led_count'],
+            initial_score=args['initial_score'],
+            auto_mode=args['auto_mode'],
+            speed=args['speed'],
+            hit_spacing=args['hit_spacing']
+        )
+    
     await visualizer.run()
     pygame.quit()
 

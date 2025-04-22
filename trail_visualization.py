@@ -16,6 +16,7 @@ import game_constants
 from hit_trail import HitTrail
 from display_manager import DisplayManager
 from get_key import get_key
+from simple_hit_trail import SimpleHitTrail
 
 
 class TrailVisualizer:
@@ -375,10 +376,7 @@ class SimpleTrailVisualizer(TrailVisualizer):
             self.update_position(self.speed)
             
             # Draw simple hit trail
-            self.simple_hit_trail.draw(lambda pos, color: self.display.set_hit_trail_pixel(pos, color))
-            
-            # Indicate current position with a dim white pixel
-            self.display.set_pixel(self.current_position, Color(128, 128, 128))
+            self.draw_hit_trail()
             
             # Update display
             self.display.update()
@@ -402,6 +400,14 @@ class SimpleTrailVisualizer(TrailVisualizer):
         # Reset the simple hit trail by creating a new instance
         self.simple_hit_trail = SimpleHitTrail(fade_duration_ms=self.simple_hit_trail.fade_duration_ms)
         print("Hit trail cleared manually")
+        
+    def draw_hit_trail(self) -> None:
+        """Draw the simple hit trail on the display."""
+        # Draw the simple hit trail using the SimpleHitTrail implementation
+        self.simple_hit_trail.draw(lambda pos, color: self.display.set_hit_trail_pixel(pos, color))
+        
+        # Indicate current position with a dim white pixel
+        self.display.set_pixel(self.current_position, Color(128, 128, 128))
 
 
 async def main() -> None:

@@ -21,7 +21,13 @@ from display_manager import DisplayManager
 from score_manager import ScoreManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
-from trail_visualization import HitTrailVisualizer
+from trail_visualization import (
+    HitTrailVisualizer,
+    SimpleTrailVisualizer,
+    print_hit_trail_instructions,
+    parse_hit_trail_args
+)
+from simple_hit_trail import SimpleHitTrail
 
 # Import game constants - import specific constants first
 from game_constants import (
@@ -52,6 +58,8 @@ def parse_args():
                       help='Display main trail')
     display_group.add_argument('--show-hit-trail', action='store_true',
                       help='Display hit trail')
+    display_group.add_argument('--hit-trail-strategy', type=str, choices=['normal', 'simple'], default='normal',
+                      help='Strategy for hit trail visualization (normal=traditional trail, simple=single LED fade)')
     
     # Debug options
     debug_group = parser.add_argument_group('Debug options')
@@ -90,6 +98,7 @@ default_args = argparse.Namespace(
     show_bonus_trails=True,
     show_main_trail=True,
     show_hit_trail=True,
+    hit_trail_strategy='normal',
     score=0.0,
     max_bonus_trails=5,
     one_loop=False,
@@ -358,15 +367,27 @@ async def run_game() -> None:
     # Initialize game state
     game_state: GameState = GameState()
     
-    # Initialize hit trail visualizer for hit trail rendering
-    hit_trail_visualizer = HitTrailVisualizer(
-        led_count=game_constants.NUMBER_OF_LEDS,
-        initial_score=args.score,
-        auto_mode=False,  # No auto mode in main game
-        speed=1,  # Speed is controlled by the game
-        hit_spacing=game_constants.INITIAL_HIT_SPACING
-    )
-    # No need to connect score_manager anymore since HitTrailVisualizer manages its own state
+    # Initialize hit trail visualization based on strategy
+    use_simple_hit_trail = args.hit_trail_strategy == 'simple'
+    
+    if use_simple_hit_trail:
+        # For simple strategy, use SimpleTrailVisualizer
+        hit_trail_visualizer = SimpleTrailVisualizer(
+            led_count=game_constants.NUMBER_OF_LEDS,
+            auto_mode=False,  # No auto mode in main game
+            speed=1,  # Speed is controlled by the game
+            fade_duration_ms=500  # 500ms fade duration
+        )
+    else:
+        # For normal strategy, use HitTrailVisualizer
+        hit_trail_visualizer = HitTrailVisualizer(
+            led_count=game_constants.NUMBER_OF_LEDS,
+            initial_score=args.score,
+            auto_mode=False,  # No auto mode in main game
+            speed=1,  # Speed is controlled by the game
+            hit_spacing=game_constants.INITIAL_HIT_SPACING
+        )
+    
     hit_trail_visualizer.display = display
     
     # Debug display modes
@@ -379,28 +400,30 @@ async def run_game() -> None:
     if args.score > 0:
         print(f"Setting initial score to {args.score}")
         game_state.score_manager.score = args.score
-        hit_trail_visualizer.score = args.score  # Also set score in visualizer
+        if not use_simple_hit_trail:
+            hit_trail_visualizer.score = args.score  # Only set score for normal strategy
     
     # Debug setup for different display modes
     if show_main_trail:
         print(f"Showing main trail")
     if show_hit_trail:
-        print(f"Showing hit trail")
+        print(f"Showing hit trail using {args.hit_trail_strategy} strategy")
         
-        # Set up hit colors based on score (simulate multiple hits)
-        # Add different colors based on the score level
-        hit_colors_count = int(game_state.score * 4)  # 4 colors per score point
-        for i in range(min(hit_colors_count, 40)):  # Max 40 colors
-            if i % 4 == 0:
-                hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.RED])
-            elif i % 4 == 1:
-                hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.GREEN])
-            elif i % 4 == 2:
-                hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.BLUE])
-            else:
-                hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.YELLOW])
-                
-        print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
+        # Set up hit colors based on score (simulate multiple hits) - only for normal strategy
+        if not use_simple_hit_trail:
+            # Add different colors based on the score level
+            hit_colors_count = int(game_state.score * 4)  # 4 colors per score point
+            for i in range(min(hit_colors_count, 40)):  # Max 40 colors
+                if i % 4 == 0:
+                    hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.RED])
+                elif i % 4 == 1:
+                    hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.GREEN])
+                elif i % 4 == 2:
+                    hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.BLUE])
+                else:
+                    hit_trail_visualizer.hit_colors.append(TARGET_COLORS[TargetType.YELLOW])
+                    
+            print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     if show_bonus_trails:
         print(f"Showing bonus trails")
     
@@ -465,19 +488,25 @@ async def run_game() -> None:
                 print(f"New score: {new_score}, target hit: {target_hit}")
                 game_state.update_score(new_score, target_hit, beat_float)
                 
-                # If the score increased and we're showing hit trail, update hit_trail_visualizer
+                # If the score increased and we're showing hit trail, update the hit trail
                 if new_score > game_state.score and show_hit_trail:
                     try:
                         if target_hit != "none":
                             target_enum = TargetType[target_hit.upper()]
-                            hit_trail_visualizer.score = new_score
-                            # Add the hit to the visualizer's trail
-                            hit_trail_visualizer.add_hit(target_enum)
+                            
+                            # Update the appropriate hit trail strategy
+                            if use_simple_hit_trail:
+                                # For simple strategy, just add the hit at the current position
+                                hit_trail_visualizer.add_hit(target_enum)
+                            else:
+                                # For normal strategy, update the visualizer
+                                hit_trail_visualizer.score = new_score
+                                hit_trail_visualizer.add_hit(target_enum)
                     except KeyError:
                         pass  # Ignore invalid target types
                         
-            # Handle hit trail cleared state synchronization 
-            if game_state.hit_trail_cleared and show_hit_trail:
+            # Handle hit trail cleared state synchronization (only for normal strategy)
+            if not use_simple_hit_trail and game_state.hit_trail_cleared and show_hit_trail:
                 hit_trail_visualizer.hit_trail_cleared = True
             
             # Update trail state when LED position changes
@@ -506,16 +535,22 @@ async def run_game() -> None:
                 game_state.score_manager.hit_trail_cleared = False
                 print("Reset hit_trail_cleared flag")
             
-            # Draw hit trail in outer circle using the visualizer
+            # Draw hit trail in outer circle using the selected strategy
             if show_hit_trail:
-                # Make sure hit_trail_visualizer has the same hit trail colors as game_state
-                if hit_trail_visualizer.hit_colors != game_state.hit_colors:
-                    hit_trail_visualizer.hit_colors = game_state.hit_colors.copy()
-                    hit_trail_visualizer.hit_spacing = game_state.hit_spacing
-                
-                # Update visualizer position and draw hit trail
-                hit_trail_visualizer.current_position = led_position
-                hit_trail_visualizer.draw_hit_trail()
+                if use_simple_hit_trail:
+                    # For simple strategy, just update position and draw
+                    hit_trail_visualizer.current_position = led_position
+                    hit_trail_visualizer.draw_hit_trail()
+                else:
+                    # For normal strategy, use the visualizer
+                    # Make sure hit_trail_visualizer has the same hit trail colors as game_state
+                    if hit_trail_visualizer.hit_colors != game_state.hit_colors:
+                        hit_trail_visualizer.hit_colors = game_state.hit_colors.copy()
+                        hit_trail_visualizer.hit_spacing = game_state.hit_spacing
+                    
+                    # Update visualizer position and draw hit trail
+                    hit_trail_visualizer.current_position = led_position
+                    hit_trail_visualizer.draw_hit_trail()
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
@@ -557,6 +592,17 @@ async def run_game() -> None:
             for key, keydown in get_key():
                 if key == "quit":
                     return
+                
+                # If using simple hit trail strategy, allow direct key presses to light up LEDs
+                if use_simple_hit_trail and show_hit_trail and keydown:
+                    if key == "r" or key == "up":
+                        hit_trail_visualizer.add_hit(TargetType.RED)
+                    elif key == "g" or key == "right":
+                        hit_trail_visualizer.add_hit(TargetType.GREEN) 
+                    elif key == "b" or key == "down":
+                        hit_trail_visualizer.add_hit(TargetType.BLUE)
+                    elif key == "y" or key == "left":
+                        hit_trail_visualizer.add_hit(TargetType.YELLOW)
 
             # Update display
             display.update()
