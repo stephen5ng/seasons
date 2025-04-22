@@ -16,6 +16,7 @@ import game_constants
 from hit_trail import HitTrail
 from display_manager import DisplayManager
 from get_key import get_key
+from simple_hit_trail import SimpleHitTrail  # Import the SimpleHitTrail class
 
 
 class TrailVisualizer:
@@ -266,7 +267,8 @@ def print_hit_trail_instructions() -> None:
     print("  --score N    - Set initial score (default: 0.0)")
     print("  --auto       - Automatically add hits")
     print("  --speed N    - Set movement speed (1-10, default: 1)")
-    print("  --spacing N  - Set initial hit spacing\n")
+    print("  --spacing N  - Set initial hit spacing")
+    print("  --strategy S - Hit trail strategy (normal or simple)")
 
 
 # Utility functions for command-line usage
@@ -285,6 +287,10 @@ def parse_hit_trail_args() -> Dict[str, Any]:
                       help='Speed of LED movement (1-10, default: 1)')
     parser.add_argument('--spacing', type=int, default=game_constants.INITIAL_HIT_SPACING,
                       help=f'Initial spacing between hit trail elements (default: {game_constants.INITIAL_HIT_SPACING})')
+    parser.add_argument('--strategy', type=str, choices=['normal', 'simple'], default='normal',
+                      help='Hit trail visualization strategy (normal=traditional trail, simple=single LED fade)')
+    parser.add_argument('--fade-duration', type=int, default=500,
+                      help='Fade duration in ms for simple strategy (default: 500)')
     
     args = parser.parse_args()
     return {
@@ -292,8 +298,111 @@ def parse_hit_trail_args() -> Dict[str, Any]:
         'initial_score': args.score,
         'auto_mode': args.auto,
         'speed': args.speed,
-        'hit_spacing': args.spacing
+        'hit_spacing': args.spacing,
+        'strategy': args.strategy,
+        'fade_duration': args.fade_duration
     }
+
+
+class SimpleTrailVisualizer(TrailVisualizer):
+    """Visualizer using the SimpleHitTrail strategy."""
+    
+    def __init__(self, 
+                 led_count: int = 80, 
+                 auto_mode: bool = False, 
+                 speed: int = 1,
+                 fade_duration_ms: int = 500) -> None:
+        """Initialize the simple hit trail visualizer.
+        
+        Args:
+            led_count: Number of LEDs in the strip
+            auto_mode: When True, automatically adds hits on a timer
+            speed: Speed of LED movement (1-10)
+            fade_duration_ms: Duration in milliseconds for the fade-out effect
+        """
+        super().__init__(led_count)
+        
+        # Simple hit trail implementation
+        self.simple_hit_trail = SimpleHitTrail(fade_duration_ms=fade_duration_ms)
+        
+        # Settings
+        self.auto_mode = auto_mode
+        self.auto_timer = 0
+        self.speed = max(1, min(10, speed))  # Clamp between 1 and 10
+        self.target_types = [
+            game_constants.TargetType.RED,
+            game_constants.TargetType.GREEN,
+            game_constants.TargetType.BLUE,
+            game_constants.TargetType.YELLOW
+        ]
+        self.next_target = 0
+    
+    async def run(self) -> None:
+        """Run the simple hit trail visualization loop."""
+        pygame.init()
+        self.running = True
+        
+        while self.running:
+            self.display.clear()
+            
+            # Process pygame events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
+                        self.running = False
+                    elif not self.auto_mode:
+                        if event.key in (pygame.K_r, pygame.K_UP):
+                            self.add_hit(game_constants.TargetType.RED)
+                        elif event.key in (pygame.K_g, pygame.K_RIGHT):
+                            self.add_hit(game_constants.TargetType.GREEN)
+                        elif event.key in (pygame.K_b, pygame.K_DOWN):
+                            self.add_hit(game_constants.TargetType.BLUE)
+                        elif event.key in (pygame.K_y, pygame.K_LEFT):
+                            self.add_hit(game_constants.TargetType.YELLOW)
+                        elif event.key == pygame.K_c:
+                            self.clear_hit_trail()
+            
+            # Handle automatic hit generation
+            if self.auto_mode:
+                self.auto_timer += 1
+                if self.auto_timer >= 30:  # Add hit every 30 frames
+                    self.auto_timer = 0
+                    self.add_hit(self.target_types[self.next_target])
+                    self.next_target = (self.next_target + 1) % len(self.target_types)
+            
+            # Update position
+            self.update_position(self.speed)
+            
+            # Draw simple hit trail
+            self.simple_hit_trail.draw(lambda pos, color: self.display.set_hit_trail_pixel(pos, color))
+            
+            # Indicate current position with a dim white pixel
+            self.display.set_pixel(self.current_position, Color(128, 128, 128))
+            
+            # Update display
+            self.display.update()
+            await self.tick(30)
+    
+    def add_hit(self, target_type: game_constants.TargetType) -> None:
+        """Add a hit of the specified target type to the hit trail.
+        
+        Args:
+            target_type: Type of target to add
+        """
+        # Add the hit at the current position
+        self.simple_hit_trail.add_hit(
+            self.current_position, 
+            game_constants.TARGET_COLORS[target_type]
+        )
+        print(f"Added {target_type.name} hit at position {self.current_position}")
+    
+    def clear_hit_trail(self) -> None:
+        """Clear the hit trail."""
+        # Reset the simple hit trail by creating a new instance
+        self.simple_hit_trail = SimpleHitTrail(fade_duration_ms=self.simple_hit_trail.fade_duration_ms)
+        print("Hit trail cleared manually")
 
 
 async def main() -> None:
@@ -303,14 +412,24 @@ async def main() -> None:
     # Parse command line arguments
     args = parse_hit_trail_args()
     
-    # Initialize visualizer
-    visualizer = HitTrailVisualizer(
-        led_count=args['led_count'],
-        initial_score=args['initial_score'],
-        auto_mode=args['auto_mode'],
-        speed=args['speed'],
-        hit_spacing=args['hit_spacing']
-    )
+    # Initialize visualizer based on strategy
+    if args['strategy'] == 'simple':
+        print(f"Using SIMPLE hit trail strategy with {args['fade_duration']}ms fade duration")
+        visualizer = SimpleTrailVisualizer(
+            led_count=args['led_count'],
+            auto_mode=args['auto_mode'],
+            speed=args['speed'],
+            fade_duration_ms=args['fade_duration']
+        )
+    else:
+        print(f"Using NORMAL hit trail strategy with {args['hit_spacing']} hit spacing")
+        visualizer = HitTrailVisualizer(
+            led_count=args['led_count'],
+            initial_score=args['initial_score'],
+            auto_mode=args['auto_mode'],
+            speed=args['speed'],
+            hit_spacing=args['hit_spacing']
+        )
     
     # Run visualization loop
     await visualizer.run()
