@@ -521,20 +521,7 @@ async def run_game() -> None:
             
             # Draw hit trail in outer circle using the selected strategy
             if show_hit_trail:
-                if isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
-                    # For simple strategy, just update position and draw
-                    hit_trail_visualizer.current_position = led_position
-                    hit_trail_visualizer.draw_hit_trail()
-                else:
-                    # For normal strategy, use the visualizer
-                    # Make sure hit_trail_visualizer has the same hit trail colors as game_state
-                    if hit_trail_visualizer.hit_colors != game_state.hit_colors:
-                        hit_trail_visualizer.hit_colors = game_state.hit_colors.copy()
-                        hit_trail_visualizer.hit_spacing = game_state.hit_spacing
-                    
-                    # Update visualizer position and draw hit trail
-                    hit_trail_visualizer.current_position = led_position
-                    hit_trail_visualizer.draw_hit_trail()
+                hit_trail_visualizer.sync_with_game_state(game_state, led_position)
                 # Log hit trail behavior to file
                 if not isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
                     logger.info(f"Hit trail drawn at position {led_position}, colors={hit_trail_visualizer.hit_colors}")

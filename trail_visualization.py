@@ -56,6 +56,19 @@ class TrailVisualizer:
         self.current_position = 0
         self.running = False
     
+    def sync_with_game_state(self, game_state: 'GameState', led_position: int) -> None:
+        """Synchronize the visualizer's state with the game state.
+        
+        Args:
+            game_state: The current game state
+            led_position: Current LED position
+        """
+        # Update position
+        self.current_position = led_position
+        
+        # Draw hit trail
+        self.draw_hit_trail()
+    
     @classmethod
     def create_visualizer(cls, 
                          strategy: str,
@@ -189,6 +202,24 @@ class HitTrailVisualizer(TrailVisualizer):
                 self.hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.YELLOW])
                 
         print(f"Created hit trail with {len(self.hit_colors)} colors")
+    
+    def sync_with_game_state(self, game_state: 'GameState', led_position: int) -> None:
+        """Synchronize the visualizer's state with the game state.
+        
+        Args:
+            game_state: The current game state
+            led_position: Current LED position
+        """
+        # Update position
+        self.current_position = led_position
+        
+        # Sync hit colors and spacing with game state
+        if self.hit_colors != game_state.hit_colors:
+            self.hit_colors = game_state.hit_colors.copy()
+            self.hit_spacing = game_state.hit_spacing
+        
+        # Draw hit trail
+        self.draw_hit_trail()
     
     async def run(self) -> None:
         """Run the hit trail visualization loop."""
