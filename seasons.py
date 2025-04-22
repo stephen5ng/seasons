@@ -502,9 +502,17 @@ async def run_game() -> None:
                     BONUS_TRAIL_EASE,
                     lambda pos, color: display.set_bonus_trail_pixel(pos, color)
                 )
+                # Reset hit_trail_cleared flag after drawing the bonus trail
+                game_state.score_manager.hit_trail_cleared = False
+                print("Reset hit_trail_cleared flag")
             
             # Draw hit trail in outer circle using the visualizer
             if show_hit_trail:
+                # Make sure hit_trail_visualizer has the same hit trail colors as game_state
+                if hit_trail_visualizer.hit_colors != game_state.hit_colors:
+                    hit_trail_visualizer.hit_colors = game_state.hit_colors.copy()
+                    hit_trail_visualizer.hit_spacing = game_state.hit_spacing
+                
                 # Update visualizer position and draw hit trail
                 hit_trail_visualizer.current_position = led_position
                 hit_trail_visualizer.draw_hit_trail()
