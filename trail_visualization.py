@@ -16,7 +16,6 @@ import game_constants
 from hit_trail import HitTrail
 from display_manager import DisplayManager
 from get_key import get_key
-from simple_hit_trail import SimpleHitTrail  # Import the SimpleHitTrail class
 
 
 class TrailVisualizer:
