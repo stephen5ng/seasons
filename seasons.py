@@ -378,7 +378,7 @@ async def run_game() -> None:
         # For simple strategy, use SimpleTrailVisualizer
         hit_trail_visualizer = SimpleTrailVisualizer(
             led_count=game_constants.NUMBER_OF_LEDS,
-            auto_mode=False,  # No auto mode in main game
+            auto_mode=args.auto_score,  # Pass auto_score flag to enable auto mode
             speed=1,  # Speed is controlled by the game
             fade_duration_ms=500  # 500ms fade duration
         )
@@ -518,6 +518,13 @@ async def run_game() -> None:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
                 game_state.trail_state_manager.update_position(led_position, current_time_s)
+                
+                # If using simple strategy and auto scoring, add a hit at the current position
+                if use_simple_hit_trail and args.auto_score and game_state.button_handler.is_in_valid_window(led_position):
+                    target_type = game_state.button_handler.get_target_type(led_position)
+                    if target_type:
+                        hit_trail_visualizer.add_hit(target_type)
+                        print(f"Auto-scoring: Added {target_type.name} hit at position {led_position}")
             
             # Draw target trail
             if show_main_trail:

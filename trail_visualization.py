@@ -336,11 +336,28 @@ class SimpleTrailVisualizer(TrailVisualizer):
             game_constants.TargetType.YELLOW
         ]
         self.next_target = 0
+        
+        # Track score
+        self._score = 0.0
+        
+        print(f"SimpleTrailVisualizer initialized with auto_mode={auto_mode}, fade_duration={fade_duration_ms}ms")
+    
+    @property
+    def score(self) -> float:
+        """Get the current score."""
+        return self._score
+    
+    @score.setter
+    def score(self, value: float) -> None:
+        """Set the current score."""
+        self._score = value
     
     async def run(self) -> None:
         """Run the simple hit trail visualization loop."""
         pygame.init()
         self.running = True
+        
+        print("Starting SimpleTrailVisualizer run loop")
         
         while self.running:
             self.display.clear()
@@ -393,13 +410,15 @@ class SimpleTrailVisualizer(TrailVisualizer):
             self.current_position, 
             game_constants.TARGET_COLORS[target_type]
         )
-        print(f"Added {target_type.name} hit at position {self.current_position}")
+        # Update score
+        self._score += 0.25
+        print(f"SimpleTrailVisualizer: Added {target_type.name} hit at position {self.current_position}, score: {self._score}")
     
     def clear_hit_trail(self) -> None:
         """Clear the hit trail."""
         # Reset the simple hit trail by creating a new instance
         self.simple_hit_trail = SimpleHitTrail(fade_duration_ms=self.simple_hit_trail.fade_duration_ms)
-        print("Hit trail cleared manually")
+        print("SimpleTrailVisualizer: Hit trail cleared manually")
         
     def draw_hit_trail(self) -> None:
         """Draw the simple hit trail on the display."""
@@ -408,6 +427,11 @@ class SimpleTrailVisualizer(TrailVisualizer):
         
         # Indicate current position with a dim white pixel
         self.display.set_pixel(self.current_position, Color(128, 128, 128))
+        
+        # Debug output for hit trail positions
+        if self.simple_hit_trail.hit_positions:
+            positions = list(self.simple_hit_trail.hit_positions.keys())
+            print(f"SimpleTrailVisualizer: Drawing {len(positions)} hit positions: {positions}")
 
 
 async def main() -> None:

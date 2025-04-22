@@ -21,6 +21,7 @@ class SimpleHitTrail:
         """
         self.hit_positions: Dict[int, Tuple[Color, int]] = {}  # Maps position -> (color, timestamp)
         self.fade_duration_ms = fade_duration_ms
+        print(f"SimpleHitTrail initialized with fade_duration={fade_duration_ms}ms")
     
     def add_hit(self, position: int, color: Color) -> None:
         """Add a hit at the specified position with the given color.
@@ -32,7 +33,8 @@ class SimpleHitTrail:
         # Store a copy of the color to avoid any reference issues
         stored_color = Color(color.r, color.g, color.b, color.a if hasattr(color, 'a') else 255)
         self.hit_positions[position] = (stored_color, pygame.time.get_ticks())
-        print(f"Simple hit trail: Hit at position {position} with color {stored_color}")
+        print(f"SimpleHitTrail: Added hit at position {position} with color {stored_color}")
+        print(f"SimpleHitTrail: Current hit positions: {list(self.hit_positions.keys())}")
     
     def draw(self, display_func) -> None:
         """Draw the simple hit trail.
@@ -65,7 +67,16 @@ class SimpleHitTrail:
             
             # Display the pixel
             display_func(pos, faded_color)
+            
+            # Debug output for fade progress
+            if pos in positions_to_remove:
+                print(f"SimpleHitTrail: Position {pos} has faded out (elapsed: {elapsed_ms}ms)")
         
         # Remove expired positions
         for pos in positions_to_remove:
-            del self.hit_positions[pos] 
+            del self.hit_positions[pos]
+            print(f"SimpleHitTrail: Removed expired position {pos}")
+        
+        # Debug output for remaining positions
+        if self.hit_positions:
+            print(f"SimpleHitTrail: Remaining hit positions: {list(self.hit_positions.keys())}") 
