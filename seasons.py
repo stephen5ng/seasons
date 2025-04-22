@@ -23,7 +23,8 @@ from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
 from trail_visualization import (
     HitTrailVisualizer,
-    SimpleTrailVisualizer
+    SimpleTrailVisualizer,
+    TrailVisualizer
 )
 from simple_hit_trail import SimpleHitTrail
 
@@ -375,25 +376,15 @@ async def run_game() -> None:
     game_state: GameState = GameState()
     
     # Initialize hit trail visualization based on strategy
-    use_simple_hit_trail = args.hit_trail_strategy == 'simple'
-    
-    if use_simple_hit_trail:
-        # For simple strategy, use SimpleTrailVisualizer
-        hit_trail_visualizer = SimpleTrailVisualizer(
-            led_count=game_constants.NUMBER_OF_LEDS,
-            auto_mode=args.auto_score,  # Pass auto_score flag to enable auto mode
-            speed=1,  # Speed is controlled by the game
-            fade_duration_ms=500  # 500ms fade duration
-        )
-    else:
-        # For normal strategy, use HitTrailVisualizer
-        hit_trail_visualizer = HitTrailVisualizer(
-            led_count=game_constants.NUMBER_OF_LEDS,
-            initial_score=args.score,
-            auto_mode=False,  # No auto mode in main game
-            speed=1,  # Speed is controlled by the game
-            hit_spacing=game_constants.INITIAL_HIT_SPACING
-        )
+    hit_trail_visualizer = TrailVisualizer.create_visualizer(
+        strategy=args.hit_trail_strategy,
+        led_count=game_constants.NUMBER_OF_LEDS,
+        initial_score=args.score,
+        auto_mode=args.auto_score,
+        speed=1,  # Speed is controlled by the game
+        hit_spacing=game_constants.INITIAL_HIT_SPACING,
+        fade_duration_ms=500  # 500ms fade duration
+    )
     
     hit_trail_visualizer.display = display
     
@@ -407,7 +398,7 @@ async def run_game() -> None:
     if args.score > 0:
         print(f"Setting initial score to {args.score}")
         game_state.score_manager.score = args.score
-        if not use_simple_hit_trail:
+        if not isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
             hit_trail_visualizer.score = args.score  # Only set score for normal strategy
     
     # Debug setup for different display modes
@@ -417,7 +408,7 @@ async def run_game() -> None:
         print(f"Showing hit trail using {args.hit_trail_strategy} strategy")
         
         # Set up hit colors based on score (simulate multiple hits) - only for normal strategy
-        if not use_simple_hit_trail:
+        if not isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
             hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
             print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     if show_bonus_trails:
@@ -530,7 +521,7 @@ async def run_game() -> None:
             
             # Draw hit trail in outer circle using the selected strategy
             if show_hit_trail:
-                if use_simple_hit_trail:
+                if isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
                     # For simple strategy, just update position and draw
                     hit_trail_visualizer.current_position = led_position
                     hit_trail_visualizer.draw_hit_trail()
@@ -545,10 +536,8 @@ async def run_game() -> None:
                     hit_trail_visualizer.current_position = led_position
                     hit_trail_visualizer.draw_hit_trail()
                 # Log hit trail behavior to file
-                if not use_simple_hit_trail:
+                if not isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
                     logger.info(f"Hit trail drawn at position {led_position}, colors={hit_trail_visualizer.hit_colors}")
-                else:
-                    logger.info(f"Hit trail drawn at position {led_position}")
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
@@ -592,7 +581,7 @@ async def run_game() -> None:
                     return
                 
                 # If using simple hit trail strategy, allow direct key presses to light up LEDs
-                if use_simple_hit_trail and show_hit_trail and keydown:
+                if isinstance(hit_trail_visualizer, SimpleTrailVisualizer) and show_hit_trail and keydown:
                     if key in ["r", "up", "g", "right", "b", "down", "y", "left"]:
                         target_type = TargetType[key.upper() if key in ["r", "g", "b", "y"] else key]
                         hit_trail_visualizer.add_hit(target_type)

@@ -56,6 +56,45 @@ class TrailVisualizer:
         self.current_position = 0
         self.running = False
     
+    @classmethod
+    def create_visualizer(cls, 
+                         strategy: str,
+                         led_count: int,
+                         initial_score: float = 0.0,
+                         auto_mode: bool = False,
+                         speed: int = 1,
+                         hit_spacing: int = game_constants.INITIAL_HIT_SPACING,
+                         fade_duration_ms: int = 500) -> 'TrailVisualizer':
+        """Create a trail visualizer based on the specified strategy.
+        
+        Args:
+            strategy: The visualization strategy to use ('normal' or 'simple')
+            led_count: Number of LEDs in the strip
+            initial_score: Starting score value
+            auto_mode: When True, automatically adds hits on a timer
+            speed: Speed of LED movement (1-10)
+            hit_spacing: Initial spacing between hit trail elements
+            fade_duration_ms: Duration in milliseconds for the fade-out effect
+            
+        Returns:
+            A TrailVisualizer instance configured with the specified strategy
+        """
+        if strategy == 'simple':
+            return SimpleTrailVisualizer(
+                led_count=led_count,
+                auto_mode=auto_mode,
+                speed=speed,
+                fade_duration_ms=fade_duration_ms
+            )
+        else:
+            return HitTrailVisualizer(
+                led_count=led_count,
+                initial_score=initial_score,
+                auto_mode=auto_mode,
+                speed=speed,
+                hit_spacing=hit_spacing
+            )
+    
     async def run(self) -> None:
         """Run the visualization loop.
         
@@ -442,23 +481,15 @@ async def main() -> None:
     args = parse_hit_trail_args()
     
     # Initialize visualizer based on strategy
-    if args['strategy'] == 'simple':
-        print(f"Using SIMPLE hit trail strategy with {args['fade_duration']}ms fade duration")
-        visualizer = SimpleTrailVisualizer(
-            led_count=args['led_count'],
-            auto_mode=args['auto_mode'],
-            speed=args['speed'],
-            fade_duration_ms=args['fade_duration']
-        )
-    else:
-        print(f"Using NORMAL hit trail strategy with {args['hit_spacing']} hit spacing")
-        visualizer = HitTrailVisualizer(
-            led_count=args['led_count'],
-            initial_score=args['initial_score'],
-            auto_mode=args['auto_mode'],
-            speed=args['speed'],
-            hit_spacing=args['hit_spacing']
-        )
+    visualizer = TrailVisualizer.create_visualizer(
+        strategy=args['strategy'],
+        led_count=args['led_count'],
+        initial_score=args['initial_score'],
+        auto_mode=args['auto_mode'],
+        speed=args['speed'],
+        hit_spacing=args['hit_spacing'],
+        fade_duration_ms=args['fade_duration']
+    )
     
     # Run visualization loop
     await visualizer.run()
