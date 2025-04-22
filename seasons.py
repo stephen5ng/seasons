@@ -231,9 +231,9 @@ class GameState:
         )
         
         # Update total beats when we cross a beat boundary
-        if beat > self.last_beat:
+        if beat_float > self.last_beat:
             self.total_beats += 1
-            self.last_beat = beat
+            self.last_beat = int(beat_float)
             print(f"Total beats in song: {self.total_beats}")
             
             # Update WLED based on current measure and score
@@ -424,22 +424,19 @@ async def run_game() -> None:
         game_state.audio_manager.play_music(start_pos_s=0.0)
 
         # Variables for tracking if we've completed one full loop in debug mode
-        debug_loop_started = True  # Start tracking immediately
         previous_led_position = -1
 
         while True:
             display.clear()
 
             # Update timing and music
-            beat: int
             beat_in_measure: int
             beat_float: float
             fractional_beat: float
-            beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
+            _, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
             game_state.handle_music_loop(beat_in_measure)
 
             current_time_ms: int = pygame.time.get_ticks()
-            current_time_s: float = current_time_ms / 1000.0
             
             # Calculate LED position and update loop count
             led_position: int = game_state.calculate_led_position(beat_in_measure, fractional_beat)
@@ -484,30 +481,23 @@ async def run_game() -> None:
                     try:
                         if target_hit != "none":
                             target_enum = TargetType[target_hit.upper()]
-                            
-                            # Update the appropriate hit trail strategy
-                            if use_simple_hit_trail:
-                                # For simple strategy, just add the hit at the current position
-                                hit_trail_visualizer.add_hit(target_enum)
-                            else:
-                                # For normal strategy, update the visualizer
-                                hit_trail_visualizer.score = new_score
-                                hit_trail_visualizer.add_hit(target_enum)
+                            hit_trail_visualizer.score = new_score
+                            hit_trail_visualizer.add_hit(target_enum)
                     except KeyError:
                         pass  # Ignore invalid target types
                         
-            # Handle hit trail cleared state synchronization (only for normal strategy)
-            if not use_simple_hit_trail and game_state.hit_trail_cleared and show_hit_trail:
+            # Handle hit trail cleared state synchronization
+            if game_state.hit_trail_cleared and show_hit_trail:
                 hit_trail_visualizer.hit_trail_cleared = True
             
             # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
-                game_state.trail_state_manager.update_position(led_position, current_time_s)
+                game_state.trail_state_manager.update_position(led_position, current_time_ms / 1000.0)
                 
-                # If using simple strategy and auto scoring, add a hit at the current position
-                if use_simple_hit_trail and args.auto_score and game_state.button_handler.is_in_valid_window(led_position):
+                # Handle auto-scoring through the visualizer
+                if args.auto_score and game_state.button_handler.is_in_valid_window(led_position):
                     target_type = game_state.button_handler.get_target_type(led_position)
                     if target_type:
                         hit_trail_visualizer.add_hit(target_type)
@@ -593,14 +583,9 @@ async def run_game() -> None:
                 
                 # If using simple hit trail strategy, allow direct key presses to light up LEDs
                 if use_simple_hit_trail and show_hit_trail and keydown:
-                    if key == "r" or key == "up":
-                        hit_trail_visualizer.add_hit(TargetType.RED)
-                    elif key == "g" or key == "right":
-                        hit_trail_visualizer.add_hit(TargetType.GREEN) 
-                    elif key == "b" or key == "down":
-                        hit_trail_visualizer.add_hit(TargetType.BLUE)
-                    elif key == "y" or key == "left":
-                        hit_trail_visualizer.add_hit(TargetType.YELLOW)
+                    if key in ["r", "up", "g", "right", "b", "down", "y", "left"]:
+                        target_type = TargetType[key.upper() if key in ["r", "g", "b", "y"] else key]
+                        hit_trail_visualizer.add_hit(target_type)
 
             # Update display
             display.update()
