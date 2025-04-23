@@ -3,8 +3,12 @@ import asyncio
 import pygame
 from seasons import (
     GameState, ButtonHandler, TargetType, TARGET_COLORS,
-    NUMBER_OF_LEDS, TARGET_WINDOW_SIZE, MID_TARGET_POS,
-    RIGHT_TARGET_POS, LEFT_TARGET_POS
+    NUMBER_OF_LEDS, TARGET_WINDOW_SIZE
+)
+from game_constants import (
+    BLUE_TARGET_PERCENT,
+    GREEN_TARGET_PERCENT,
+    YELLOW_TARGET_PERCENT
 )
 
 class TestButtonHandler(unittest.TestCase):
@@ -25,20 +29,20 @@ class TestButtonHandler(unittest.TestCase):
         # Test positions within each target window
         self.assertTrue(self.handler.is_in_valid_window(0))  # Red target
         self.assertTrue(self.handler.is_in_valid_window(TARGET_WINDOW_SIZE - 1))  # Red target
-        self.assertTrue(self.handler.is_in_valid_window(int(MID_TARGET_POS)))  # Blue target
-        self.assertTrue(self.handler.is_in_valid_window(int(RIGHT_TARGET_POS)))  # Green target
-        self.assertTrue(self.handler.is_in_valid_window(int(LEFT_TARGET_POS)))  # Yellow target
+        self.assertTrue(self.handler.is_in_valid_window(int(NUMBER_OF_LEDS * BLUE_TARGET_PERCENT)))  # Blue target
+        self.assertTrue(self.handler.is_in_valid_window(int(NUMBER_OF_LEDS * GREEN_TARGET_PERCENT)))  # Green target
+        self.assertTrue(self.handler.is_in_valid_window(int(NUMBER_OF_LEDS * YELLOW_TARGET_PERCENT)))  # Yellow target
         
         # Test positions outside target windows
         self.assertFalse(self.handler.is_in_valid_window(TARGET_WINDOW_SIZE + 1))
-        self.assertFalse(self.handler.is_in_valid_window(int(MID_TARGET_POS) + TARGET_WINDOW_SIZE + 1))
+        self.assertFalse(self.handler.is_in_valid_window(int(NUMBER_OF_LEDS * BLUE_TARGET_PERCENT) + TARGET_WINDOW_SIZE + 1))
 
     def test_get_target_type(self):
         # Test each target type
         self.assertEqual(self.handler.get_target_type(0), TargetType.RED)
-        self.assertEqual(self.handler.get_target_type(int(MID_TARGET_POS)), TargetType.BLUE)
-        self.assertEqual(self.handler.get_target_type(int(RIGHT_TARGET_POS)), TargetType.GREEN)
-        self.assertEqual(self.handler.get_target_type(int(LEFT_TARGET_POS)), TargetType.YELLOW)
+        self.assertEqual(self.handler.get_target_type(int(NUMBER_OF_LEDS * BLUE_TARGET_PERCENT)), TargetType.BLUE)
+        self.assertEqual(self.handler.get_target_type(int(NUMBER_OF_LEDS * GREEN_TARGET_PERCENT)), TargetType.GREEN)
+        self.assertEqual(self.handler.get_target_type(int(NUMBER_OF_LEDS * YELLOW_TARGET_PERCENT)), TargetType.YELLOW)
         
         # Test positions outside target windows
         self.assertIsNone(self.handler.get_target_type(TARGET_WINDOW_SIZE + 1))
