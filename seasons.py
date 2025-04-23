@@ -104,11 +104,11 @@ else:
     # Use default values when the script is imported
     args = default_args
 
-# Update shared constants in game_constants for runtime values
-game_constants.NUMBER_OF_LEDS = args.leds
+# Set number_of_leds from command line arguments
+number_of_leds = args.leds
 
-# Update dependent constants
-game_constants.TARGET_WINDOW_SIZE = game_constants.NUMBER_OF_LEDS // 20
+# Calculate target_window_size based on the number of LEDs
+target_window_size = number_of_leds // 20
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
@@ -116,7 +116,7 @@ IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith
 if IS_RASPBERRY_PI:
     from rpi_ws281x import PixelStrip, Color as LEDColor
     # LED strip configuration:
-    LED_COUNT = NUMBER_OF_LEDS  # Number of LED pixels
+    LED_COUNT = number_of_leds  # Number of LED pixels
     LED_PIN = 18  # GPIO pin connected to the pixels (must support PWM)
     LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
     LED_DMA = 10  # DMA channel to use for generating signal
@@ -139,8 +139,8 @@ class GameState:
         self.error_sound: pygame.mixer.Sound = pygame.mixer.Sound(ERROR_SOUND)
         self.button_handler = ButtonHandler(
             self.error_sound,
-            number_of_leds=NUMBER_OF_LEDS,
-            target_window_size=TARGET_WINDOW_SIZE,
+            number_of_leds=number_of_leds,
+            target_window_size=target_window_size,
             auto_score=args.auto_score
         )
         self.trail_length: int = 0 
@@ -271,7 +271,7 @@ class GameState:
 
     def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
         """Update score and trigger flash effect if score increased."""
-        self.score_manager.update_score(new_score, target_type, beat_float, NUMBER_OF_LEDS)
+        self.score_manager.update_score(new_score, target_type, beat_float, number_of_leds)
     
     def get_score_flash_intensity(self, beat_float: float) -> float:
         """Calculate the intensity of the score flash effect based on musical beats."""
@@ -279,7 +279,7 @@ class GameState:
 
     def calculate_led_position(self, beat_in_measure: int, fractional_beat: float) -> int:
         """Calculate the current LED position based on beat timing."""
-        return LEDPosition.calculate_position(beat_in_measure, fractional_beat, BEATS_PER_MEASURE, NUMBER_OF_LEDS)
+        return LEDPosition.calculate_position(beat_in_measure, fractional_beat, BEATS_PER_MEASURE, number_of_leds)
     
     def update_loop_count(self, percent_of_measure: float) -> None:
         """Update the loop count based on measure progress."""
@@ -291,7 +291,7 @@ class GameState:
 
 def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
-    x, y = LEDPosition.get_ring_position(i, radius, NUMBER_OF_LEDS)
+    x, y = LEDPosition.get_ring_position(i, radius, number_of_leds)
     return (CIRCLE_CENTER_X + x, CIRCLE_CENTER_Y + y)
 
 def get_hit_trail_position(i: int) -> Tuple[int, int]:
@@ -412,7 +412,7 @@ async def run_game() -> None:
             
             # Calculate LED position and update loop count
             led_position: int = game_state.calculate_led_position(beat_in_measure, fractional_beat)
-            game_state.update_loop_count(led_position / NUMBER_OF_LEDS)
+            game_state.update_loop_count(led_position / number_of_leds)
 
             # For debug mode, track when we've completed one loop
             if run_one_loop:
@@ -423,8 +423,8 @@ async def run_game() -> None:
                 
                 # If we've gone from a high position to a low position, we've completed a loop
                 # Use 90% of total LEDs as the high threshold and 10% as the low threshold
-                high_threshold = int(NUMBER_OF_LEDS * 0.9)
-                low_threshold = int(NUMBER_OF_LEDS * 0.1)
+                high_threshold = int(number_of_leds * 0.9)
+                low_threshold = int(number_of_leds * 0.1)
                 if previous_led_position > high_threshold and led_position < low_threshold:
                     print(f"Debug: Completed one full loop, exiting.")
                     return
