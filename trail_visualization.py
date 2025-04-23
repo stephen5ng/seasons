@@ -40,10 +40,7 @@ class TrailVisualizer:
             scaling_factor: Scaling factor for the display
         """
         self.led_count = led_count
-        
-        # Update global constants
-        game_constants.NUMBER_OF_LEDS = led_count
-        
+                
         # Initialize display
         self.display = DisplayManager(
             screen_width=screen_width,

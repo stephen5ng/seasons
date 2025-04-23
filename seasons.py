@@ -22,21 +22,8 @@ from score_manager import ScoreManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
 from trail_visualization import (
-    HitTrailVisualizer,
     SimpleTrailVisualizer,
     TrailVisualizer
-)
-from simple_hit_trail import SimpleHitTrail
-
-# Import game constants - import specific constants first
-from game_constants import (
-    WLED_IP, WLED_SETTINGS, SCALING_FACTOR, SCREEN_WIDTH, SCREEN_HEIGHT, 
-    CIRCLE_CENTER_X, CIRCLE_CENTER_Y, BEATS_PER_MEASURE, 
-    BEAT_PER_MS, SECONDS_PER_MEASURE_S, ERROR_SOUND, HIT_TRAIL_RADIUS,
-    BONUS_TRAIL_RADIUS, TRAIL_FADE_DURATION_S, TRAIL_EASE,
-    BONUS_TRAIL_FADE_DURATION_S, BONUS_TRAIL_EASE, HIGH_SCORE_THRESHOLD,
-    SCORE_FLASH_DURATION_MS, SCORE_LINE_ANIMATION_TIME_MS, SCORE_LINE_HEIGHT,
-    SCORE_LINE_SPACING, SCORE_LINE_COLOR, TargetType, TARGET_COLORS
 )
 
 # Import remaining constants
@@ -122,15 +109,6 @@ game_constants.NUMBER_OF_LEDS = args.leds
 
 # Update dependent constants
 game_constants.TARGET_WINDOW_SIZE = game_constants.NUMBER_OF_LEDS // 20
-
-# Calculate target positions based on percentages
-MID_TARGET_POS = int(game_constants.NUMBER_OF_LEDS * game_constants.BLUE_TARGET_PERCENT)
-RIGHT_TARGET_POS = int(game_constants.NUMBER_OF_LEDS * game_constants.GREEN_TARGET_PERCENT)
-LEFT_TARGET_POS = int(game_constants.NUMBER_OF_LEDS * game_constants.YELLOW_TARGET_PERCENT)
-
-# For convenience, reference frequently used constants directly
-NUMBER_OF_LEDS = game_constants.NUMBER_OF_LEDS
-TARGET_WINDOW_SIZE = game_constants.TARGET_WINDOW_SIZE
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
@@ -326,8 +304,6 @@ def get_bonus_trail_position(i: int) -> Tuple[int, int]:
 
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
-    from game_constants import COLOR_CYCLE_TIME_MS
-    
     hue: float = (time_ms / COLOR_CYCLE_TIME_MS + line_index * 0.1) % 1.0
     
     if hue < 1/6:  # Red to Yellow
