@@ -398,6 +398,14 @@ async def run_game() -> None:
         # Variables for tracking if we've completed one full loop in debug mode
         previous_led_position = -1
 
+        # Handle key press mapping
+        key_mapping = {
+            "r": TargetType.RED,
+            "g": TargetType.GREEN,
+            "b": TargetType.BLUE,
+            "y": TargetType.YELLOW
+        }
+
         while True:
             display.clear()
 
@@ -455,9 +463,9 @@ async def run_game() -> None:
                 if new_score > game_state.score and show_hit_trail:
                     try:
                         if target_hit != "none":
-                            target_enum = TargetType[target_hit.upper()]
+                            target_type = TargetType[target_hit.upper()]
                             hit_trail_visualizer.score = new_score
-                            hit_trail_visualizer.add_hit(target_enum)
+                            hit_trail_visualizer.add_hit(target_type)
                     except KeyError:
                         pass  # Ignore invalid target types
                         
@@ -545,8 +553,8 @@ async def run_game() -> None:
                 
                 # If using simple hit trail strategy, allow direct key presses to light up LEDs
                 if isinstance(hit_trail_visualizer, SimpleTrailVisualizer) and show_hit_trail and keydown:
-                    if key in ["r", "up", "g", "right", "b", "down", "y", "left"]:
-                        target_type = TargetType[key.upper() if key in ["r", "g", "b", "y"] else key]
+                    if key in key_mapping:
+                        target_type = key_mapping[key]
                         hit_trail_visualizer.add_hit(target_type)
 
             # Update display
