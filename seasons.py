@@ -446,7 +446,10 @@ async def run_game() -> None:
                     print(f"Debug: Started tracking at position {led_position}")
                 
                 # If we've gone from a high position to a low position, we've completed a loop
-                elif previous_led_position > 70 and led_position < 10:
+                # Use 90% of total LEDs as the high threshold and 10% as the low threshold
+                high_threshold = int(NUMBER_OF_LEDS * 0.9)
+                low_threshold = int(NUMBER_OF_LEDS * 0.1)
+                if previous_led_position > high_threshold and led_position < low_threshold:
                     print(f"Debug: Completed one full loop, exiting.")
                     return
                 
@@ -522,9 +525,6 @@ async def run_game() -> None:
             # Draw hit trail in outer circle using the selected strategy
             if show_hit_trail:
                 hit_trail_visualizer.sync_with_game_state(game_state, led_position)
-                # Log hit trail behavior to file
-                if not isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
-                    logger.info(f"Hit trail drawn at position {led_position}, colors={hit_trail_visualizer.hit_colors}")
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
