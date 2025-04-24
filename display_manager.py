@@ -96,21 +96,6 @@ class DisplayManager:
                                          game_constants.NUMBER_OF_LEDS)
             self.pygame_surface.set_at((x, y), color)
     
-    def set_bonus_trail_pixel(self, pos: int, color: Color) -> None:
-        """Set pixel color at position in bonus trail ring.
-        
-        Args:
-            pos: LED position index
-            color: Color to set
-        """
-        if IS_RASPBERRY_PI:
-            # Convert Pygame color to WS281x color (RGB order)
-            ws_color: LEDColor = LEDColor(color.r, color.g, color.b)
-            self.strip.setPixelColor(pos, ws_color)
-        else:
-            x, y = self._get_ring_position(pos, CIRCLE_CENTER_X, CIRCLE_CENTER_Y, BONUS_TRAIL_RADIUS, NUMBER_OF_LEDS)
-            self.pygame_surface.set_at((x, y), color)
-    
     # New-style methods
     def set_target_pixel(self, pos: int, color: Color, 
                          center_x: int, center_y: int, radius: int, led_count: int) -> None:

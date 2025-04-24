@@ -53,16 +53,3 @@ class TrailRenderer:
             base_color[3] if len(base_color) > 3 else 255
         )
 
-    def get_bonus_trail_color(self, brightness: float) -> Color:
-        """Get color for bonus trail with brightness."""
-        if not self.get_rainbow_color:
-            raise RuntimeError("get_rainbow_color_func must be provided to TrailRenderer for bonus trail color.")
-        current_time_ms: int = self.get_ticks()
-        # Use a different offset for bonus trail to create a different rainbow pattern
-        rainbow_color: Color = self.get_rainbow_color(current_time_ms, 10)  # Using 10 as offset
-        return Color(
-            int(rainbow_color[0] * brightness),
-            int(rainbow_color[1] * brightness),
-            int(rainbow_color[2] * brightness),
-            rainbow_color[3]
-        )

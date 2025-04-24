@@ -67,10 +67,6 @@ class SimpleHitTrail:
             
             # Display the pixel
             display_func(pos, faded_color)
-            
-            # Debug output for fade progress
-            if pos in positions_to_remove:
-                print(f"SimpleHitTrail: Position {pos} has faded out (elapsed: {elapsed_ms}ms)")
         
         # Remove expired positions
         for pos in positions_to_remove:

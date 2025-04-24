@@ -387,25 +387,13 @@ class SimpleTrailVisualizer(TrailVisualizer):
             self.current_position, 
             game_constants.TARGET_COLORS[target_type]
         )
-        # Update score
-        self._score += 0.25
-        print(f"SimpleTrailVisualizer: Added {target_type.name} hit at position {self.current_position}, score: {self._score}")
     
     def clear_hit_trail(self) -> None:
         """Clear the hit trail."""
-        # Reset the simple hit trail by creating a new instance
         self.simple_hit_trail = SimpleHitTrail(fade_duration_ms=self.simple_hit_trail.fade_duration_ms)
-        print("SimpleTrailVisualizer: Hit trail cleared manually")
         
     def draw_hit_trail(self) -> None:
         """Draw the simple hit trail on the display."""
         # Draw the simple hit trail using the SimpleHitTrail implementation
         self.simple_hit_trail.draw(lambda pos, color: self.display.set_hit_trail_pixel(pos, color))
         
-        # Indicate current position with a dim white pixel
-        self.display.set_pixel(self.current_position, Color(128, 128, 128))
-        
-        # Debug output for hit trail positions
-        if self.simple_hit_trail.hit_positions:
-            positions = list(self.simple_hit_trail.hit_positions.keys())
-            print(f"SimpleTrailVisualizer: Drawing {len(positions)} hit positions: {positions}") 

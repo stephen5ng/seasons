@@ -30,11 +30,6 @@ class TrailRendererTest(unittest.TestCase):
         expected = Color(int(TARGET_COLORS[TargetType.RED][0]*0.25), 0, 0, 255)
         self.assertEqual(color, expected)
 
-    def test_get_bonus_trail_color(self):
-        color = self.trail_renderer.get_bonus_trail_color(0.8)
-        self.mock_rainbow.assert_called_with(self.fixed_time, 10)
-        self.assertEqual(color, Color(80, 120, 160, 255))
-
     def test_draw_trail_with_easing(self):
         positions = {3: 120.0, 5: 122.0}
         fade_duration = 5.0
