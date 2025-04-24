@@ -430,18 +430,14 @@ async def run_game() -> None:
             new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
                 led_position, game_state.score_manager.score, current_time_ms)
             if new_score != game_state.score:
-                print(f"New score: {new_score}, target hit: {target_hit}")
                 game_state.update_score(new_score, target_hit, beat_float)
                 
                 # If the score increased and we're showing hit trail, update the hit trail
                 if new_score > game_state.score and show_hit_trail:
-                    try:
-                        if target_hit != "none":
-                            target_type = TargetType[target_hit.upper()]
-                            hit_trail_visualizer.add_hit(target_type)
-                    except KeyError:
-                        pass  # Ignore invalid target types
-                        
+                    if target_hit != "none" and target_hit.upper() in [t.name for t in TargetType]:
+                        target_type = TargetType[target_hit.upper()]
+                        hit_trail_visualizer.add_hit(target_type)
+            
             # Handle hit trail cleared state synchronization
             if game_state.hit_trail_cleared and show_hit_trail:
                 hit_trail_visualizer.hit_trail_cleared = True
@@ -451,13 +447,6 @@ async def run_game() -> None:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
                 game_state.trail_state_manager.update_position(led_position, current_time_ms / 1000.0)
-                
-                # Handle auto-scoring through the visualizer
-                if args.auto_score and game_state.button_handler.is_in_valid_window(led_position):
-                    target_type = game_state.button_handler.get_target_type(led_position)
-                    if target_type:
-                        hit_trail_visualizer.add_hit(target_type)
-                        print(f"Auto-scoring: Added {target_type.name} hit at position {led_position}")
             
             # Draw target trail
             if show_main_trail:
