@@ -64,36 +64,28 @@ class TestHitTrailVisualizer(unittest.TestCase):
         # Since HitTrail has only static methods, we'll patch them individually
         self.hit_trail_add_color_patcher = patch('trail_visualization.HitTrail.add_hit_color')
         self.hit_trail_calculate_positions_patcher = patch('trail_visualization.HitTrail.calculate_trail_positions')
-        self.hit_trail_should_adjust_spacing_patcher = patch('trail_visualization.HitTrail.should_adjust_spacing')
-        self.hit_trail_get_new_spacing_patcher = patch('trail_visualization.HitTrail.get_new_spacing')
         self.hit_trail_limit_trail_length_patcher = patch('trail_visualization.HitTrail.limit_trail_length')
         
         self.mock_add_hit_color = self.hit_trail_add_color_patcher.start()
         self.mock_calculate_positions = self.hit_trail_calculate_positions_patcher.start()
-        self.mock_should_adjust_spacing = self.hit_trail_should_adjust_spacing_patcher.start()
-        self.mock_get_new_spacing = self.hit_trail_get_new_spacing_patcher.start()
         self.mock_limit_trail_length = self.hit_trail_limit_trail_length_patcher.start()
         
         # Set up return values for mocked methods
         self.mock_add_hit_color.side_effect = lambda colors, new_color: [new_color] + colors
         self.mock_limit_trail_length.side_effect = lambda colors, max_length: colors[:max_length]
-        self.mock_should_adjust_spacing.return_value = False
         
         with patch('trail_visualization.DisplayManager', return_value=self.display_mock):
             self.visualizer = HitTrailVisualizer(
                 led_count=100,
                 initial_score=2.0,
                 auto_mode=False,
-                speed=2,
-                hit_spacing=8
+                speed=2
             )
     
     def tearDown(self):
         """Clean up after each test."""
         self.hit_trail_add_color_patcher.stop()
         self.hit_trail_calculate_positions_patcher.stop()
-        self.hit_trail_should_adjust_spacing_patcher.stop()
-        self.hit_trail_get_new_spacing_patcher.stop()
         self.hit_trail_limit_trail_length_patcher.stop()
     
     def test_init(self):
@@ -101,7 +93,6 @@ class TestHitTrailVisualizer(unittest.TestCase):
         self.assertEqual(self.visualizer.led_count, 100)
         self.assertEqual(self.visualizer.speed, 2)
         self.assertFalse(self.visualizer.auto_mode)
-        self.assertEqual(self.visualizer.hit_spacing, 8)
         self.assertEqual(self.visualizer.score, 2.0)
     
     def test_add_hit(self):
@@ -128,11 +119,8 @@ class TestHitTrailVisualizer(unittest.TestCase):
     
     def test_clear_hit_trail(self):
         """Test clearing the hit trail."""
-        from game_constants import INITIAL_HIT_SPACING
-        
         # Set up some initial state
         self.visualizer.hit_colors = [Color(255, 0, 0), Color(0, 255, 0)]
-        self.visualizer.hit_spacing = 4
         self.visualizer.hit_trail_cleared = False
         
         # Clear the trail
@@ -140,7 +128,6 @@ class TestHitTrailVisualizer(unittest.TestCase):
         
         # Verify state was reset
         self.assertEqual(self.visualizer.hit_colors, [])
-        self.assertEqual(self.visualizer.hit_spacing, INITIAL_HIT_SPACING)
         self.assertTrue(self.visualizer.hit_trail_cleared)
     
     def test_draw_hit_trail(self):
@@ -159,7 +146,7 @@ class TestHitTrailVisualizer(unittest.TestCase):
         self.mock_calculate_positions.assert_called_with(
             self.visualizer.current_position,
             self.visualizer.hit_colors,
-            self.visualizer.hit_spacing,
+            16,  # Default spacing from game_constants.INITIAL_HIT_SPACING
             self.visualizer.led_count
         )
         
@@ -193,49 +180,6 @@ class TestHitTrailVisualizer(unittest.TestCase):
             
             # Check if add_hit was called with RED target
             self.mock_add_hit_color.assert_called()
-    
-    def test_spacing_adjustment(self):
-        """Test spacing adjustment when trail gets too long."""
-        from game_constants import TargetType, TARGET_COLORS
-        
-        # Set up initial state
-        self.visualizer.hit_colors = [Color(255, 0, 0)] * 10
-        self.visualizer.hit_spacing = 8
-        
-        # Mock HitTrail to indicate spacing needs adjustment
-        self.mock_should_adjust_spacing.return_value = True
-        self.mock_get_new_spacing.return_value = 4  # New spacing value
-        
-        # Add a hit which should trigger spacing adjustment
-        self.visualizer.add_hit(TargetType.RED)
-        
-        # Verify spacing was adjusted
-        self.assertEqual(self.visualizer.hit_spacing, 4)
-        
-        # Verify methods were called
-        self.mock_should_adjust_spacing.assert_called()
-        self.mock_get_new_spacing.assert_called_with(8)
-    
-    def test_spacing_adjustment_clear_trail(self):
-        """Test clearing trail when spacing cannot be reduced further."""
-        from game_constants import TargetType, TARGET_COLORS, INITIAL_HIT_SPACING
-        
-        # Set up initial state
-        self.visualizer.hit_colors = [Color(255, 0, 0)] * 10
-        self.visualizer.hit_spacing = 4
-        self.visualizer.hit_trail_cleared = False
-        
-        # Mock HitTrail to indicate spacing needs adjustment and trail should be cleared
-        self.mock_should_adjust_spacing.return_value = True
-        self.mock_get_new_spacing.return_value = 0  # Signal to clear trail
-        
-        # Add a hit which should trigger trail clearing
-        self.visualizer.add_hit(TargetType.RED)
-        
-        # Verify trail was cleared and spacing reset
-        self.assertEqual(self.visualizer.hit_colors, [])
-        self.assertEqual(self.visualizer.hit_spacing, INITIAL_HIT_SPACING)
-        self.assertTrue(self.visualizer.hit_trail_cleared)
 
 
 if __name__ == '__main__':
