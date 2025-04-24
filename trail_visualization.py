@@ -397,9 +397,10 @@ class SimpleTrailVisualizer(TrailVisualizer):
             
         # Add the hit at the target position
         self.simple_hit_trail.add_hit(
-            self.current_position, 
+            target_pos, 
             game_constants.TARGET_COLORS[target_type]
         )
+
         # Update score
         self._score += 0.25
     
