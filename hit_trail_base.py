@@ -14,7 +14,6 @@ class HitTrailBase:
         Args:
             fade_duration_ms: Duration in milliseconds for the fade-out effect
         """
-        fade_duration_ms = 2000
         self.easing = QuadEaseOut(start=1.0, end=0.0, duration=fade_duration_ms)
         self.active_hits: Dict[int, Tuple[Color, int]] = {}  # position -> (color, start_time)
     
