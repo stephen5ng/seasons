@@ -548,12 +548,6 @@ async def run_game() -> None:
                 if key == "quit":
                     return
                 
-                # If using simple hit trail strategy, allow direct key presses to light up LEDs
-                if isinstance(hit_trail_visualizer, SimpleTrailVisualizer) and show_hit_trail and keydown:
-                    if key in key_mapping:
-                        target_type = key_mapping[key]
-                        hit_trail_visualizer.add_hit(target_type)
-
             # Update display
             display.update()
             await clock.tick(30)
