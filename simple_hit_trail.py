@@ -5,18 +5,23 @@ simply lights up the closest LED, rather than creating a trailing effect.
 """
 
 from typing import Optional, Tuple
-import pygame
 from pygame import Color
+from hit_trail_base import HitTrailBase
 
-class SimpleHitTrail:
+class SimpleHitTrail(HitTrailBase):
     """A simple hit trail implementation that lights up a single LED position."""
     
-    def __init__(self) -> None:
-        """Initialize the simple hit trail."""
+    def __init__(self, fade_duration_ms: int = 500) -> None:
+        """Initialize the simple hit trail.
+        
+        Args:
+            fade_duration_ms: Duration in milliseconds for the fade-out effect
+        """
+        super().__init__(fade_duration_ms)
         self.hit_position: Optional[Tuple[int, Color]] = None  # (position, color)
     
-    def add_hit(self, position: int, color: Color) -> None:
-        """Add a hit at the specified position with the given color.
+    def _add_hit_impl(self, position: int, color: Color) -> None:
+        """Implementation of add_hit for subclasses.
         
         Args:
             position: The LED position to light up
@@ -36,4 +41,5 @@ class SimpleHitTrail:
             return
             
         position, color = self.hit_position
-        display_func(position, color) 
+        if not self._display(position, color, display_func):
+            self.hit_position = None 
