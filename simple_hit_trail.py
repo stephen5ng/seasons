@@ -40,6 +40,5 @@ class SimpleHitTrail(HitTrailBase):
         if not self.hit_position:
             return
             
-        position, color = self.hit_position
-        if not self._display(position, color, display_func):
+        if not self._display(display_func):
             self.hit_position = None 
