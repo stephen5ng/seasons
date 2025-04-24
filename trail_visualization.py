@@ -123,13 +123,6 @@ class TrailVisualizer:
     async def run(self) -> None:
         """Run the visualization loop.
         
-        This method should be overridden by subclasses to implement specific visualization.
-        """
-        raise NotImplementedError("Subclasses must implement run()")
-    
-    async def _run_visualization_loop(self) -> None:
-        """Run the common visualization loop functionality.
-        
         This method handles:
         - Pygame initialization
         - Event handling
@@ -329,10 +322,6 @@ class HitTrailVisualizer(TrailVisualizer):
         # Draw hit trail
         self.draw_hit_trail()
     
-    async def run(self) -> None:
-        """Run the hit trail visualization loop."""
-        await self._run_visualization_loop()
-    
     def add_hit(self, target_type: game_constants.TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
         
@@ -498,11 +487,6 @@ class SimpleTrailVisualizer(TrailVisualizer):
             List of colors in the hit trail
         """
         return [color for _, (color, _) in self.simple_hit_trail.hit_positions.items()]
-    
-    async def run(self) -> None:
-        """Run the simple hit trail visualization loop."""
-        print("Starting SimpleTrailVisualizer run loop")
-        await self._run_visualization_loop()
     
     def add_hit(self, target_type: game_constants.TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
