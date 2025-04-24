@@ -283,6 +283,15 @@ class HitTrailVisualizer(TrailVisualizer):
         """
         return self._hit_colors
     
+    @hit_colors.setter
+    def hit_colors(self, value: List[Color]) -> None:
+        """Set the current hit colors.
+        
+        Args:
+            value: List of colors to set for the hit trail
+        """
+        self._hit_colors = value
+    
     def _init_hit_trail_colors(self, initial_score: float) -> None:
         """Initialize hit trail colors based on the starting score.
         
