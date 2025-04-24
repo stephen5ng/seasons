@@ -40,8 +40,6 @@ def parse_args():
     
     # Display mode options
     display_group = parser.add_argument_group('Display options')
-    display_group.add_argument('--show-bonus-trails', action='store_true',
-                      help='Display bonus trails')
     display_group.add_argument('--show-main-trail', action='store_true',
                       help='Display main trail')
     display_group.add_argument('--show-hit-trail', action='store_true',
@@ -53,8 +51,6 @@ def parse_args():
     debug_group = parser.add_argument_group('Debug options')
     debug_group.add_argument('--score', type=float, default=0.0,
                       help='Set initial score value for debug modes')
-    debug_group.add_argument('--max-bonus-trails', type=int, default=5,
-                      help='Maximum number of bonus trails to create (default: 5)')
     debug_group.add_argument('--one-loop', action='store_true',
                       help='Run for one loop and exit')
     debug_group.add_argument('--disable-wled', action='store_true',
@@ -62,21 +58,10 @@ def parse_args():
     debug_group.add_argument('--auto-score', action='store_true',
                       help='Automatically score points when in valid windows')
     
-    # Positional shortcut
-    parser.add_argument('trails', type=int, nargs='?', default=0,
-                      help='Number of bonus trails to display (shortcut for --show-bonus-trails --max-bonus-trails N)')
-    
     args = parser.parse_args()
     
-    # Handle the positional argument for bonus trails
-    if args.trails > 0:
-        args.show_bonus_trails = True
-        args.max_bonus_trails = args.trails
-        print(f"Debug mode: Showing {args.trails} bonus trails")
-    
     # If no display modes specified, enable all by default
-    if not args.show_bonus_trails and not args.show_main_trail and not args.show_hit_trail:
-        args.show_bonus_trails = True
+    if not args.show_main_trail and not args.show_hit_trail:
         args.show_main_trail = True
         args.show_hit_trail = True
     
@@ -85,12 +70,10 @@ def parse_args():
 # Define default values to use when the script is imported (not run directly)
 default_args = argparse.Namespace(
     leds=80,
-    show_bonus_trails=True,
     show_main_trail=True,
     show_hit_trail=True,
     hit_trail_strategy='normal',
     score=0.0,
-    max_bonus_trails=5,
     one_loop=False,
     disable_wled=False,
     auto_score=False,
@@ -298,10 +281,6 @@ def get_hit_trail_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in the hit trail ring, starting at 12 o'clock."""
     return get_target_ring_position(i, HIT_TRAIL_RADIUS)
 
-def get_bonus_trail_position(i: int) -> Tuple[int, int]:
-    """Convert LED index to x,y coordinates in the bonus trail ring, starting at 12 o'clock."""
-    return get_target_ring_position(i, BONUS_TRAIL_RADIUS)
-
 def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     """Generate a rainbow color based on time and line position."""
     hue: float = (time_ms / COLOR_CYCLE_TIME_MS + line_index * 0.1) % 1.0
@@ -367,7 +346,6 @@ async def run_game() -> None:
     # Debug display modes
     show_main_trail = args.show_main_trail
     show_hit_trail = args.show_hit_trail
-    show_bonus_trails = args.show_bonus_trails
     run_one_loop = args.one_loop
     
     # Set initial score for debug modes
@@ -385,8 +363,6 @@ async def run_game() -> None:
         # Set up hit colors based on score (simulate multiple hits)
         hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
         print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
-    if show_bonus_trails:
-        print(f"Showing bonus trails")
     
     try:
         # Initialize music
@@ -491,18 +467,7 @@ async def run_game() -> None:
                     game_state.button_handler,
                     lambda pos, color: display.set_pixel(pos, color)
                 )
-            
-            # Draw bonus trail if hit trail has been cleared
-            if game_state.hit_trail_cleared and show_bonus_trails:
-                game_state.trail_state_manager.draw_bonus_trail(
-                    BONUS_TRAIL_FADE_DURATION_S,
-                    BONUS_TRAIL_EASE,
-                    lambda pos, color: display.set_bonus_trail_pixel(pos, color)
-                )
-                # Reset hit_trail_cleared flag after drawing the bonus trail
-                game_state.score_manager.hit_trail_cleared = False
-                print("Reset hit_trail_cleared flag")
-            
+                        
             # Draw hit trail in outer circle using the selected strategy
             if show_hit_trail:
                 hit_trail_visualizer.sync_with_game_state(game_state, led_position)
