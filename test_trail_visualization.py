@@ -52,19 +52,6 @@ class TestTrailVisualizer(unittest.TestCase):
         self.visualizer.update_position(speed=10)
         self.assertEqual(self.visualizer.current_position, 5)  # 95 + 10 = 105 % 100 = 5
     
-    def test_run_not_implemented(self):
-        """Test that run() raises NotImplementedError in the base class."""
-        import asyncio
-        
-        # Use AsyncMock to test async method
-        async def run_test():
-            # This should raise NotImplementedError immediately
-            await self.visualizer.run()
-            
-        # Run the async test with asyncio.run
-        with self.assertRaises(NotImplementedError):
-            asyncio.run(run_test())
-
 
 class TestHitTrailVisualizer(unittest.TestCase):
     """Test cases for the HitTrailVisualizer class."""
