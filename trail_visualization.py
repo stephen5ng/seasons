@@ -108,7 +108,8 @@ class TrailVisualizer:
             return SimpleTrailVisualizer(
                 led_count=led_count,
                 auto_mode=auto_mode,
-                speed=speed
+                speed=speed,
+                fade_duration_ms=fade_duration_ms
             )
         else:
             return HitTrailVisualizer(
@@ -324,18 +325,20 @@ class SimpleTrailVisualizer(TrailVisualizer):
     def __init__(self, 
                  led_count: int = 80, 
                  auto_mode: bool = False, 
-                 speed: int = 1) -> None:
+                 speed: int = 1,
+                 fade_duration_ms: int = 500) -> None:
         """Initialize the simple hit trail visualizer.
         
         Args:
             led_count: Number of LEDs in the strip
             auto_mode: When True, automatically adds hits on a timer
             speed: Speed of LED movement (1-10)
+            fade_duration_ms: Duration in milliseconds for the fade-out effect
         """
         super().__init__(led_count)
         
         # Simple hit trail implementation
-        self.simple_hit_trail = SimpleHitTrail()
+        self.simple_hit_trail = SimpleHitTrail(fade_duration_ms=fade_duration_ms)
         
         # Settings
         self.auto_mode = auto_mode
