@@ -7,10 +7,7 @@ import sys
 import time
 
 from trail_state_manager import TrailStateManager
-from game_constants import TRAIL_FADE_DURATION_S, TRAIL_EASE, BONUS_TRAIL_FADE_DURATION_S, BONUS_TRAIL_EASE
-
-# Add this line to make the error more verbose if it happens again
-print(f"Easing functions TRAIL_EASE type: {type(TRAIL_EASE)}")
+from game_constants import TRAIL_FADE_DURATION_S, TRAIL_EASE
 
 # Mock button handler for testing
 class MockButtonHandler:

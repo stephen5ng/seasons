@@ -3,7 +3,7 @@
 Trail Visualization - Common utilities for visualizing LED trails
 
 This module provides shared functionality for visualizing different types of LED trails
-including hit trails, main trails, and bonus trails. It's used by both the main
+including hit trails and main trails. It's used by both the main
 game (seasons.py) and the standalone hit trail viewer (hit_trail_display.py).
 """
 

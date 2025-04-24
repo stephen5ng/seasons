@@ -31,8 +31,6 @@ ERROR_SOUND = "music/error.mp3"  # Path to error sound effect
 INITIAL_HIT_SPACING = 16  # Initial spacing between hit trail LEDs
 HIT_TRAIL_RADIUS = CIRCLE_RADIUS - 4  # Radius for hit trail (inner circle)
 TARGET_TRAIL_RADIUS = CIRCLE_RADIUS + 4  # Radius for target trail (outer circle)
-BONUS_TRAIL_RADIUS = HIT_TRAIL_RADIUS - 2  # Radius for bonus trail (outermost circle)
-BONUS_TRAIL_COLOR = Color(255, 165, 0)  # Orange color for bonus trail
 
 # Game timing constants
 BEATS_PER_MEASURE = 8
@@ -42,8 +40,6 @@ SECONDS_PER_MEASURE_S = 3.7
 # Trail settings
 TRAIL_FADE_DURATION_S = 0.8  # Time for trail to fade out
 TRAIL_EASE = easing_functions.CircularEaseOut(start=1.0, end=0.0, duration=TRAIL_FADE_DURATION_S)
-BONUS_TRAIL_FADE_DURATION_S = 0.2  # Time for bonus trail to fade out
-BONUS_TRAIL_EASE = easing_functions.CircularEaseOut(start=1.0, end=0.0, duration=BONUS_TRAIL_FADE_DURATION_S)
 
 # Score display constants
 HIGH_SCORE_THRESHOLD = 5  # Score threshold for exciting effects
@@ -52,8 +48,7 @@ SCORE_LINE_COLOR = Color("green")
 SCORE_LINE_SPACING = 0.5  # Pixels between score lines
 SCORE_LINE_HEIGHT = 0.5  # Height of each score line
 SCORE_FLASH_DURATION_MS = 1000  # How long the score flash lasts
-SCORE_LINE_ANIMATION_TIME_MS = 100  # ms per line animation
-SCORE_FLASH_EASE = easing_functions.ExponentialEaseOut(start=0, end=1, duration=1)  # Smooth animation for score flashes
+SCORE_LINE_ANIMATION_TIME_MS = 500  # How long the score line animation lasts
 
 # WLED settings
 WLED_IP = "192.168.0.121"
