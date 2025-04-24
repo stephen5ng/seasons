@@ -333,27 +333,6 @@ class HitTrailVisualizer(TrailVisualizer):
             self.display.set_hit_trail_pixel(pos, color)
 
 
-def print_hit_trail_instructions() -> None:
-    """Print usage instructions for the hit trail visualizer."""
-    print("\nHit Trail Visualizer")
-    print("===================\n")
-    print("Controls:")
-    print("  R / UP     - Add RED hit")
-    print("  G / RIGHT  - Add GREEN hit")
-    print("  B / DOWN   - Add BLUE hit")
-    print("  Y / LEFT   - Add YELLOW hit")
-    print("  C          - Clear trail")
-    print("  ESC / Q    - Quit")
-    print("\nOptions:")
-    print("  --leds N     - Set number of LEDs (default: 80)")
-    print("  --score N    - Set initial score (default: 0.0)")
-    print("  --auto       - Automatically add hits")
-    print("  --speed N    - Set movement speed (1-10, default: 1)")
-    print("  --spacing N  - Set initial hit spacing")
-    print("  --strategy S - Hit trail strategy (normal or simple)")
-    print("  --fade-duration N - Fade duration in ms for simple strategy (default: 500)")
-
-
 class SimpleTrailVisualizer(TrailVisualizer):
     """Visualizer using the SimpleHitTrail strategy."""
     
