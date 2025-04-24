@@ -430,13 +430,14 @@ async def run_game() -> None:
             new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
                 led_position, game_state.score_manager.score, current_time_ms)
             if new_score != game_state.score:
-                game_state.update_score(new_score, target_hit, beat_float)
-                
-                # If the score increased and we're showing hit trail, update the hit trail
+                # Check for hit trail visualization before updating score
                 if new_score > game_state.score and show_hit_trail:
                     if target_hit != "none" and target_hit.upper() in [t.name for t in TargetType]:
                         target_type = TargetType[target_hit.upper()]
                         hit_trail_visualizer.add_hit(target_type)
+                
+                # Update score after hit trail check
+                game_state.update_score(new_score, target_hit, beat_float)
             
             # Handle hit trail cleared state synchronization
             if game_state.hit_trail_cleared and show_hit_trail:
