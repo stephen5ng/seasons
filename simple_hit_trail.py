@@ -5,13 +5,13 @@ simply lights up the closest LED and fades it out over time, rather than
 creating a trailing effect.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 import time
 import pygame
 from pygame import Color
 
 class SimpleHitTrail:
-    """A simple hit trail implementation that lights up LEDs at the current position only."""
+    """A simple hit trail implementation that lights up a single LED position."""
     
     def __init__(self, fade_duration_ms: int = 500):
         """Initialize the simple hit trail.
@@ -19,7 +19,7 @@ class SimpleHitTrail:
         Args:
             fade_duration_ms: Duration in milliseconds for the fade-out effect
         """
-        self.hit_positions: Dict[int, Tuple[Color, int]] = {}  # Maps position -> (color, timestamp)
+        self.hit_position: Optional[Tuple[int, Color, int]] = None  # (position, color, timestamp)
         self.fade_duration_ms = fade_duration_ms
         print(f"SimpleHitTrail initialized with fade_duration={fade_duration_ms}ms")
     
@@ -32,9 +32,7 @@ class SimpleHitTrail:
         """
         # Store a copy of the color to avoid any reference issues
         stored_color = Color(color.r, color.g, color.b, color.a if hasattr(color, 'a') else 255)
-        self.hit_positions[position] = (stored_color, pygame.time.get_ticks())
-        print(f"SimpleHitTrail: Added hit at position {position} with color {stored_color}")
-        print(f"SimpleHitTrail: Current hit positions: {list(self.hit_positions.keys())}")
+        self.hit_position = (position, stored_color, pygame.time.get_ticks())
     
     def draw(self, display_func) -> None:
         """Draw the simple hit trail.
@@ -42,37 +40,29 @@ class SimpleHitTrail:
         Args:
             display_func: Function to call to display a pixel
         """
+        if not self.hit_position:
+            return
+            
         current_time_ms = pygame.time.get_ticks()
-        positions_to_remove = []
+        position, color, timestamp = self.hit_position
+        elapsed_ms = current_time_ms - timestamp
         
-        for pos, (color, timestamp) in self.hit_positions.items():
-            elapsed_ms = current_time_ms - timestamp
-            
-            # If the fade duration has elapsed, mark for removal
-            if elapsed_ms > self.fade_duration_ms:
-                positions_to_remove.append(pos)
-                continue
-            
-            # Calculate brightness based on elapsed time (non-linear fade for better effect)
-            progress = elapsed_ms / self.fade_duration_ms
-            brightness = 1.0 - (progress * progress)  # Quadratic fade
-            
-            # Apply brightness to color
-            faded_color = Color(
-                int(color.r * brightness),
-                int(color.g * brightness),
-                int(color.b * brightness),
-                255  # Always full alpha
-            )
-            
-            # Display the pixel
-            display_func(pos, faded_color)
+        # If the fade duration has elapsed, clear the hit
+        if elapsed_ms > self.fade_duration_ms:
+            self.hit_position = None
+            return
         
-        # Remove expired positions
-        for pos in positions_to_remove:
-            del self.hit_positions[pos]
-            print(f"SimpleHitTrail: Removed expired position {pos}")
+        # Calculate brightness based on elapsed time (non-linear fade for better effect)
+        progress = elapsed_ms / self.fade_duration_ms
+        brightness = 1.0 - (progress * progress)  # Quadratic fade
         
-        # Debug output for remaining positions
-        if self.hit_positions:
-            print(f"SimpleHitTrail: Remaining hit positions: {list(self.hit_positions.keys())}") 
+        # Apply brightness to color
+        faded_color = Color(
+            int(color.r * brightness),
+            int(color.g * brightness),
+            int(color.b * brightness),
+            255  # Always full alpha
+        )
+        
+        # Display the pixel at its actual position
+        display_func(position, faded_color) 

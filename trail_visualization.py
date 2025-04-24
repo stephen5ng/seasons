@@ -374,7 +374,10 @@ class SimpleTrailVisualizer(TrailVisualizer):
         Returns:
             List of colors in the hit trail
         """
-        return [color for _, (color, _) in self.simple_hit_trail.hit_positions.items()]
+        if self.simple_hit_trail.hit_position:
+            _, color, _ = self.simple_hit_trail.hit_position
+            return [color]
+        return []
     
     def add_hit(self, target_type: game_constants.TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
