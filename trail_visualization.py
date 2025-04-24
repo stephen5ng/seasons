@@ -286,21 +286,7 @@ class HitTrailVisualizer(TrailVisualizer):
         """
         # Update score (0.25 points per hit)
         self.score += 0.25
-        
-        # Check if we need to adjust spacing
-        if HitTrail.should_adjust_spacing(self._hit_colors, self.hit_spacing, self.led_count):
-            new_spacing = HitTrail.get_new_spacing(self.hit_spacing)
-            if new_spacing == 0:  # Signal to clear trail
-                # Clear hit trail if we've hit minimum spacing
-                self._hit_colors = []
-                self.hit_spacing = game_constants.INITIAL_HIT_SPACING  # Reset to initial spacing
-                self.hit_trail_cleared = True  # Mark that hit trail has been cleared
-                print("*********** Hit trail cleared, resetting spacing")
-                return  # Skip adding hit color when trail is cleared
-            else:
-                self.hit_spacing = new_spacing
-                print(f"*********** Hit spacing: {self.hit_spacing}")
-        
+     
         # Add hit color to beginning of trail
         self._hit_colors = HitTrail.add_hit_color(
             self._hit_colors, 
