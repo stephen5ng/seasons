@@ -10,13 +10,16 @@ game (seasons.py) and the standalone hit trail viewer (hit_trail_display.py).
 import asyncio
 import pygame
 from pygame import Color
-from typing import List, Dict, Optional, Tuple, Callable, Any
+from typing import List, Dict, Any, TYPE_CHECKING
 
 import game_constants
 from hit_trail import HitTrail
 from display_manager import DisplayManager
 from get_key import get_key
 from simple_hit_trail import SimpleHitTrail
+
+if TYPE_CHECKING:
+    from seasons import GameState
 
 
 class TrailVisualizer:
@@ -52,6 +55,18 @@ class TrailVisualizer:
         # Common state
         self.current_position = 0
         self.running = False
+        
+        # Optional state with defaults
+        self.auto_mode = False
+        self.auto_timer = 0
+        self.speed = 1
+        self.target_types = [
+            game_constants.TargetType.RED,
+            game_constants.TargetType.GREEN,
+            game_constants.TargetType.BLUE,
+            game_constants.TargetType.YELLOW
+        ]
+        self.next_target = 0
     
     def sync_with_game_state(self, game_state: 'GameState', led_position: int) -> None:
         """Synchronize the visualizer's state with the game state.
@@ -112,6 +127,68 @@ class TrailVisualizer:
         """
         raise NotImplementedError("Subclasses must implement run()")
     
+    async def _run_visualization_loop(self) -> None:
+        """Run the common visualization loop functionality.
+        
+        This method handles:
+        - Pygame initialization
+        - Event handling
+        - Auto mode handling
+        - Position updates
+        - Display updates
+        """
+        pygame.init()
+        self.running = True
+        
+        while self.running:
+            self.display.clear()
+            
+            # Process pygame events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
+                        self.running = False
+                    else:
+                        self._handle_keydown(event.key)
+            
+            # Handle automatic hit generation
+            if self.auto_mode:
+                self.auto_timer += 1
+                if self.auto_timer >= 30:  # Add hit every 30 frames
+                    self.auto_timer = 0
+                    self.add_hit(self.target_types[self.next_target])
+                    self.next_target = (self.next_target + 1) % len(self.target_types)
+            
+            # Update position
+            self.update_position(self.speed)
+            
+            # Draw hit trail
+            self.draw_hit_trail()
+            
+            # Update display
+            self.display.update()
+            await self.tick(30)
+    
+    def _handle_keydown(self, key: int) -> None:
+        """Handle keydown events.
+        
+        Args:
+            key: The key that was pressed
+        """
+        if not self.auto_mode:
+            if key in (pygame.K_r, pygame.K_UP):
+                self.add_hit(game_constants.TargetType.RED)
+            elif key in (pygame.K_g, pygame.K_RIGHT):
+                self.add_hit(game_constants.TargetType.GREEN)
+            elif key in (pygame.K_b, pygame.K_DOWN):
+                self.add_hit(game_constants.TargetType.BLUE)
+            elif key in (pygame.K_y, pygame.K_LEFT):
+                self.add_hit(game_constants.TargetType.YELLOW)
+            elif key == pygame.K_c:
+                self.clear_hit_trail()
+    
     def update_position(self, speed: int = 1) -> None:
         """Update the current LED position.
         
@@ -138,6 +215,13 @@ class TrailVisualizer:
             fps: Target frames per second
         """
         await asyncio.sleep(1.0 / fps)
+    
+    def draw_hit_trail(self) -> None:
+        """Draw the hit trail on the display.
+        
+        This method should be implemented by subclasses to draw their specific hit trail visualization.
+        """
+        raise NotImplementedError("Subclasses must implement draw_hit_trail()")
 
 
 class HitTrailVisualizer(TrailVisualizer):
@@ -220,48 +304,7 @@ class HitTrailVisualizer(TrailVisualizer):
     
     async def run(self) -> None:
         """Run the hit trail visualization loop."""
-        pygame.init()
-        self.running = True
-        
-        while self.running:
-            self.display.clear()
-            
-            # Process pygame events
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
-                        self.running = False
-                    elif not self.auto_mode:
-                        if event.key in (pygame.K_r, pygame.K_UP):
-                            self.add_hit(game_constants.TargetType.RED)
-                        elif event.key in (pygame.K_g, pygame.K_RIGHT):
-                            self.add_hit(game_constants.TargetType.GREEN)
-                        elif event.key in (pygame.K_b, pygame.K_DOWN):
-                            self.add_hit(game_constants.TargetType.BLUE)
-                        elif event.key in (pygame.K_y, pygame.K_LEFT):
-                            self.add_hit(game_constants.TargetType.YELLOW)
-                        elif event.key == pygame.K_c:
-                            self.clear_hit_trail()
-            
-            # Handle automatic hit generation
-            if self.auto_mode:
-                self.auto_timer += 1
-                if self.auto_timer >= 30:  # Add hit every 30 frames
-                    self.auto_timer = 0
-                    self.add_hit(self.target_types[self.next_target])
-                    self.next_target = (self.next_target + 1) % len(self.target_types)
-            
-            # Update position
-            self.update_position(self.speed)
-            
-            # Draw hit trail
-            self.draw_hit_trail()
-            
-            # Update display
-            self.display.update()
-            await self.tick(30)
+        await self._run_visualization_loop()
     
     def add_hit(self, target_type: game_constants.TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
@@ -336,6 +379,7 @@ def print_hit_trail_instructions() -> None:
     print("  --speed N    - Set movement speed (1-10, default: 1)")
     print("  --spacing N  - Set initial hit spacing")
     print("  --strategy S - Hit trail strategy (normal or simple)")
+    print("  --fade-duration N - Fade duration in ms for simple strategy (default: 500)")
 
 
 # Utility functions for command-line usage
@@ -421,50 +465,8 @@ class SimpleTrailVisualizer(TrailVisualizer):
     
     async def run(self) -> None:
         """Run the simple hit trail visualization loop."""
-        pygame.init()
-        self.running = True
-        
         print("Starting SimpleTrailVisualizer run loop")
-        
-        while self.running:
-            self.display.clear()
-            
-            # Process pygame events
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
-                        self.running = False
-                    elif not self.auto_mode:
-                        if event.key in (pygame.K_r, pygame.K_UP):
-                            self.add_hit(game_constants.TargetType.RED)
-                        elif event.key in (pygame.K_g, pygame.K_RIGHT):
-                            self.add_hit(game_constants.TargetType.GREEN)
-                        elif event.key in (pygame.K_b, pygame.K_DOWN):
-                            self.add_hit(game_constants.TargetType.BLUE)
-                        elif event.key in (pygame.K_y, pygame.K_LEFT):
-                            self.add_hit(game_constants.TargetType.YELLOW)
-                        elif event.key == pygame.K_c:
-                            self.clear_hit_trail()
-            
-            # Handle automatic hit generation
-            if self.auto_mode:
-                self.auto_timer += 1
-                if self.auto_timer >= 30:  # Add hit every 30 frames
-                    self.auto_timer = 0
-                    self.add_hit(self.target_types[self.next_target])
-                    self.next_target = (self.next_target + 1) % len(self.target_types)
-            
-            # Update position
-            self.update_position(self.speed)
-            
-            # Draw simple hit trail
-            self.draw_hit_trail()
-            
-            # Update display
-            self.display.update()
-            await self.tick(30)
+        await self._run_visualization_loop()
     
     def add_hit(self, target_type: game_constants.TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
