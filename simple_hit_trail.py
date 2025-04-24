@@ -11,7 +11,7 @@ from hit_trail_base import HitTrailBase
 class SimpleHitTrail(HitTrailBase):
     """A simple hit trail implementation that lights up a single LED position."""
     
-    def __init__(self, fade_duration_ms: int = 500) -> None:
+    def __init__(self, fade_duration_ms: int) -> None:
         """Initialize the simple hit trail.
         
         Args:

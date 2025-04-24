@@ -8,7 +8,7 @@ from easing_functions import QuadEaseOut
 class HitTrailBase:
     """Base class for hit trails with easing support."""
     
-    def __init__(self, fade_duration_ms: int = 500) -> None:  # 30 seconds
+    def __init__(self, fade_duration_ms: int) -> None:
         """Initialize the hit trail.
         
         Args:
@@ -63,12 +63,10 @@ class HitTrailBase:
             elapsed_ms = current_time - start_time
             
             if elapsed_ms > self.easing.duration:
-                print(f"deleting elapsed_ms: {elapsed_ms}, duration: {self.easing.duration}")
-                positions_to_remove.append(pos)
+                del self.active_hits[pos]
                 continue
                 
             brightness = self.easing(elapsed_ms)
-            print(f"elapsed_ms: {elapsed_ms}, brightness: {brightness}")
                 
             faded_color = Color(
                 int(hit_color.r * brightness),
