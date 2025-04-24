@@ -223,6 +223,15 @@ class TrailVisualizer:
         """
         raise NotImplementedError("Subclasses must implement draw_hit_trail()")
 
+    @property
+    def hit_colors(self) -> List[Color]:
+        """Get the current hit colors.
+        
+        Returns:
+            List of colors in the hit trail
+        """
+        return []
+
 
 class HitTrailVisualizer(TrailVisualizer):
     """Specialized visualizer for hit trails."""
@@ -246,7 +255,7 @@ class HitTrailVisualizer(TrailVisualizer):
         
         # Manage hit trail state directly
         self.score = initial_score
-        self.hit_colors: List[Color] = []
+        self._hit_colors: List[Color] = []
         self.hit_spacing = hit_spacing
         self.hit_trail_cleared = False
         
@@ -265,6 +274,15 @@ class HitTrailVisualizer(TrailVisualizer):
         # Initialize hit trail colors based on starting score
         self._init_hit_trail_colors(initial_score)
     
+    @property
+    def hit_colors(self) -> List[Color]:
+        """Get the current hit colors.
+        
+        Returns:
+            List of colors in the hit trail
+        """
+        return self._hit_colors
+    
     def _init_hit_trail_colors(self, initial_score: float) -> None:
         """Initialize hit trail colors based on the starting score.
         
@@ -274,15 +292,15 @@ class HitTrailVisualizer(TrailVisualizer):
         hit_colors_count = int(initial_score * 4)  # 4 colors per score point
         for i in range(min(hit_colors_count, 40)):  # Max 40 colors
             if i % 4 == 0:
-                self.hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.RED])
+                self._hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.RED])
             elif i % 4 == 1:
-                self.hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.GREEN])
+                self._hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.GREEN])
             elif i % 4 == 2:
-                self.hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.BLUE])
+                self._hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.BLUE])
             else:
-                self.hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.YELLOW])
+                self._hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.YELLOW])
                 
-        print(f"Created hit trail with {len(self.hit_colors)} colors")
+        print(f"Created hit trail with {len(self._hit_colors)} colors")
     
     def sync_with_game_state(self, game_state: 'GameState', led_position: int) -> None:
         """Synchronize the visualizer's state with the game state.
@@ -295,8 +313,8 @@ class HitTrailVisualizer(TrailVisualizer):
         self.current_position = led_position
         
         # Sync hit colors and spacing with game state
-        if self.hit_colors != game_state.hit_colors:
-            self.hit_colors = game_state.hit_colors.copy()
+        if self._hit_colors != game_state.hit_colors:
+            self._hit_colors = game_state.hit_colors.copy()
             self.hit_spacing = game_state.hit_spacing
         
         # Draw hit trail
@@ -316,11 +334,11 @@ class HitTrailVisualizer(TrailVisualizer):
         self.score += 0.25
         
         # Check if we need to adjust spacing
-        if HitTrail.should_adjust_spacing(self.hit_colors, self.hit_spacing, self.led_count):
+        if HitTrail.should_adjust_spacing(self._hit_colors, self.hit_spacing, self.led_count):
             new_spacing = HitTrail.get_new_spacing(self.hit_spacing)
             if new_spacing == 0:  # Signal to clear trail
                 # Clear hit trail if we've hit minimum spacing
-                self.hit_colors = []
+                self._hit_colors = []
                 self.hit_spacing = game_constants.INITIAL_HIT_SPACING  # Reset to initial spacing
                 self.hit_trail_cleared = True  # Mark that hit trail has been cleared
                 print("*********** Hit trail cleared, resetting spacing")
@@ -330,21 +348,21 @@ class HitTrailVisualizer(TrailVisualizer):
                 print(f"*********** Hit spacing: {self.hit_spacing}")
         
         # Add hit color to beginning of trail
-        self.hit_colors = HitTrail.add_hit_color(
-            self.hit_colors, 
+        self._hit_colors = HitTrail.add_hit_color(
+            self._hit_colors, 
             game_constants.TARGET_COLORS[target_type]
         )
         
         # Limit trail length based on score
         max_trail_length = int(self.score * 4)
-        self.hit_colors = HitTrail.limit_trail_length(self.hit_colors, max_trail_length)
+        self._hit_colors = HitTrail.limit_trail_length(self._hit_colors, max_trail_length)
         
         print(f"Added {target_type.name} hit, score: {self.score}, "
-              f"trail length: {len(self.hit_colors)}")
+              f"trail length: {len(self._hit_colors)}")
     
     def clear_hit_trail(self) -> None:
         """Clear the hit trail."""
-        self.hit_colors = []
+        self._hit_colors = []
         self.hit_spacing = game_constants.INITIAL_HIT_SPACING
         self.hit_trail_cleared = True
         print("Hit trail cleared manually")
@@ -353,7 +371,7 @@ class HitTrailVisualizer(TrailVisualizer):
         """Draw the hit trail on the display."""
         trail_positions = HitTrail.calculate_trail_positions(
             self.current_position, 
-            self.hit_colors,
+            self._hit_colors,
             self.hit_spacing, 
             self.led_count
         )
@@ -462,6 +480,15 @@ class SimpleTrailVisualizer(TrailVisualizer):
     def score(self, value: float) -> None:
         """Set the current score."""
         self._score = value
+    
+    @property
+    def hit_colors(self) -> List[Color]:
+        """Get the current hit colors.
+        
+        Returns:
+            List of colors in the hit trail
+        """
+        return [color for _, (color, _) in self.simple_hit_trail.hit_positions.items()]
     
     async def run(self) -> None:
         """Run the simple hit trail visualization loop."""

@@ -374,8 +374,7 @@ async def run_game() -> None:
     if args.score > 0:
         print(f"Setting initial score to {args.score}")
         game_state.score_manager.score = args.score
-        if not isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
-            hit_trail_visualizer.score = args.score  # Only set score for normal strategy
+        hit_trail_visualizer.score = args.score  # Let each visualizer handle the score
     
     # Debug setup for different display modes
     if show_main_trail:
@@ -383,10 +382,9 @@ async def run_game() -> None:
     if show_hit_trail:
         print(f"Showing hit trail using {args.hit_trail_strategy} strategy")
         
-        # Set up hit colors based on score (simulate multiple hits) - only for normal strategy
-        if not isinstance(hit_trail_visualizer, SimpleTrailVisualizer):
-            hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
-            print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
+        # Set up hit colors based on score (simulate multiple hits)
+        hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
+        print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     if show_bonus_trails:
         print(f"Showing bonus trails")
     
@@ -464,7 +462,6 @@ async def run_game() -> None:
                     try:
                         if target_hit != "none":
                             target_type = TargetType[target_hit.upper()]
-                            hit_trail_visualizer.score = new_score
                             hit_trail_visualizer.add_hit(target_type)
                     except KeyError:
                         pass  # Ignore invalid target types
