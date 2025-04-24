@@ -120,50 +120,6 @@ class TrailVisualizer:
                 hit_spacing=hit_spacing
             )
     
-    async def run(self) -> None:
-        """Run the visualization loop.
-        
-        This method handles:
-        - Pygame initialization
-        - Event handling
-        - Auto mode handling
-        - Position updates
-        - Display updates
-        """
-        pygame.init()
-        self.running = True
-        
-        while self.running:
-            self.display.clear()
-            
-            # Process pygame events
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
-                        self.running = False
-                    else:
-                        self._handle_keydown(event.key)
-            
-            # Handle automatic hit generation
-            if self.auto_mode:
-                self.auto_timer += 1
-                if self.auto_timer >= 30:  # Add hit every 30 frames
-                    self.auto_timer = 0
-                    self.add_hit(self.target_types[self.next_target])
-                    self.next_target = (self.next_target + 1) % len(self.target_types)
-            
-            # Update position
-            self.update_position(self.speed)
-            
-            # Draw hit trail
-            self.draw_hit_trail()
-            
-            # Update display
-            self.display.update()
-            await self.tick(30)
-    
     def _handle_keydown(self, key: int) -> None:
         """Handle keydown events.
         
@@ -398,39 +354,6 @@ def print_hit_trail_instructions() -> None:
     print("  --fade-duration N - Fade duration in ms for simple strategy (default: 500)")
 
 
-# Utility functions for command-line usage
-def parse_hit_trail_args() -> Dict[str, Any]:
-    """Parse command line arguments for the hit trail visualizer."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Hit Trail Visualizer')
-    parser.add_argument('--leds', type=int, default=80,
-                      help='Number of LEDs in the strip (default: 80)')
-    parser.add_argument('--score', type=float, default=0.0,
-                      help='Initial score (default: 0.0)')
-    parser.add_argument('--auto', action='store_true',
-                      help='Automatically add hits')
-    parser.add_argument('--speed', type=int, default=1,
-                      help='Speed of LED movement (1-10, default: 1)')
-    parser.add_argument('--spacing', type=int, default=game_constants.INITIAL_HIT_SPACING,
-                      help=f'Initial spacing between hit trail elements (default: {game_constants.INITIAL_HIT_SPACING})')
-    parser.add_argument('--strategy', type=str, choices=['normal', 'simple'], default='normal',
-                      help='Hit trail visualization strategy (normal=traditional trail, simple=single LED fade)')
-    parser.add_argument('--fade-duration', type=int, default=500,
-                      help='Fade duration in ms for simple strategy (default: 500)')
-    
-    args = parser.parse_args()
-    return {
-        'led_count': args.leds,
-        'initial_score': args.score,
-        'auto_mode': args.auto,
-        'speed': args.speed,
-        'hit_spacing': args.spacing,
-        'strategy': args.strategy,
-        'fade_duration': args.fade_duration
-    }
-
-
 class SimpleTrailVisualizer(TrailVisualizer):
     """Visualizer using the SimpleHitTrail strategy."""
     
@@ -520,33 +443,4 @@ class SimpleTrailVisualizer(TrailVisualizer):
         # Debug output for hit trail positions
         if self.simple_hit_trail.hit_positions:
             positions = list(self.simple_hit_trail.hit_positions.keys())
-            print(f"SimpleTrailVisualizer: Drawing {len(positions)} hit positions: {positions}")
-
-
-async def main() -> None:
-    """Initialize and run the hit trail visualizer."""
-    print_hit_trail_instructions()
-    
-    # Parse command line arguments
-    args = parse_hit_trail_args()
-    
-    # Initialize visualizer based on strategy
-    visualizer = TrailVisualizer.create_visualizer(
-        strategy=args['strategy'],
-        led_count=args['led_count'],
-        initial_score=args['initial_score'],
-        auto_mode=args['auto_mode'],
-        speed=args['speed'],
-        hit_spacing=args['hit_spacing'],
-        fade_duration_ms=args['fade_duration']
-    )
-    
-    # Run visualization loop
-    await visualizer.run()
-    
-    # Clean up
-    pygame.quit()
-
-
-if __name__ == "__main__":
-    asyncio.run(main()) 
+            print(f"SimpleTrailVisualizer: Drawing {len(positions)} hit positions: {positions}") 
