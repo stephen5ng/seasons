@@ -4,6 +4,8 @@ from typing import Tuple, Callable, Dict
 import pygame
 from pygame import Color
 from easing_functions import QuadEaseOut  # type: ignore
+import game_constants
+from game_constants import TargetType
 
 class HitTrailBase:
     """Base class for hit trails with easing support."""
@@ -15,7 +17,7 @@ class HitTrailBase:
             fade_duration_ms: Duration in milliseconds for the fade-out effect
         """
         self.easing = QuadEaseOut(start=1.0, end=0.0, duration=fade_duration_ms)
-        self.active_hits: Dict[int, Tuple[Color, int]] = {}  # position -> (color, start_time)
+        self.active_hits: Dict[int, Tuple[TargetType, int]] = {}  # position -> (target_type, start_time)
     
     def draw(self, display_func: Callable[[int, Color], None]) -> None:
         """Draw the hit trail.
@@ -38,7 +40,7 @@ class HitTrailBase:
         positions_to_remove = []
         
         # Display all active hits
-        for pos, (hit_color, start_time) in self.active_hits.items():
+        for pos, (target_type, start_time) in self.active_hits.items():
             elapsed_ms = current_time - start_time
             
             if elapsed_ms > self.easing.duration:
@@ -46,7 +48,9 @@ class HitTrailBase:
                 continue
                 
             brightness = self.easing(elapsed_ms)
-                
+            
+            # Get the color for this target type and apply brightness
+            hit_color = game_constants.TARGET_COLORS[target_type]
             faded_color = Color(
                 int(hit_color.r * brightness),
                 int(hit_color.g * brightness),

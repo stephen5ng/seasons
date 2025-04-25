@@ -390,17 +390,7 @@ class SimpleTrailVisualizer(TrailVisualizer):
         Args:
             target_type: Type of target to remove
         """
-        # Calculate target position based on target type
-        if target_type == game_constants.TargetType.RED:
-            target_pos = 0  # 12 o'clock
-        elif target_type == game_constants.TargetType.GREEN:
-            target_pos = int(self.led_count * 0.25)  # 3 o'clock
-        elif target_type == game_constants.TargetType.BLUE:
-            target_pos = int(self.led_count * 0.5)  # 6 o'clock
-        else:  # YELLOW
-            target_pos = int(self.led_count * 0.75)  # 9 o'clock
-                    
-        self.simple_hit_trail.remove_hit(game_constants.TARGET_COLORS[target_type])
+        self.simple_hit_trail.remove_hit(target_type)
     
     def add_hit(self, target_type: game_constants.TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
@@ -419,10 +409,7 @@ class SimpleTrailVisualizer(TrailVisualizer):
             target_pos = int(self.led_count * 0.75)  # 9 o'clock
             
         # Add the hit at the target position
-        self.simple_hit_trail.add_hit(
-            target_pos, 
-            game_constants.TARGET_COLORS[target_type]
-        )
+        self.simple_hit_trail.add_hit(target_pos, target_type)
 
         # Update score
         self._score += 0.25

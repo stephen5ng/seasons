@@ -13,46 +13,37 @@ class SimpleHitTrail(HitTrailBase):
     """A simple hit trail implementation that lights up a single LED position."""
     
     def __init__(self) -> None:
-        """Initialize the simple hit trail.
-        
-        Args:
-            fade_duration_ms: Duration in milliseconds for the fade-out effect
-        """
+        """Initialize the simple hit trail."""
         super().__init__(16000)
-        self.hit_position: Optional[Tuple[int, Color]] = None  # (position, color)        
-        self.number_of_hits_by_color: Dict[Color, int] = {}
-        self.hits_by_color: Dict[Color, List[int]] = {}
-    def add_hit(self, position: int, color: Color) -> None:
+        self.hit_position: Optional[Tuple[int, TargetType]] = None  # (position, target_type)        
+        self.number_of_hits_by_type: Dict[TargetType, int] = {}
+        self.hits_by_type: Dict[TargetType, List[int]] = {}
+
+    def add_hit(self, position: int, target_type: TargetType) -> None:
         """Implementation of add_hit for subclasses.
         
         Args:
             position: The LED position to light up
-            color: The color to display at this position
+            target_type: The type of target that was hit
         """
-        # Store a copy of the color to avoid any reference issues
-        stored_color = Color(color.r, color.g, color.b, color.a if hasattr(color, 'a') else 255)
+        self.number_of_hits_by_type[target_type] = self.number_of_hits_by_type.get(target_type, 0) + 1
+        new_position = position + self.number_of_hits_by_type[target_type]
+        self.active_hits[new_position] = (target_type, pygame.time.get_ticks())
         
-        color_hash = (stored_color.r, stored_color.g, stored_color.b)
-        self.number_of_hits_by_color[color_hash] = self.number_of_hits_by_color.get(color_hash, 0) + 1
-        new_position = position + self.number_of_hits_by_color[color_hash]
-        self.active_hits[new_position] = (stored_color, pygame.time.get_ticks())
+        if target_type not in self.hits_by_type:
+            self.hits_by_type[target_type] = []
+        self.hits_by_type[target_type].append(new_position)
         
-        if color_hash not in self.hits_by_color:
-            self.hits_by_color = {}
-            self.hits_by_color[color_hash] = []
-        self.hits_by_color[color_hash].append(new_position)
-        
-    def remove_hit(self, color: Color) -> None:
+    def remove_hit(self, target_type: TargetType) -> None:
         """Remove a hit of the specified target type from the hit trail.
         
         Args:
-            color: Color of the hit to remove
+            target_type: Type of the hit to remove
         """
-        color_hash = (color.r, color.g, color.b)
-        if color_hash in self.number_of_hits_by_color:
-            self.number_of_hits_by_color[color_hash] -= 1
-        if color_hash in self.hits_by_color and self.hits_by_color[color_hash]:
-            position = self.hits_by_color[color_hash].pop(0)
+        if target_type in self.number_of_hits_by_type:
+            self.number_of_hits_by_type[target_type] -= 1
+        if target_type in self.hits_by_type and self.hits_by_type[target_type]:
+            position = self.hits_by_type[target_type].pop(0)
             
             if position in self.active_hits:
                 del self.active_hits[position]
