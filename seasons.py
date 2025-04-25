@@ -387,7 +387,7 @@ async def run_game() -> None:
             beat_in_measure: int
             beat_float: float
             fractional_beat: float
-            _, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
+            beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
             game_state.handle_music_loop(beat_in_measure)
 
             current_time_ms: int = pygame.time.get_ticks()
@@ -397,21 +397,8 @@ async def run_game() -> None:
             game_state.update_loop_count(led_position / number_of_leds)
 
             # For debug mode, track when we've completed one loop
-            if run_one_loop:
-                # Initialize the first position
-                if previous_led_position == -1:
-                    previous_led_position = led_position
-                    print(f"Debug: Started tracking at position {led_position}")
-                
-                # If we've gone from a high position to a low position, we've completed a loop
-                # Use 90% of total LEDs as the high threshold and 10% as the low threshold
-                high_threshold = int(number_of_leds * 0.9)
-                low_threshold = int(number_of_leds * 0.1)
-                if previous_led_position > high_threshold and led_position < low_threshold:
-                    print(f"Debug: Completed one full loop, exiting.")
-                    return
-                
-                previous_led_position = led_position
+            if run_one_loop and beat >= 8:
+                return
             
             # Handle scoring and penalties
             if not game_state.button_handler.is_in_valid_window(led_position):
