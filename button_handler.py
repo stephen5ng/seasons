@@ -109,7 +109,7 @@ class ButtonHandler:
             self.yellow_target_pos
         )
     
-    def handle_keypress(self, led_position: int, current_time: int) -> Tuple[Any, TargetType, Optional[Tuple[int, Color]]]:
+    def handle_keypress(self, led_position: int, current_time: int) -> Tuple[Optional[bool], Optional[TargetType]]:
         """Handle keypress and update score if in valid window with correct key.
         
         Args:
@@ -117,10 +117,9 @@ class ButtonHandler:
             current_time: Current time in milliseconds
             
         Returns:
-            Tuple of (successful_hit, target_hit, error_feedback) where:
+            Tuple of (successful_hit, target_hit) where:
             - successful_hit: True if correct key was pressed, False if wrong key, None if no key
-            - target_hit: The target type that was hit, or "none" if error
-            - error_feedback: Tuple of (error_position, error_color) if an error occurred, None otherwise
+            - target_hit: The target type that was hit, or None if no target
         """
         # Get the current keyboard state
         keys_pressed: Dict[int, bool] = pygame.key.get_pressed()
@@ -133,7 +132,7 @@ class ButtonHandler:
         # Check for correct key presses in the target window
         target_type: Optional[TargetType] = self.get_target_type(led_position)        
         if not target_type:
-            return None, target_type, None
+            return None, target_type
 
         # Check for wrong key presses in this window
         error_result = self._check_for_wrong_key_in_window(keys_pressed, target_type, led_position)
@@ -145,12 +144,12 @@ class ButtonHandler:
         if (any(keys_pressed[key] for key in keys) or self.auto_score) and not self.button_states[target_type]:
             self.button_states[target_type] = True
             self.penalty_applied = False
-            return True, target_type, None
+            return True, target_type
 
-        return None, target_type, None
+        return None, target_type
 
     
-    def _check_for_out_of_window_presses(self, keys_pressed: Dict[int, bool], led_position: int) -> Optional[Tuple[bool, str, Tuple[int, Color]]]:
+    def _check_for_out_of_window_presses(self, keys_pressed: Dict[int, bool], led_position: int) -> Optional[Tuple[bool, TargetType]]:
         """Check for key presses outside their target windows.
         
         Args:
@@ -159,7 +158,7 @@ class ButtonHandler:
             
         Returns:
             Error result tuple if an out-of-window press is detected, None otherwise.
-            The tuple contains (False, None, (error_position, error_color))
+            The tuple contains (False, target_type)
         """
         for target_type in TargetType:
             keys = ButtonHandler.get_keys_for_target(target_type)
@@ -168,11 +167,11 @@ class ButtonHandler:
                 
                 # If we're not in this key's window, show error and apply penalty
                 if abs(led_position - window_pos) > self.target_window_size:
-                    return self._create_error_feedback(target_type, window_pos)
+                    return self._create_error_feedback(target_type)
         return None
 
     def _check_for_wrong_key_in_window(self, keys_pressed: Dict[int, bool], correct_target: TargetType, 
-                                     led_position: int) -> Optional[Tuple[bool, str, Tuple[int, Color]]]:
+                                     led_position: int) -> Optional[Tuple[bool, TargetType]]:
         """Check for wrong key presses in a target window.
         
         Args:
@@ -182,7 +181,7 @@ class ButtonHandler:
             
         Returns:
             Error result tuple if a wrong key press is detected, None otherwise.
-            The tuple contains (False, "none", (error_position, error_color))
+            The tuple contains (False, target_type)
         """
         for wrong_target in TargetType:
             if wrong_target != correct_target:
@@ -190,10 +189,10 @@ class ButtonHandler:
                 
                 if any(keys_pressed[key] for key in wrong_keys):
                     error_pos = self.get_window_position_for_target(wrong_target)
-                    return self._create_error_feedback(wrong_target, error_pos)
+                    return self._create_error_feedback(wrong_target)
         return None
 
-    def _create_error_feedback(self, target_type: TargetType, error_pos: int) -> Tuple[bool, str, Tuple[int, Color]]:
+    def _create_error_feedback(self, target_type: TargetType) -> Tuple[bool, TargetType]:
         """Create error feedback for incorrect key presses.
         
         Args:
@@ -201,11 +200,10 @@ class ButtonHandler:
             error_pos: The position where the error occurred
             
         Returns:
-            Tuple containing (False, None, (error_position, error_color))
+            Tuple containing (False, target_type)
         """
         self.error_sound.play()
-        error_color: Color = TARGET_COLORS[target_type]
-        return False, None, (error_pos, error_color)
+        return False, target_type
     
     def get_window_position_for_target(self, target_type: TargetType) -> int:
         """Get the center position of a target window.

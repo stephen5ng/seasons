@@ -405,7 +405,8 @@ async def run_game() -> None:
                 new_score: float = game_state.button_handler.apply_penalty(game_state.score_manager.score)
                 if new_score != game_state.score_manager.score:
                     print(f"New score: {new_score}, target hit: none")
-                    game_state.update_score(new_score, "none", beat_float)
+                    # TODO: remove second argument after refactoring normal trail.
+                    game_state.update_score(new_score, None, beat_float)
                     if target_hit:
                         hit_trail_visualizer.remove_hit(target_hit)
             
@@ -413,14 +414,11 @@ async def run_game() -> None:
             game_state.reset_flags(led_position)
             
             # Check for scoring (both manual and auto)
-            new_score: float
-            successful_hit: any
-            error_feedback: Optional[Tuple[int, Color]] = None
-            successful_hit, target_hit, error_feedback = game_state.button_handler.handle_keypress(
+            successful_hit, target_hit = game_state.button_handler.handle_keypress(
                 led_position, current_time_ms)
-            
+                        
             if successful_hit is not None and target_hit is not None:
-                new_score = game_state.score_manager.score + 0.25 * (1 if successful_hit else -1)
+                new_score = game_state.score_manager.score + 0.25 if successful_hit else 0
                 print(f"target_hit: {target_hit}")
                     
                 if new_score > game_state.score:
@@ -472,20 +470,11 @@ async def run_game() -> None:
             
             # Draw current LED in white (unless hit-trail-only mode)
             if show_main_trail:
-                base_color: Color = Color(255, 255, 255)
-                # Apply target colors if in scoring window
-                if game_state.button_handler.is_in_valid_window(led_position):
-                    target_type: Optional[TargetType] = game_state.button_handler.get_target_type(led_position)
-                    if target_type:
-                        base_color = TARGET_COLORS[target_type]
-                
-                display.set_pixel(led_position, base_color)
-
                 # Draw error feedback if wrong key was pressed
-                if error_feedback is not None:
-                    error_pos: int
-                    error_color: Color
-                    error_pos, error_color = error_feedback
+                if successful_hit is False:
+                    print(f"successful_hit: {successful_hit}, target_type: {target_hit}")
+                    error_pos = game_state.button_handler.get_window_position_for_target(target_hit)
+                    error_color = TARGET_COLORS[target_hit]
                     display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
 
             # Handle input (only for quit)

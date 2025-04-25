@@ -40,6 +40,7 @@ class ScoreManager:
             beat_float: Current beat position as a float
             led_count: Total number of LEDs
         """
+        print(f"new_score: {new_score}, self.score: {self.score}")
         if new_score > self.score:
             self._handle_score_increase(new_score, target_type, beat_float, led_count)
         

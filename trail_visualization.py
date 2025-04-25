@@ -171,6 +171,14 @@ class TrailVisualizer:
         """
         raise NotImplementedError("Subclasses must implement draw_hit_trail()")
 
+    def remove_hit(self, target_type: game_constants.TargetType) -> None:
+        """Remove a hit of the specified target type from the hit trail.
+        
+        Args:
+            target_type: Type of target to remove
+        """
+        pass
+
     @property
     def hit_colors(self) -> List[Color]:
         """Get the current hit colors.

@@ -134,10 +134,9 @@ class TestButtonHandler(unittest.TestCase):
         
         # Test with position in red target window
         with patch.object(self.button_handler, 'get_target_type', return_value=TargetType.RED):
-            score, target_hit, error_feedback = self.button_handler.handle_keypress(0, 1000)
-            self.assertEqual(score, True)
+            successful_hit, target_hit = self.button_handler.handle_keypress(0, 1000)
+            self.assertEqual(successful_hit, True)
             self.assertEqual(target_hit, TargetType.RED)
-            self.assertIsNone(error_feedback)
     
     @patch('pygame.key.get_pressed')
     def test_handle_keypress_wrong_key(self, mock_get_pressed):
@@ -148,11 +147,9 @@ class TestButtonHandler(unittest.TestCase):
         
         # Test with position in red target window
         with patch.object(self.button_handler, 'get_target_type', return_value=TargetType.RED):
-            score, target_hit, error_feedback = self.button_handler.handle_keypress(0, 1000)
-            self.assertEqual(score, False)
-            self.assertEqual(target_hit, None)
-            self.assertIsNotNone(error_feedback)
-            self.assertEqual(error_feedback[0], self.button_handler.get_window_position_for_target(TargetType.BLUE))
+            successful_hit, target_hit = self.button_handler.handle_keypress(0, 1000)
+            self.assertEqual(successful_hit, False)
+            self.assertEqual(target_hit, TargetType.BLUE)
     
     @patch('pygame.key.get_pressed')
     def test_handle_keypress_out_of_window(self, mock_get_pressed):
@@ -163,11 +160,10 @@ class TestButtonHandler(unittest.TestCase):
         
         # Test with position not in red target window
         with patch.object(self.button_handler, '_check_for_out_of_window_presses', 
-                         return_value=(0.75, "none", (0, TARGET_COLORS[TargetType.RED]))):
-            score, target_hit, error_feedback = self.button_handler.handle_keypress(30, 1000)
-            self.assertEqual(score, 0.75)
-            self.assertEqual(target_hit, "none")
-            self.assertIsNotNone(error_feedback)
+                         return_value=(False, TargetType.RED)):
+            successful_hit, target_hit = self.button_handler.handle_keypress(30, 1000)
+            self.assertEqual(successful_hit, False)
+            self.assertEqual(target_hit, TargetType.RED)
     
     def test_reset_flags(self):
         """Test reset_flags method."""
