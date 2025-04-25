@@ -44,6 +44,7 @@ class DisplayManager:
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.scaling_factor = scaling_factor
+        self.led_count = led_count
         
         if IS_RASPBERRY_PI:
             self.strip: PixelStrip = PixelStrip(
@@ -81,7 +82,7 @@ class DisplayManager:
                                          self.screen_width // 2, 
                                          self.screen_height // 2, 
                                          game_constants.TARGET_TRAIL_RADIUS, 
-                                         game_constants.NUMBER_OF_LEDS)
+                                         self.led_count)
             self.pygame_surface.set_at((x, y), color)
     
     def set_hit_trail_pixel(self, pos: int, color: Color) -> None:
@@ -93,7 +94,7 @@ class DisplayManager:
                                          self.screen_width // 2, 
                                          self.screen_height // 2, 
                                          game_constants.HIT_TRAIL_RADIUS, 
-                                         game_constants.NUMBER_OF_LEDS)
+                                         self.led_count)
             self.pygame_surface.set_at((x, y), color)
     
     # New-style methods
