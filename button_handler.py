@@ -94,29 +94,14 @@ class ButtonHandler:
         Returns:
             TargetType if position is in a target window, None otherwise
         """
-        # Convert position to percentage around the ring (0-1)
-        position_percent = position / self.number_of_leds
-        
-        # Get fixed target positions by percentage
-        red_percent = 0.0      # 12 o'clock (0%)
-        green_percent = 0.25   # 3 o'clock (25%)
-        blue_percent = 0.5     # 6 o'clock (50%)
-        yellow_percent = 0.75  # 9 o'clock (75%)
-        
-        # Calculate window size as percentage
-        window_percent = self.target_window_size / self.number_of_leds
-        
-        # Check if position is near a target, with wrapping for the red target
-        if (position_percent <= window_percent or 
-            position_percent >= (1.0 - window_percent)):
-            return TargetType.RED
-        elif abs(position_percent - blue_percent) <= window_percent:
-            return TargetType.BLUE
-        elif abs(position_percent - green_percent) <= window_percent:
-            return TargetType.GREEN
-        elif abs(position_percent - yellow_percent) <= window_percent:
-            return TargetType.YELLOW
-        return None
+        return ButtonHandler.get_target_type_for_position(
+            position,
+            self.number_of_leds,
+            self.target_window_size,
+            self.blue_target_pos,
+            self.green_target_pos,
+            self.yellow_target_pos
+        )
     
     def handle_keypress(self, led_position: int, current_time: int) -> Tuple[Any, TargetType, Optional[Tuple[int, Color]]]:
         """Handle keypress and update score if in valid window with correct key.
