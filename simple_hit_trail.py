@@ -49,7 +49,8 @@ class SimpleHitTrail(HitTrailBase):
             color: Color of the hit to remove
         """
         color_hash = (color.r, color.g, color.b)
-        self.number_of_hits_by_color[color_hash] -= 1
+        if color_hash in self.number_of_hits_by_color:
+            self.number_of_hits_by_color[color_hash] -= 1
         if color_hash in self.hits_by_color and self.hits_by_color[color_hash]:
             position = self.hits_by_color[color_hash].pop(0)
             

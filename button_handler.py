@@ -125,21 +125,24 @@ class ButtonHandler:
             return error_result
         
         # Check for correct key presses in the target window
-        target_type: Optional[TargetType] = self.get_target_type(led_position)
-        if target_type:
-            # Check for wrong key presses in this window
-            error_result = self._check_for_wrong_key_in_window(keys_pressed, target_type, led_position)
-            if error_result:
-                return error_result
-                
-            # Check for correct key press
-            keys = ButtonHandler.get_keys_for_target(target_type)
-            if (any(keys_pressed[key] for key in keys) or self.auto_score) and not self.button_states[target_type]:
-                self.button_states[target_type] = True
-                self.penalty_applied = False
-                return True, target_type, None
-        
+        target_type: Optional[TargetType] = self.get_target_type(led_position)        
+        if not target_type:
+            return None, target_type, None
+
+        # Check for wrong key presses in this window
+        error_result = self._check_for_wrong_key_in_window(keys_pressed, target_type, led_position)
+        if error_result:
+            return error_result
+
+        # Check for correct key press
+        keys = ButtonHandler.get_keys_for_target(target_type)
+        if (any(keys_pressed[key] for key in keys) or self.auto_score) and not self.button_states[target_type]:
+            self.button_states[target_type] = True
+            self.penalty_applied = False
+            return True, target_type, None
+
         return None, target_type, None
+
     
     def _check_for_out_of_window_presses(self, keys_pressed: Dict[int, bool], led_position: int) -> Optional[Tuple[bool, str, Tuple[int, Color]]]:
         """Check for key presses outside their target windows.

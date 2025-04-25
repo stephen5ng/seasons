@@ -419,7 +419,8 @@ async def run_game() -> None:
                 if new_score != game_state.score_manager.score:
                     print(f"New score: {new_score}, target hit: none")
                     game_state.update_score(new_score, "none", beat_float)
-                    hit_trail_visualizer.remove_hit(target_hit)
+                    if target_hit:
+                        hit_trail_visualizer.remove_hit(target_hit)
             
             # Always reset flags
             game_state.reset_flags(led_position)
