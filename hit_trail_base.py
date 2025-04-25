@@ -1,9 +1,9 @@
 """Base class for hit trails with easing support."""
 
-from typing import Optional, Tuple, Callable, Dict, List
+from typing import Tuple, Callable, Dict
 import pygame
 from pygame import Color
-from easing_functions import QuadEaseOut
+from easing_functions import QuadEaseOut  # type: ignore
 
 class HitTrailBase:
     """Base class for hit trails with easing support."""
@@ -16,27 +16,6 @@ class HitTrailBase:
         """
         self.easing = QuadEaseOut(start=1.0, end=0.0, duration=fade_duration_ms)
         self.active_hits: Dict[int, Tuple[Color, int]] = {}  # position -> (color, start_time)
-    
-    def add_hit(self, position: int, color: Color) -> None:
-        """Add a hit at the specified position with the given color.
-        
-        Args:
-            position: The LED position to light up
-            color: The color to display at this position
-        """
-        # Store a copy of the color to avoid any reference issues
-        stored_color = Color(color.r, color.g, color.b, color.a if hasattr(color, 'a') else 255)
-        self.active_hits[position] = (stored_color, pygame.time.get_ticks())
-        self._add_hit_impl(position, color)
-    
-    def _add_hit_impl(self, position: int, color: Color) -> None:
-        """Implementation of add_hit for subclasses.
-        
-        Args:
-            position: The LED position to light up
-            color: The color to display at this position
-        """
-        raise NotImplementedError("Subclasses must implement _add_hit_impl()")
     
     def draw(self, display_func: Callable[[int, Color], None]) -> None:
         """Draw the hit trail.
@@ -63,7 +42,7 @@ class HitTrailBase:
             elapsed_ms = current_time - start_time
             
             if elapsed_ms > self.easing.duration:
-                del self.active_hits[pos]
+                positions_to_remove.append(pos)
                 continue
                 
             brightness = self.easing(elapsed_ms)

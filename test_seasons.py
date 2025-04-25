@@ -79,30 +79,18 @@ class TestGameState(unittest.TestCase):
     def test_update_score(self):
         # Test score increase
         initial_score = self.game_state.score
-        self.game_state.update_score(initial_score + 0.25, "red", 0.0)
+        self.game_state.update_score(initial_score + 0.25, TargetType.RED, 0.0)
         self.assertEqual(self.game_state.score, initial_score + 0.25)
         
-        # Test hit trail clearing and color addition when target is hit
+        # Test hit trail color addition when target is hit
         # Get initial state
         initial_hit_colors_length = len(self.game_state.hit_colors)
         
         # Simulate a hit
-        self.game_state.update_score(self.game_state.score + 0.25, "red", 0.0)
+        self.game_state.update_score(self.game_state.score + 0.25, TargetType.RED, 0.0)
         
         # After hitting a red target, we should have at least one color in the hit trail
-        # (unless it was cleared due to spacing, which is harder to test)
-        if not self.game_state.hit_trail_cleared:
-            self.assertGreaterEqual(len(self.game_state.hit_colors), initial_hit_colors_length)
-        
-        # Force hit trail clearing by setting up a full trail and minimum spacing
-        self.game_state.score_manager.hit_colors = [TARGET_COLORS[TargetType.RED]] * 40
-        self.game_state.score_manager.hit_spacing = 2  # Set to minimum spacing to trigger clearing
-        
-        # Update score one more time to trigger clearing
-        self.game_state.update_score(self.game_state.score + 0.25, "blue", 0.0)
-        
-        # Verify the hit trail was cleared
-        self.assertTrue(self.game_state.hit_trail_cleared)
+        self.assertGreaterEqual(len(self.game_state.hit_colors), initial_hit_colors_length)
 
     def test_calculate_led_position(self):
         # Test LED position calculation

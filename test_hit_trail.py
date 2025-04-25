@@ -17,42 +17,6 @@ class HitTrailTest(unittest.TestCase):
         total_space = HitTrail.calculate_total_space(colors, spacing)
         self.assertEqual(total_space, 32)  # (3+1) * 8 = 32
     
-    def test_should_adjust_spacing(self):
-        """Test determination of whether spacing needs adjustment."""
-        # Trail needs 40 units but only 30 available
-        colors = [Color(255, 0, 0), Color(0, 255, 0), Color(0, 0, 255)]
-        spacing = 10
-        max_leds = 30
-        self.assertTrue(HitTrail.should_adjust_spacing(colors, spacing, max_leds))
-        
-        # Trail needs 20 units with 30 available
-        colors = [Color(255, 0, 0)]
-        spacing = 10
-        max_leds = 30
-        self.assertFalse(HitTrail.should_adjust_spacing(colors, spacing, max_leds))
-    
-    def test_get_new_spacing(self):
-        """Test calculation of new spacing."""
-        # Current spacing above minimum
-        current_spacing = 16
-        new_spacing = HitTrail.get_new_spacing(current_spacing)
-        self.assertEqual(new_spacing, 8)  # 16/2 = 8
-        
-        # Current spacing at minimum
-        current_spacing = 4
-        new_spacing = HitTrail.get_new_spacing(current_spacing)
-        self.assertEqual(new_spacing, 0)  # Signal to clear trail
-        
-        # Current spacing below minimum
-        current_spacing = 3
-        new_spacing = HitTrail.get_new_spacing(current_spacing)
-        self.assertEqual(new_spacing, 0)  # Signal to clear trail
-        
-        # Custom minimum
-        current_spacing = 6
-        new_spacing = HitTrail.get_new_spacing(current_spacing, min_spacing=5)
-        self.assertEqual(new_spacing, 3)  # 6/2 = 3
-    
     def test_add_hit_color(self):
         """Test adding a color to the hit trail."""
         # Add to empty trail

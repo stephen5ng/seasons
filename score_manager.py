@@ -50,7 +50,7 @@ class ScoreManager:
         self.previous_score = self.score
         self.score = new_score
     
-    def _handle_score_increase(self, new_score: float, target_type: str, beat_float: float, led_count: int) -> None:
+    def _handle_score_increase(self, new_score: float, target_type: TargetType, beat_float: float, led_count: int) -> None:
         """Handle logic when score increases.
         
         Args:
@@ -61,28 +61,10 @@ class ScoreManager:
         """
         self.score_flash_start_beat = beat_float
         self.last_hit_target = target_type
-        
-        # Check if adding a new hit would exceed circle size
-        if HitTrail.should_adjust_spacing(self.hit_colors, self.hit_spacing, led_count):
-            new_spacing = HitTrail.get_new_spacing(self.hit_spacing)
-            if new_spacing == 0:  # Signal to clear trail
-                # Clear hit trail if we've hit minimum spacing
-                self.hit_colors = []
-                self.hit_spacing = INITIAL_HIT_SPACING  # Reset to initial spacing
-                self.hit_trail_cleared = True  # Mark that hit trail has been cleared
-                print("*********** Hit trail cleared, resetting spacing")
-                return  # Skip adding hit color when trail is cleared
-            else:
-                self.hit_spacing = new_spacing
-                print(f"*********** Hit spacing: {self.hit_spacing}")
-        
+
         # Add hit color to beginning of trail
-        try:
-            target_enum: TargetType = TargetType[target_type.upper()]
-            self.hit_colors = HitTrail.add_hit_color(self.hit_colors, TARGET_COLORS[target_enum])
-            print(f"Hit colors: {len(self.hit_colors)}")
-        except KeyError:
-            pass  # Ignore invalid target types
+        self.hit_colors = HitTrail.add_hit_color(self.hit_colors, TARGET_COLORS[target_type])
+        print(f"Hit colors: {len(self.hit_colors)}")
     
     def get_score_flash_intensity(self, beat_float: float) -> float:
         """Calculate the intensity of the score flash effect based on musical beats.

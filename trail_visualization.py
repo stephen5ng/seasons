@@ -108,8 +108,7 @@ class TrailVisualizer:
             return SimpleTrailVisualizer(
                 led_count=led_count,
                 auto_mode=auto_mode,
-                speed=speed,
-                fade_duration_ms=fade_duration_ms
+                speed=speed
             )
         else:
             return HitTrailVisualizer(
@@ -325,20 +324,18 @@ class SimpleTrailVisualizer(TrailVisualizer):
     def __init__(self, 
                  led_count: int = 80, 
                  auto_mode: bool = False, 
-                 speed: int = 1,
-                 fade_duration_ms: int = 500) -> None:
+                 speed: int = 1) -> None:
         """Initialize the simple hit trail visualizer.
         
         Args:
             led_count: Number of LEDs in the strip
             auto_mode: When True, automatically adds hits on a timer
             speed: Speed of LED movement (1-10)
-            fade_duration_ms: Duration in milliseconds for the fade-out effect
         """
         super().__init__(led_count)
         
         # Simple hit trail implementation
-        self.simple_hit_trail = SimpleHitTrail(fade_duration_ms=fade_duration_ms)
+        self.simple_hit_trail = SimpleHitTrail()
         
         # Settings
         self.auto_mode = auto_mode
@@ -379,6 +376,24 @@ class SimpleTrailVisualizer(TrailVisualizer):
             return [color]
         return []
     
+    def remove_hit(self, target_type: game_constants.TargetType) -> None:
+        """Remove a hit of the specified target type from the hit trail.
+        
+        Args:
+            target_type: Type of target to remove
+        """
+        # Calculate target position based on target type
+        if target_type == game_constants.TargetType.RED:
+            target_pos = 0  # 12 o'clock
+        elif target_type == game_constants.TargetType.GREEN:
+            target_pos = int(self.led_count * 0.25)  # 3 o'clock
+        elif target_type == game_constants.TargetType.BLUE:
+            target_pos = int(self.led_count * 0.5)  # 6 o'clock
+        else:  # YELLOW
+            target_pos = int(self.led_count * 0.75)  # 9 o'clock
+                    
+        self.simple_hit_trail.remove_hit(game_constants.TARGET_COLORS[target_type])
+    
     def add_hit(self, target_type: game_constants.TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
         
@@ -406,7 +421,7 @@ class SimpleTrailVisualizer(TrailVisualizer):
     
     def clear_hit_trail(self) -> None:
         """Clear the hit trail."""
-        self.simple_hit_trail = SimpleHitTrail()
+        self.simple_hit_trail = SimpleHitTrail(fade_duration_ms=500)  # Use same default as in __init__
         
     def draw_hit_trail(self) -> None:
         """Draw the simple hit trail on the display."""

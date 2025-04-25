@@ -50,65 +50,16 @@ class TestScoreManager(unittest.TestCase):
         mock_add_hit_color.return_value = [Color(255, 0, 0)]
         
         # Update with increased score
-        self.score_manager.update_score(0.25, "red", 2.5, self.led_count)
+        self.score_manager.update_score(0.25, TargetType.RED, 2.5, self.led_count)
         
         # Check that state is updated correctly
         self.assertEqual(self.score_manager.score, 0.25)
         self.assertEqual(self.score_manager.previous_score, 0.0)
         self.assertEqual(self.score_manager.score_flash_start_beat, 2.5)
-        self.assertEqual(self.score_manager.last_hit_target, "red")
+        self.assertEqual(self.score_manager.last_hit_target, TargetType.RED)
         
         # Verify HitTrail.add_hit_color was called
         mock_add_hit_color.assert_called_once()
-    
-    @patch('score_manager.HitTrail.should_adjust_spacing')
-    @patch('score_manager.HitTrail.get_new_spacing')
-    @patch('score_manager.HitTrail.add_hit_color')
-    def test_handle_score_increase_adjust_spacing(self, mock_add_hit_color, mock_get_new_spacing, mock_should_adjust_spacing):
-        """Test _handle_score_increase when spacing needs adjustment."""
-        # Set up mocks
-        mock_should_adjust_spacing.return_value = True
-        mock_get_new_spacing.return_value = 4
-        mock_add_hit_color.return_value = [Color(255, 0, 0)]
-        
-        # Call the method
-        self.score_manager._handle_score_increase(0.25, "red", 2.5, self.led_count)
-        
-        # Check that spacing was adjusted
-        self.assertEqual(self.score_manager.hit_spacing, 4)
-        
-        # Verify mocks were called
-        mock_should_adjust_spacing.assert_called_once()
-        mock_get_new_spacing.assert_called_once()
-        mock_add_hit_color.assert_called_once()
-    
-    @patch('score_manager.HitTrail.should_adjust_spacing')
-    @patch('score_manager.HitTrail.get_new_spacing')
-    @patch('score_manager.HitTrail.add_hit_color')
-    def test_handle_score_increase_clear_trail(self, mock_add_hit_color, mock_get_new_spacing, mock_should_adjust_spacing):
-        """Test _handle_score_increase when trail needs to be cleared."""
-        # Set up mocks
-        mock_should_adjust_spacing.return_value = True
-        mock_get_new_spacing.return_value = 0  # Signal to clear trail
-        mock_add_hit_color.return_value = [Color(255, 0, 0)]
-        
-        # Set initial state
-        self.score_manager.hit_colors = [Color(0, 255, 0), Color(0, 0, 255)]
-        self.score_manager.hit_spacing = 2
-        
-        # Call the method
-        self.score_manager._handle_score_increase(0.25, "red", 2.5, self.led_count)
-        
-        # Check that trail was cleared
-        self.assertEqual(self.score_manager.hit_colors, [])
-        self.assertEqual(self.score_manager.hit_spacing, INITIAL_HIT_SPACING)
-        self.assertTrue(self.score_manager.hit_trail_cleared)
-        
-        # Verify mocks were called
-        mock_should_adjust_spacing.assert_called_once()
-        mock_get_new_spacing.assert_called_once()
-        # add_hit_color should not be called when trail is cleared
-        mock_add_hit_color.assert_not_called()
     
     @patch('score_manager.ScoreEffects.get_flash_intensity')
     def test_get_score_flash_intensity(self, mock_get_flash_intensity):

@@ -38,7 +38,7 @@ class WLEDManager:
         if score != self.last_wled_score or self.last_wled_measure != current_measure:
             # If measure changed, check for a new command
             if self.last_wled_measure != current_measure:
-                print(f"NEW MEASURE {current_measure}")
+                # print(f"NEW MEASURE {current_measure}")
                 wled_command = WLEDController.get_command_for_measure(current_measure, self.command_settings)
                 if wled_command:
                     self.last_wled_measure = current_measure
@@ -46,7 +46,7 @@ class WLEDManager:
                     
             # Always update the last score
             self.last_wled_score = score
-            print(f"score {score}")
+            # print(f"score {score}")
             
     async def send_wled_command(self, wled_command: str, score: float) -> None:
         """Send a command to the WLED device.

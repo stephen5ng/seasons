@@ -19,36 +19,6 @@ class HitTrail:
         return (len(colors) + 1) * spacing
     
     @staticmethod
-    def should_adjust_spacing(colors: List[Color], spacing: float, max_leds: int) -> bool:
-        """Determine if spacing needs to be adjusted based on available space.
-        
-        Args:
-            colors: List of colors in the hit trail
-            spacing: Current spacing between hit trail elements
-            max_leds: Maximum number of LEDs available
-            
-        Returns:
-            True if spacing needs adjustment, False otherwise
-        """
-        total_space: float = HitTrail.calculate_total_space(colors, spacing)
-        return total_space >= max_leds
-    
-    @staticmethod
-    def get_new_spacing(current_spacing: float, min_spacing: float = 4.0) -> float:
-        """Calculate new spacing when adjustment is needed.
-        
-        Args:
-            current_spacing: Current spacing between hit trail elements
-            min_spacing: Minimum allowed spacing before trail is cleared
-            
-        Returns:
-            New spacing value
-        """
-        if current_spacing <= min_spacing:
-            return 0  # Signal that trail should be cleared
-        return max(current_spacing / 2, 1)
-    
-    @staticmethod
     def add_hit_color(colors: List[Color], target_color: Color) -> List[Color]:
         """Add a new color to the beginning of the hit trail.
         

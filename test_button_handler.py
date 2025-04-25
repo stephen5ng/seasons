@@ -134,9 +134,9 @@ class TestButtonHandler(unittest.TestCase):
         
         # Test with position in red target window
         with patch.object(self.button_handler, 'get_target_type', return_value=TargetType.RED):
-            score, target_hit, error_feedback = self.button_handler.handle_keypress(0, 1.0, 1000)
-            self.assertEqual(score, 1.25)
-            self.assertEqual(target_hit, "red")
+            score, target_hit, error_feedback = self.button_handler.handle_keypress(0, 1000)
+            self.assertEqual(score, True)
+            self.assertEqual(target_hit, TargetType.RED)
             self.assertIsNone(error_feedback)
     
     @patch('pygame.key.get_pressed')
@@ -148,9 +148,9 @@ class TestButtonHandler(unittest.TestCase):
         
         # Test with position in red target window
         with patch.object(self.button_handler, 'get_target_type', return_value=TargetType.RED):
-            score, target_hit, error_feedback = self.button_handler.handle_keypress(0, 1.0, 1000)
-            self.assertEqual(score, 0.75)
-            self.assertEqual(target_hit, "none")
+            score, target_hit, error_feedback = self.button_handler.handle_keypress(0, 1000)
+            self.assertEqual(score, False)
+            self.assertEqual(target_hit, None)
             self.assertIsNotNone(error_feedback)
             self.assertEqual(error_feedback[0], self.button_handler.get_window_position_for_target(TargetType.BLUE))
     
@@ -164,7 +164,7 @@ class TestButtonHandler(unittest.TestCase):
         # Test with position not in red target window
         with patch.object(self.button_handler, '_check_for_out_of_window_presses', 
                          return_value=(0.75, "none", (0, TARGET_COLORS[TargetType.RED]))):
-            score, target_hit, error_feedback = self.button_handler.handle_keypress(30, 1.0, 1000)
+            score, target_hit, error_feedback = self.button_handler.handle_keypress(30, 1000)
             self.assertEqual(score, 0.75)
             self.assertEqual(target_hit, "none")
             self.assertIsNotNone(error_feedback)

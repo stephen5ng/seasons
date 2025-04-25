@@ -198,7 +198,7 @@ class GameState:
         if beat_float > self.last_beat:
             self.total_beats += 1
             self.last_beat = int(beat_float)
-            print(f"Total beats in song: {self.total_beats}")
+            # print(f"Total beats in song: {self.total_beats}")
             
             # Update WLED based on current measure and score
             # Skip if WLED is disabled
@@ -337,8 +337,7 @@ async def run_game() -> None:
         initial_score=args.score,
         auto_mode=args.auto_score,
         speed=1,  # Speed is controlled by the game
-        hit_spacing=game_constants.INITIAL_HIT_SPACING,
-        fade_duration_ms=500  # 500ms fade duration
+        hit_spacing=game_constants.INITIAL_HIT_SPACING
     )
     
     hit_trail_visualizer.display = display
@@ -350,19 +349,19 @@ async def run_game() -> None:
     
     # Set initial score for debug modes
     if args.score > 0:
-        print(f"Setting initial score to {args.score}")
+        logger.info(f"Setting initial score to {args.score}")
         game_state.score_manager.score = args.score
         hit_trail_visualizer.score = args.score  # Let each visualizer handle the score
     
     # Debug setup for different display modes
     if show_main_trail:
-        print(f"Showing main trail")
+        logger.info("Showing main trail")
     if show_hit_trail:
-        print(f"Showing hit trail using {args.hit_trail_strategy} strategy")
+        logger.info(f"Showing hit trail using {args.hit_trail_strategy} strategy")
         
         # Set up hit colors based on score (simulate multiple hits)
         hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
-        print(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
+        logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     
     try:
         # Initialize music
@@ -380,6 +379,7 @@ async def run_game() -> None:
             "y": TargetType.YELLOW
         }
 
+        target_hit: TargetType
         while True:
             display.clear()
 
@@ -419,23 +419,25 @@ async def run_game() -> None:
                 if new_score != game_state.score_manager.score:
                     print(f"New score: {new_score}, target hit: none")
                     game_state.update_score(new_score, "none", beat_float)
+                    hit_trail_visualizer.remove_hit(target_hit)
             
             # Always reset flags
             game_state.reset_flags(led_position)
             
             # Check for scoring (both manual and auto)
             new_score: float
-            target_hit: str
+            successful_hit: any
             error_feedback: Optional[Tuple[int, Color]] = None
-            new_score, target_hit, error_feedback = game_state.button_handler.handle_keypress(
-                led_position, game_state.score_manager.score, current_time_ms)
-            if new_score != game_state.score:
-                # Check for hit trail visualization before updating score
-                if new_score > game_state.score and show_hit_trail:
-                    if target_hit != "none" and target_hit.upper() in [t.name for t in TargetType]:
-                        target_type = TargetType[target_hit.upper()]
-                        hit_trail_visualizer.add_hit(target_type)
-                
+            successful_hit, target_hit, error_feedback = game_state.button_handler.handle_keypress(
+                led_position, current_time_ms)
+            
+            if successful_hit is not None and target_hit is not None:
+                new_score = game_state.score_manager.score + 0.25 * (1 if successful_hit else -1)
+                print(f"target_hit: {target_hit}")
+                    
+                if new_score > game_state.score:
+                    hit_trail_visualizer.add_hit(target_hit)
+            
                 # Update score after hit trail check
                 game_state.update_score(new_score, target_hit, beat_float)
             
