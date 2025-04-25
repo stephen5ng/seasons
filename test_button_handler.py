@@ -25,7 +25,7 @@ class TestButtonHandler(unittest.TestCase):
         
         # Create button handler with our test values
         self.button_handler = ButtonHandler(
-            self.mock_sound,
+            error_sound=self.mock_sound,
             number_of_leds=self.led_count,
             target_window_size=self.window_size
         )

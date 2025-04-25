@@ -14,7 +14,7 @@ class ButtonHandler:
     in the correct window, and updating the score accordingly.
     """
     
-    def __init__(self, error_sound: Optional[pygame.mixer.Sound] = None,
+    def __init__(self, error_sound: pygame.mixer.Sound,
                 number_of_leds: int = 80, target_window_size: int = 4,
                 auto_score: bool = False) -> None:
         """Initialize the button handler.
@@ -33,7 +33,7 @@ class ButtonHandler:
         }
         self.penalty_applied: bool = False
         self.round_active: bool = False
-        self.error_sound: Optional[pygame.mixer.Sound] = error_sound
+        self.error_sound: pygame.mixer.Sound = error_sound
         self.auto_score: bool = auto_score
         
         # Store LED configuration
@@ -194,8 +194,7 @@ class ButtonHandler:
         Returns:
             Tuple containing (False, None, (error_position, error_color))
         """
-        if self.error_sound:
-            self.error_sound.play()
+        self.error_sound.play()
         error_color: Color = TARGET_COLORS[target_type]
         return False, None, (error_pos, error_color)
     
