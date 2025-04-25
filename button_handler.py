@@ -159,14 +159,11 @@ class ButtonHandler:
                 
                 # If we're not in this key's window, show error and apply penalty
                 if abs(led_position - window_pos) > self.target_window_size:
-                    if self.error_sound:
-                        self.error_sound.play()
-                    error_color: Color = TARGET_COLORS[target_type]
-                    return False, None, (window_pos, error_color)
+                    return self._create_error_feedback(target_type, window_pos)
         return None
-    # TODO: merge with _check_for_out_of_window_presses
+
     def _check_for_wrong_key_in_window(self, keys_pressed: Dict[int, bool], correct_target: TargetType, 
-                                       led_position: int) -> Optional[Tuple[bool, str, Tuple[int, Color]]]:
+                                     led_position: int) -> Optional[Tuple[bool, str, Tuple[int, Color]]]:
         """Check for wrong key presses in a target window.
         
         Args:
@@ -183,12 +180,24 @@ class ButtonHandler:
                 wrong_keys = ButtonHandler.get_keys_for_target(wrong_target)
                 
                 if any(keys_pressed[key] for key in wrong_keys):
-                    if self.error_sound:
-                        self.error_sound.play()
                     error_pos = self.get_window_position_for_target(wrong_target)
-                    error_color: Color = TARGET_COLORS[wrong_target]
-                    return False, "none", (error_pos, error_color)
+                    return self._create_error_feedback(wrong_target, error_pos)
         return None
+
+    def _create_error_feedback(self, target_type: TargetType, error_pos: int) -> Tuple[bool, str, Tuple[int, Color]]:
+        """Create error feedback for incorrect key presses.
+        
+        Args:
+            target_type: The target type that was incorrectly pressed
+            error_pos: The position where the error occurred
+            
+        Returns:
+            Tuple containing (False, None, (error_position, error_color))
+        """
+        if self.error_sound:
+            self.error_sound.play()
+        error_color: Color = TARGET_COLORS[target_type]
+        return False, None, (error_pos, error_color)
     
     def get_window_position_for_target(self, target_type: TargetType) -> int:
         """Get the center position of a target window.
