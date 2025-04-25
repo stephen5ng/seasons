@@ -14,6 +14,12 @@ class ButtonHandler:
     in the correct window, and updating the score accordingly.
     """
     
+    # Target positions as percentages around the ring (0-1)
+    RED_TARGET_PERCENT = 0.0      # 12 o'clock
+    GREEN_TARGET_PERCENT = 0.25   # 3 o'clock
+    BLUE_TARGET_PERCENT = 0.5     # 6 o'clock
+    YELLOW_TARGET_PERCENT = 0.75  # 9 o'clock
+    
     def __init__(self, error_sound: pygame.mixer.Sound,
                 number_of_leds: int = 80, target_window_size: int = 4,
                 auto_score: bool = False) -> None:
@@ -42,9 +48,9 @@ class ButtonHandler:
         
         # Calculate target positions using percentages
         self.red_target_pos = 0
-        self.blue_target_pos = int(number_of_leds * 0.5)   # 6 o'clock (50%)
-        self.green_target_pos = int(number_of_leds * 0.25) # 3 o'clock (25%)
-        self.yellow_target_pos = int(number_of_leds * 0.75) # 9 o'clock (75%)
+        self.blue_target_pos = int(number_of_leds * self.BLUE_TARGET_PERCENT)
+        self.green_target_pos = int(number_of_leds * self.GREEN_TARGET_PERCENT)
+        self.yellow_target_pos = int(number_of_leds * self.YELLOW_TARGET_PERCENT)
     
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
@@ -277,12 +283,6 @@ class ButtonHandler:
         # Convert position to percentage around the ring (0-1)
         position_percent = position / led_count
         
-        # Get fixed target positions by percentage
-        red_percent = 0.0      # 12 o'clock (0%)
-        green_percent = 0.25   # 3 o'clock (25%)
-        blue_percent = 0.5     # 6 o'clock (50%)
-        yellow_percent = 0.75  # 9 o'clock (75%)
-        
         # Calculate window size as percentage
         window_percent = window_size / led_count
         
@@ -290,11 +290,11 @@ class ButtonHandler:
         if (position_percent <= window_percent or 
             position_percent >= (1.0 - window_percent)):
             return TargetType.RED
-        elif abs(position_percent - blue_percent) <= window_percent:
+        elif abs(position_percent - ButtonHandler.BLUE_TARGET_PERCENT) <= window_percent:
             return TargetType.BLUE
-        elif abs(position_percent - green_percent) <= window_percent:
+        elif abs(position_percent - ButtonHandler.GREEN_TARGET_PERCENT) <= window_percent:
             return TargetType.GREEN
-        elif abs(position_percent - yellow_percent) <= window_percent:
+        elif abs(position_percent - ButtonHandler.YELLOW_TARGET_PERCENT) <= window_percent:
             return TargetType.YELLOW
         return None
     
@@ -316,6 +316,3 @@ class ButtonHandler:
             return [pygame.K_g, pygame.K_RIGHT]
         else:  # YELLOW
             return [pygame.K_y, pygame.K_LEFT]
-
-# For backward compatibility
-ButtonPressHandler = ButtonHandler
