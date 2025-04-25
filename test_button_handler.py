@@ -172,14 +172,24 @@ class TestButtonHandler(unittest.TestCase):
     def test_reset_flags(self):
         """Test reset_flags method."""
         # Set initial state
-        self.button_handler.button_states = {"r": True, "b": True, "g": True, "y": True}
+        self.button_handler.button_states = {
+            TargetType.RED: True,
+            TargetType.BLUE: True,
+            TargetType.GREEN: True,
+            TargetType.YELLOW: True
+        }
         self.button_handler.penalty_applied = True
         self.button_handler.round_active = False
         
         # Test entering a valid window
         with patch.object(self.button_handler, 'is_in_valid_window', return_value=True):
             self.button_handler.reset_flags(0)
-            self.assertEqual(self.button_handler.button_states, {"r": False, "b": False, "g": False, "y": False})
+            self.assertEqual(self.button_handler.button_states, {
+                TargetType.RED: False,
+                TargetType.BLUE: False,
+                TargetType.GREEN: False,
+                TargetType.YELLOW: False
+            })
             self.assertFalse(self.button_handler.penalty_applied)
             self.assertTrue(self.button_handler.round_active)
         

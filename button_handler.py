@@ -25,11 +25,11 @@ class ButtonHandler:
             target_window_size: Size of target windows (default: 4)
             auto_score: When True, automatically scores on every round
         """
-        self.button_states: Dict[str, bool] = {
-            "r": False,
-            "b": False,
-            "g": False,
-            "y": False
+        self.button_states: Dict[TargetType, bool] = {
+            TargetType.RED: False,
+            TargetType.BLUE: False,
+            TargetType.GREEN: False,
+            TargetType.YELLOW: False
         }
         self.penalty_applied: bool = False
         self.round_active: bool = False
@@ -79,7 +79,7 @@ class ButtonHandler:
             led_position: Current LED position
         """
         if self.is_in_valid_window(led_position) and not self.round_active:
-            self.button_states = {k: False for k in self.button_states}
+            self.button_states = {target: False for target in TargetType}
             self.penalty_applied = False
             self.round_active = True  # Start a new scoring round
         elif not self.is_in_valid_window(led_position):
@@ -141,7 +141,6 @@ class ButtonHandler:
         
         # Check for correct key presses in the target window
         target_type: Optional[TargetType] = self.get_target_type(led_position)
-        # print(f"target_type: {target_type}")
         if target_type:
             # Check for wrong key presses in this window
             error_result = self._check_for_wrong_key_in_window(keys_pressed, target_type, led_position)
@@ -150,8 +149,8 @@ class ButtonHandler:
                 
             # Check for correct key press
             keys = ButtonHandler.get_keys_for_target(target_type)
-            if (any(keys_pressed[key] for key in keys) or self.auto_score) and not self.button_states[target_type.name[0].lower()]:
-                self.button_states[target_type.name[0].lower()] = True
+            if (any(keys_pressed[key] for key in keys) or self.auto_score) and not self.button_states[target_type]:
+                self.button_states[target_type] = True
                 self.penalty_applied = False
                 return True, target_type, None
         
