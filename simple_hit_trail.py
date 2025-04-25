@@ -14,7 +14,7 @@ class SimpleHitTrail(HitTrailBase):
     
     def __init__(self) -> None:
         """Initialize the simple hit trail."""
-        super().__init__(16000)
+        super().__init__(90000000000)
         self.hit_position: Optional[Tuple[int, TargetType]] = None  # (position, target_type)        
         self.number_of_hits_by_type: Dict[TargetType, int] = {}
         self.hits_by_type: Dict[TargetType, List[int]] = {}

@@ -318,7 +318,7 @@ async def run_game() -> None:
         screen_width=SCREEN_WIDTH,
         screen_height=SCREEN_HEIGHT,
         scaling_factor=SCALING_FACTOR,
-        led_count=game_constants.NUMBER_OF_LEDS,
+        led_count=number_of_leds,
         led_pin=18,  # Default GPIO pin
         led_freq_hz=800000,  # Default frequency
         led_dma=10,  # Default DMA channel
@@ -333,7 +333,7 @@ async def run_game() -> None:
     # Initialize hit trail visualization based on strategy
     hit_trail_visualizer = TrailVisualizer.create_visualizer(
         strategy=args.hit_trail_strategy,
-        led_count=game_constants.NUMBER_OF_LEDS,
+        led_count=number_of_leds,
         initial_score=args.score,
         auto_mode=args.auto_score,
         speed=1,  # Speed is controlled by the game
