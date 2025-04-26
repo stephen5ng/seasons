@@ -40,10 +40,6 @@ def parse_args():
     
     # Display mode options
     display_group = parser.add_argument_group('Display options')
-    display_group.add_argument('--show-main-trail', action='store_true',
-                      help='Display main trail')
-    display_group.add_argument('--show-hit-trail', action='store_true',
-                      help='Display hit trail')
     display_group.add_argument('--hit-trail-strategy', type=str, choices=['normal', 'simple'], default='normal',
                       help='Strategy for hit trail visualization (normal=traditional trail, simple=single LED fade)')
     
@@ -60,18 +56,11 @@ def parse_args():
     
     args = parser.parse_args()
     
-    # If no display modes specified, enable all by default
-    if not args.show_main_trail and not args.show_hit_trail:
-        args.show_main_trail = True
-        args.show_hit_trail = True
-    
     return args
 
 # Define default values to use when the script is imported (not run directly)
 default_args = argparse.Namespace(
     leds=80,
-    show_main_trail=True,
-    show_hit_trail=True,
     hit_trail_strategy='normal',
     score=0.0,
     one_loop=False,
@@ -343,8 +332,6 @@ async def run_game() -> None:
     hit_trail_visualizer.display = display
     
     # Debug display modes
-    show_main_trail = args.show_main_trail
-    show_hit_trail = args.show_hit_trail
     run_one_loop = args.one_loop
     
     # Set initial score for debug modes
@@ -354,14 +341,12 @@ async def run_game() -> None:
         hit_trail_visualizer.score = args.score  # Let each visualizer handle the score
     
     # Debug setup for different display modes
-    if show_main_trail:
-        logger.info("Showing main trail")
-    if show_hit_trail:
-        logger.info(f"Showing hit trail using {args.hit_trail_strategy} strategy")
+    logger.info("Showing main trail")
+    logger.info(f"Showing hit trail using {args.hit_trail_strategy} strategy")
         
-        # Set up hit colors based on score (simulate multiple hits)
-        hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
-        logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
+    # Set up hit colors based on score (simulate multiple hits)
+    hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
+    logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     
     try:
         # Initialize music
@@ -433,7 +418,7 @@ async def run_game() -> None:
                 game_state.update_score(new_score, target_hit, beat_float)
             
             # Handle hit trail cleared state synchronization
-            if game_state.hit_trail_cleared and show_hit_trail:
+            if game_state.hit_trail_cleared:
                 hit_trail_visualizer.hit_trail_cleared = True
             
             # Update trail state when LED position changes
@@ -443,17 +428,15 @@ async def run_game() -> None:
                 game_state.trail_state_manager.update_position(led_position, current_time_ms / 1000.0)
             
             # Draw target trail
-            if show_main_trail:
-                game_state.trail_state_manager.draw_main_trail(
-                    TRAIL_FADE_DURATION_S,
-                    TRAIL_EASE,
-                    game_state.button_handler,
-                    lambda pos, color: display.set_pixel(pos, color)
-                )
+            game_state.trail_state_manager.draw_main_trail(
+                TRAIL_FADE_DURATION_S,
+                TRAIL_EASE,
+                game_state.button_handler,
+                lambda pos, color: display.set_pixel(pos, color)
+            )
                         
             # Draw hit trail in outer circle using the selected strategy
-            if show_hit_trail:
-                hit_trail_visualizer.sync_with_game_state(game_state, led_position)
+            hit_trail_visualizer.sync_with_game_state(game_state, led_position)
             
             # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
@@ -474,13 +457,11 @@ async def run_game() -> None:
                 )
             
             # Draw current LED in white (unless hit-trail-only mode)
-            if show_main_trail:
-                # Draw error feedback if wrong key was pressed
-                if successful_hit is False:
-                    print(f"successful_hit: {successful_hit}, target_type: {target_hit}")
-                    error_pos = game_state.button_handler.get_window_position_for_target(target_hit)
-                    error_color = TARGET_COLORS[target_hit]
-                    display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
+            if successful_hit is False:
+                print(f"successful_hit: {successful_hit}, target_type: {target_hit}")
+                error_pos = game_state.button_handler.get_window_position_for_target(target_hit)
+                error_color = TARGET_COLORS[target_hit]
+                display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
 
             # Handle input (only for quit)
             for key, keydown in get_key():
