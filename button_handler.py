@@ -52,6 +52,8 @@ class ButtonHandler:
         self.green_target_pos = int(number_of_leds * self.GREEN_TARGET_PERCENT)
         self.yellow_target_pos = int(number_of_leds * self.YELLOW_TARGET_PERCENT)
     
+        self.last_target_type = TargetType.RED
+        
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
         
@@ -99,7 +101,7 @@ class ButtonHandler:
         Returns:
             TargetType if position is in a target window, None otherwise
         """
-        return ButtonHandler.get_target_type_for_position(
+        target_type = ButtonHandler.get_target_type_for_position(
             position,
             self.number_of_leds,
             self.target_window_size,
@@ -107,7 +109,10 @@ class ButtonHandler:
             self.green_target_pos,
             self.yellow_target_pos
         )
-    
+        if target_type:
+            self.last_target_type = target_type
+        return target_type
+
     def handle_keypress(self, led_position: int, current_time: int) -> Tuple[Optional[bool], Optional[TargetType]]:
         """Handle keypress and update score if in valid window with correct key.
         
@@ -123,15 +128,16 @@ class ButtonHandler:
         # Get the current keyboard state
         keys_pressed: Dict[int, bool] = pygame.key.get_pressed()
         
+        # Check for correct key presses in the target window
+        target_type: Optional[TargetType] = self.get_target_type(led_position)        
+        if not target_type:
+            return None, target_type
+
         # Check for key presses outside their windows
         error_result = self._check_for_out_of_window_presses(keys_pressed, led_position)
         if error_result:
             return error_result
         
-        # Check for correct key presses in the target window
-        target_type: Optional[TargetType] = self.get_target_type(led_position)        
-        if not target_type:
-            return None, target_type
 
         # Check for wrong key presses in this window
         error_result = self._check_for_wrong_key_in_window(keys_pressed, target_type, led_position)

@@ -160,8 +160,8 @@ class TestButtonHandler(unittest.TestCase):
         with patch.object(self.button_handler, '_check_for_out_of_window_presses', 
                          return_value=(False, TargetType.RED)):
             successful_hit, target_hit = self.button_handler.handle_keypress(30, 1000)
-            self.assertEqual(successful_hit, False)
-            self.assertEqual(target_hit, TargetType.RED)
+            self.assertIsNone(successful_hit)
+            self.assertIsNone(target_hit)
     
     def test_reset_flags(self):
         """Test reset_flags method."""
