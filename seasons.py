@@ -379,7 +379,8 @@ async def run_game() -> None:
             "y": TargetType.YELLOW
         }
 
-        target_hit: TargetType
+        last_beat = -1
+        target_hit: Optional[TargetType] = None
         while True:
             display.clear()
 
@@ -388,6 +389,10 @@ async def run_game() -> None:
             beat_float: float
             fractional_beat: float
             beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
+            if last_beat != beat:
+                last_beat = beat
+                if beat % 8 == 0:
+                    print(f"beat: {beat}")
             game_state.handle_music_loop(beat_in_measure)
 
             current_time_ms: int = pygame.time.get_ticks()
