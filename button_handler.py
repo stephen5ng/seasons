@@ -61,8 +61,7 @@ class ButtonHandler:
         Returns:
             True if the position is in a valid scoring window
         """
-        return ButtonHandler.is_position_in_valid_window(led_position, self.number_of_leds, self.target_window_size, 
-                                                       self.blue_target_pos, self.green_target_pos, self.yellow_target_pos)
+        return self.get_target_type(led_position) is not None
     
     def apply_penalty(self, score: float) -> float:
         """Apply penalty if button wasn't pressed in valid window.
@@ -222,28 +221,6 @@ class ButtonHandler:
             return self.green_target_pos
         else:  # YELLOW
             return self.yellow_target_pos
-    
-    @staticmethod
-    def is_position_in_valid_window(led_position: int, led_count: int, window_size: int,
-                                   mid_pos: float, right_pos: float, left_pos: float) -> bool:
-        """Check if the LED position is in a valid scoring window.
-        
-        Args:
-            led_position: Position to check
-            led_count: Total number of LEDs
-            window_size: Size of the target window
-            mid_pos: Middle target position
-            right_pos: Right target position
-            left_pos: Left target position
-            
-        Returns:
-            True if the position is in a valid window
-        """
-        return (led_position >= led_count - window_size or 
-                led_position <= window_size or
-                abs(led_position - mid_pos) <= window_size or
-                abs(led_position - right_pos) <= window_size or
-                abs(led_position - left_pos) <= window_size)
     
     @staticmethod
     def calculate_penalty_score(score: float) -> float:

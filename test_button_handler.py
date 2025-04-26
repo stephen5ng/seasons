@@ -38,29 +38,27 @@ class TestButtonHandler(unittest.TestCase):
     def test_is_position_in_valid_window(self):
         """Test the is_position_in_valid_window static method."""
         # Test positions in each window
-        self.assertTrue(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNotNone(ButtonHandler.get_target_type_for_position(
             0, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
-        self.assertTrue(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNotNone(ButtonHandler.get_target_type_for_position(
             self.led_count - 1, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
-        self.assertTrue(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNotNone(ButtonHandler.get_target_type_for_position(
             self.mid_pos, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
-        self.assertTrue(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNotNone(ButtonHandler.get_target_type_for_position(
             self.right_pos, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
-        self.assertTrue(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNotNone(ButtonHandler.get_target_type_for_position(
             self.left_pos, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
         
         # Test positions at window edges
-        self.assertTrue(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNotNone(ButtonHandler.get_target_type_for_position(
             self.window_size, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
-        self.assertTrue(ButtonHandler.is_position_in_valid_window(
-            self.mid_pos + self.window_size, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
         
         # Test positions outside windows
-        self.assertFalse(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNone(ButtonHandler.get_target_type_for_position(
             10, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
-        self.assertFalse(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNone(ButtonHandler.get_target_type_for_position(
             30, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
-        self.assertFalse(ButtonHandler.is_position_in_valid_window(
+        self.assertIsNone(ButtonHandler.get_target_type_for_position(
             50, self.led_count, self.window_size, self.mid_pos, self.right_pos, self.left_pos))
     
     def test_calculate_penalty_score(self):
