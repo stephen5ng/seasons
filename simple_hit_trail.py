@@ -43,7 +43,7 @@ class SimpleHitTrail(HitTrailBase):
         if target_type in self.number_of_hits_by_type:
             self.number_of_hits_by_type[target_type] -= 1
         if target_type in self.hits_by_type and self.hits_by_type[target_type]:
-            position = self.hits_by_type[target_type].pop(0)
+            position = self.hits_by_type[target_type].pop()
             
             if position in self.active_hits:
                 del self.active_hits[position]

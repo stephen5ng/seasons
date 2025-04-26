@@ -394,11 +394,10 @@ async def run_game() -> None:
             if not game_state.button_handler.is_in_valid_window(led_position):
                 new_score: float = game_state.button_handler.apply_penalty(game_state.score_manager.score)
                 if new_score != game_state.score_manager.score:
-                    print(f"New score: {new_score}, target hit: none")
+                    print(f"PENALTY New score: {new_score}, target hit: {target_hit}")
                     # TODO: remove second argument after refactoring normal trail.
                     game_state.update_score(new_score, None, beat_float)
-                    if target_hit:
-                        hit_trail_visualizer.remove_hit(target_hit)
+                    hit_trail_visualizer.remove_hit(game_state.button_handler.last_target_type)
             
             # Always reset flags
             game_state.reset_flags(led_position)
