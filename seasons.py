@@ -350,7 +350,7 @@ async def run_game() -> None:
     
     try:
         # Initialize music
-        game_state.audio_manager.load_music("music/Rise Up 3.mp3")
+        game_state.audio_manager.load_music("music/Rise Up 4.mp3")
         game_state.audio_manager.play_music(start_pos_s=0.0)
 
         # Variables for tracking if we've completed one full loop in debug mode
@@ -378,6 +378,9 @@ async def run_game() -> None:
                 last_beat = beat
                 if beat % 8 == 0:
                     print(f"beat: {beat}")
+                # Quit if beat count exceeds 320
+                if beat > 320:
+                    return
             game_state.handle_music_loop(beat_in_measure)
 
             current_time_ms: int = pygame.time.get_ticks()
@@ -426,7 +429,6 @@ async def run_game() -> None:
                 # Store the timestamp and base white color for the new position
                 game_state.trail_state_manager.update_position(led_position, current_time_ms / 1000.0)
             
-            # Draw target trail
             game_state.trail_state_manager.draw_main_trail(
                 TRAIL_FADE_DURATION_S,
                 TRAIL_EASE,

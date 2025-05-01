@@ -18,6 +18,7 @@ class SimpleHitTrail(HitTrailBase):
         self.hit_position: Optional[Tuple[int, TargetType]] = None  # (position, target_type)        
         self.number_of_hits_by_type: Dict[TargetType, int] = {}
         self.hits_by_type: Dict[TargetType, List[int]] = {}
+        self.total_hits: int = 0
 
     def add_hit(self, position: int, target_type: TargetType) -> None:
         """Implementation of add_hit for subclasses.
@@ -26,6 +27,7 @@ class SimpleHitTrail(HitTrailBase):
             position: The LED position to light up
             target_type: The type of target that was hit
         """
+        self.total_hits += 1
         self.number_of_hits_by_type[target_type] = self.number_of_hits_by_type.get(target_type, 0) + 1
         new_position = position + self.number_of_hits_by_type[target_type]
         self.active_hits[new_position] = (target_type, pygame.time.get_ticks())
@@ -40,6 +42,7 @@ class SimpleHitTrail(HitTrailBase):
         Args:
             target_type: Type of the hit to remove
         """
+        self.total_hits -= 1
         if target_type in self.number_of_hits_by_type:
             self.number_of_hits_by_type[target_type] -= 1
         if target_type in self.hits_by_type and self.hits_by_type[target_type]:
@@ -54,4 +57,11 @@ class SimpleHitTrail(HitTrailBase):
         Args:
             display_func: Function to call to display a pixel
         """
+        if self.total_hits <= 20:
+            self.rotate_speed = 0.1
+        elif self.total_hits > 20:
+            self.rotate_speed = 0.01
+        # elif self.total_hits > 40:
+        #     self.rotate_speed = 0.1
+            
         self._display(display_func) 

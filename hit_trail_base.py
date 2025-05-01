@@ -18,7 +18,9 @@ class HitTrailBase:
         """
         self.easing = QuadEaseOut(start=1.0, end=0.0, duration=fade_duration_ms)
         self.active_hits: Dict[int, Tuple[TargetType, int]] = {}  # position -> (target_type, start_time)
-    
+        self.rotate = 0.0
+        self.rotate_speed = 0.0
+        
     def draw(self, display_func: Callable[[int, Color], None]) -> None:
         """Draw the hit trail.
         
@@ -58,7 +60,10 @@ class HitTrailBase:
                 255  # Always full alpha
             )
             
-            display_func(pos, faded_color)
+            self.rotate += self.rotate_speed
+            r = int(self.rotate) % 300
+            print(f"r: {r}, {self.rotate}, {self.rotate_speed}")
+            display_func(pos + r, faded_color)
         
         # Remove expired positions
         for pos in positions_to_remove:
