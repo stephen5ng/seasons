@@ -42,7 +42,7 @@ class ButtonHandler:
         self.error_sound: pygame.mixer.Sound = error_sound
         self.auto_score: bool = auto_score
         if auto_score:
-            self.target_window_size = 1
+            self.target_window_size = 0
         # Store LED configuration
         self.number_of_leds = number_of_leds
         self.target_window_size = target_window_size

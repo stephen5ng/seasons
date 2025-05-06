@@ -355,7 +355,6 @@ async def run_game() -> None:
     
     # Initialize game state
     game_state: GameState = GameState()
-    
     # Initialize hit trail visualization based on strategy
     hit_trail_visualizer = TrailVisualizer.create_visualizer(
         strategy=args.hit_trail_strategy,
@@ -367,11 +366,7 @@ async def run_game() -> None:
     )
     
     hit_trail_visualizer.display = display
-    
-    # Debug display modes
-    run_one_loop = args.one_loop
-    
-    # Set initial score for debug modes
+
     if args.score > 0:
         logger.info(f"Setting initial score to {args.score}")
         game_state.score_manager.score = args.score
@@ -403,7 +398,7 @@ async def run_game() -> None:
 
         last_beat = -1
         target_hit: Optional[TargetType] = None
-        ending_measure = 3 if run_one_loop else 37
+        ending_measure = 3 if args.one_loop else 37
         while True:
             display.clear()
             # Update timing and music

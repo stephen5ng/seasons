@@ -35,7 +35,7 @@ class SimpleHitTrail(HitTrailBase):
         if target_type not in self.hits_by_type:
             self.hits_by_type[target_type] = []
         self.hits_by_type[target_type].append(new_position)
-        
+        print(f"total_hits: {self.total_hits}")
     def remove_hit(self, target_type: TargetType) -> None:
         """Remove a hit of the specified target type from the hit trail.
         
@@ -57,10 +57,12 @@ class SimpleHitTrail(HitTrailBase):
         Args:
             display_func: Function to call to display a pixel
         """
-        if self.total_hits <= 20:
-            self.rotate_speed = 0.0
+        if self.total_hits > 40:
+            self.rotate_speed = -0.01
         elif self.total_hits > 20:
             self.rotate_speed = 0.01
+        else:
+            self.rotate_speed = 0.0
         # elif self.total_hits > 40:
         #     self.rotate_speed = 0.1
             
