@@ -62,7 +62,7 @@ class HitTrailBase:
             
             self.rotate += self.rotate_speed
             r = int(self.rotate) % 300
-            print(f"r: {r}, {self.rotate}, {self.rotate_speed}")
+            # print(f"r: {r}, {self.rotate}, {self.rotate_speed}")
             display_func(pos + r, faded_color)
         
         # Remove expired positions

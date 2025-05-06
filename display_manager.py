@@ -197,6 +197,8 @@ class DisplayManager:
         Returns:
             Tuple of (x, y) coordinates
         """
+        # print(f"i: {i}, led_count: {led_count}")
+        i -= 1
         angle = 2 * math.pi * i / led_count
         # Start at top (12 o'clock) and go clockwise
         x = int(radius * math.sin(angle))

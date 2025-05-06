@@ -291,7 +291,44 @@ def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: 
     """Get the color for score lines during flash effect."""
     return ScoreManager.get_score_line_color(base_color, flash_intensity, flash_type)
 
+def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
+    """Draw the fifth line with easing animation and color transitions.
+    
+    Args:
+        display: The display manager instance to draw on.
+        percent_complete: The completion percentage of the animation (0.0 to 1.5).
+    """
+    FIFTH_LINE_EASE = easing_functions.QuadEaseInOut(start=0.0, end=1.0, duration=1.0)
+    
+    fifth_color = Color(128, 128, 128)
+    CENTER_X = 96
+    eased_percent_complete = FIFTH_LINE_EASE(min(percent_complete, 1.0))
+    position_x = int(CENTER_X * eased_percent_complete)
+    if percent_complete > 0.9:
+        fifth_color = Color(255, 0, 0)
+    if percent_complete > 1.0:
+        # Fade from 100% to 0% between 1.0 and 1.5
+        fade_amount = min(1.0, (percent_complete - 1.0) * 2)  # Reaches 1.0 at 150%
+        fifth_color.r = int(fifth_color.r * (1.0 - fade_amount))
+        fifth_color.g = int(fifth_color.g * (1.0 - fade_amount))
+        fifth_color.b = int(fifth_color.b * (1.0 - fade_amount))
+    pygame.draw.circle(display.pygame_surface, fifth_color, (position_x, 96), 4, 1)
 
+def draw_fifth_lines(display: DisplayManager, measure: float) -> None:
+    """Draw the fifth line animation based on the current measure.
+    
+    Args:
+        display: The display manager instance to draw on.
+        measure: The current measure number in the song.
+    """
+    TARGET_MEASURES = [9, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35]
+    TARGET_BUFFER = 1
+    
+    for target in TARGET_MEASURES:
+        if measure > target - TARGET_BUFFER and measure <= target + TARGET_BUFFER/2:
+            percent_complete = (measure - (target - TARGET_BUFFER)) / TARGET_BUFFER
+            draw_fifth_line(display, percent_complete)
+            break
 
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
@@ -366,32 +403,32 @@ async def run_game() -> None:
 
         last_beat = -1
         target_hit: Optional[TargetType] = None
+        ending_measure = 3 if run_one_loop else 37
         while True:
             display.clear()
-
             # Update timing and music
             beat_in_measure: int
             beat_float: float
             fractional_beat: float
             beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
+            measure = 1 + (beat_float / 4)
+            # print(f"measure: {measure}, beat: {beat}")
             if last_beat != beat:
                 last_beat = beat
                 if beat % 8 == 0:
-                    print(f"beat: {beat}")
+                    print(f"measure: {measure}, beat: {beat}")
                 # Quit if beat count exceeds 320
-                if beat > 320:
+                if measure >= ending_measure:
                     return
             game_state.handle_music_loop(beat_in_measure)
+ 
+            draw_fifth_lines(display, measure)
 
             current_time_ms: int = pygame.time.get_ticks()
             
             # Calculate LED position and update loop count
             led_position: int = game_state.calculate_led_position(beat_in_measure, fractional_beat)
             game_state.update_loop_count(led_position / number_of_leds)
-
-            # For debug mode, track when we've completed one loop
-            if run_one_loop and beat >= 8:
-                return
             
             # Handle scoring and penalties
             if not game_state.button_handler.is_in_valid_window(led_position):
@@ -471,7 +508,7 @@ async def run_game() -> None:
                 
             # Update display
             display.update()
-            await clock.tick(30)
+            await clock.tick(60)
     finally:
         # Clean up the HTTP session
         await game_state.http_session.close()

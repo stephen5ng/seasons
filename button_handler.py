@@ -41,7 +41,8 @@ class ButtonHandler:
         self.round_active: bool = False
         self.error_sound: pygame.mixer.Sound = error_sound
         self.auto_score: bool = auto_score
-        
+        if auto_score:
+            self.target_window_size = 1
         # Store LED configuration
         self.number_of_leds = number_of_leds
         self.target_window_size = target_window_size
@@ -128,7 +129,6 @@ class ButtonHandler:
         # Get the current keyboard state
         keys_pressed: Dict[int, bool] = pygame.key.get_pressed()
         
-        # Check for correct key presses in the target window
         target_type: Optional[TargetType] = self.get_target_type(led_position)        
         if not target_type:
             return None, target_type

@@ -58,7 +58,7 @@ class SimpleHitTrail(HitTrailBase):
             display_func: Function to call to display a pixel
         """
         if self.total_hits <= 20:
-            self.rotate_speed = 0.1
+            self.rotate_speed = 0.0
         elif self.total_hits > 20:
             self.rotate_speed = 0.01
         # elif self.total_hits > 40:

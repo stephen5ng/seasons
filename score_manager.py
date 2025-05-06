@@ -40,7 +40,7 @@ class ScoreManager:
             beat_float: Current beat position as a float
             led_count: Total number of LEDs
         """
-        print(f"new_score: {new_score}, self.score: {self.score}")
+        # print(f"new_score: {new_score}, self.score: {self.score}")
         if new_score > self.score:
             self._handle_score_increase(new_score, target_type, beat_float, led_count)
         
@@ -65,7 +65,7 @@ class ScoreManager:
 
         # Add hit color to beginning of trail
         self.hit_colors = HitTrail.add_hit_color(self.hit_colors, TARGET_COLORS[target_type])
-        print(f"Hit colors: {len(self.hit_colors)}")
+        # print(f"Hit colors: {len(self.hit_colors)}")
     
     def get_score_flash_intensity(self, beat_float: float) -> float:
         """Calculate the intensity of the score flash effect based on musical beats.
