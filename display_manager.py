@@ -1,7 +1,7 @@
 """Display management utilities."""
 import pygame
 import math
-from typing import Optional, Tuple, Callable, List
+from typing import Optional, Tuple, Callable, List, Any
 from pygame import Color, Surface
 
 # For Raspberry Pi mode
@@ -48,7 +48,7 @@ class DisplayManager:
         
         if IS_RASPBERRY_PI:
             self.strip: PixelStrip = PixelStrip(
-                led_count, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
+                led_count*2, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
             )
             self.strip.begin()
             self.pygame_surface: Optional[Surface] = None
@@ -73,7 +73,7 @@ class DisplayManager:
         """Set pixel color at position in target ring."""
         if IS_RASPBERRY_PI:
             # Convert Pygame color to WS281x color (RGB order)
-            ws_color: LEDColor = LEDColor(color.r, color.g, color.b)
+            ws_color = LEDColor(color.r, color.g, color.b) if LEDColor else None
             self.strip.setPixelColor(pos, ws_color)
         else:
             # Avoid circular import
@@ -87,8 +87,13 @@ class DisplayManager:
     
     def set_hit_trail_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in hit trail ring."""
-        if not IS_RASPBERRY_PI:
-            # Avoid circular import
+        if IS_RASPBERRY_PI:
+            led_pos = pos % self.led_count
+            led_pos += self.led_count
+            print(f"setting target {pos}")
+            ws_color: Optional[Any] = LEDColor(color.r, color.g, color.b)
+            self.strip.setPixelColor(led_pos, ws_color)
+        else:            # Avoid circular import
             import game_constants
             x, y = self._get_ring_position(pos, 
                                          self.screen_width // 2, 
@@ -96,7 +101,7 @@ class DisplayManager:
                                          game_constants.HIT_TRAIL_RADIUS, 
                                          self.led_count)
             self.pygame_surface.set_at((x, y), color)
-    
+            
     # New-style methods
     def set_target_pixel(self, pos: int, color: Color, 
                          center_x: int, center_y: int, radius: int, led_count: int) -> None:
@@ -111,8 +116,7 @@ class DisplayManager:
             led_count: Total number of LEDs in the circle
         """
         if IS_RASPBERRY_PI:
-            # Convert Pygame color to WS281x color (RGB order)
-            ws_color: LEDColor = LEDColor(color.r, color.g, color.b)
+            ws_color = LEDColor(color.r, color.g, color.b) if LEDColor else None
             self.strip.setPixelColor(pos, ws_color)
         else:
             x, y = self._get_ring_position(pos, center_x, center_y, radius, led_count)

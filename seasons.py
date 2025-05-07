@@ -417,7 +417,9 @@ async def run_game() -> None:
                     return
             game_state.handle_music_loop(beat_in_measure)
  
-            draw_fifth_lines(display, measure)
+            # Handle input (only for quit)
+            if not IS_RASPBERRY_PI:
+                draw_fifth_lines(display, measure)
 
             current_time_ms: int = pygame.time.get_ticks()
             
@@ -497,9 +499,10 @@ async def run_game() -> None:
                 display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
 
             # Handle input (only for quit)
-            for key, keydown in get_key():
-                if key == "quit":
-                    return
+            if not IS_RASPBERRY_PI:
+                for key, keydown in get_key():
+                    if key == "quit":
+                        return
                 
             # Update display
             display.update()

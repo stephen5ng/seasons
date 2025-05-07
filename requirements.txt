@@ -5,4 +5,5 @@ pillow
 pygame-ce
 pyvidplayer2
 requests
+rpi-ws281x
 RGBMatrixEmulator
