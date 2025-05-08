@@ -110,7 +110,6 @@ class GameState:
             target_window_size=target_window_size,
             auto_score=args.auto_score
         )
-        self.trail_length: int = 0 
         self.beat_start_time_ms: int = 0
         self.total_beats: int = 0  # Track total beats in song
         self.last_beat: int = -1  # Track last beat for increment
@@ -238,14 +237,6 @@ class GameState:
     def calculate_led_position(self, beat_in_phrase: int, fractional_beat: float) -> int:
         """Calculate the current LED position based on beat timing."""
         return LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
-    
-    def update_loop_count(self, percent_of_measure: float) -> None:
-        """Update the loop count based on measure progress."""
-        if percent_of_measure < 0.5:
-            if self.loop_count != self.next_loop:
-                self.loop_count = self.next_loop
-        elif self.next_loop == self.loop_count:
-            self.next_loop = self.loop_count + 1
 
 def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
