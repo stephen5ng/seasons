@@ -405,16 +405,11 @@ async def run_game() -> None:
                 flash_intensity: float = game_state.score_manager.get_score_flash_intensity(beat_float)
                 display.draw_score_lines(
                     score=game_state.score_manager.score,
-                    current_time=current_time_ms,
                     flash_intensity=flash_intensity,
                     flash_type=target_hit,
                     score_line_color=SCORE_LINE_COLOR,
-                    high_score_threshold=HIGH_SCORE_THRESHOLD,
-                    score_flash_duration_ms=SCORE_FLASH_DURATION_MS,
-                    score_line_animation_time_ms=SCORE_LINE_ANIMATION_TIME_MS,
                     score_line_height=SCORE_LINE_HEIGHT,
                     score_line_spacing=SCORE_LINE_SPACING,
-                    get_rainbow_color_func=get_rainbow_color,
                     get_score_line_color_func=get_score_line_color
                 )
             

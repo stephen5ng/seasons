@@ -141,26 +141,19 @@ class DisplayManager:
             )
             pygame.display.update()
     
-    def draw_score_lines(self, score: float, current_time: int, flash_intensity: float, 
-                         flash_type: str, score_line_color: Color, high_score_threshold: float,
-                         score_flash_duration_ms: int, score_line_animation_time_ms: int,
+    def draw_score_lines(self, score: float, flash_intensity: float, 
+                         flash_type: str, score_line_color: Color,
                          score_line_height: float, score_line_spacing: float,
-                         get_rainbow_color_func: Callable[[int, int], Color],
                          get_score_line_color_func: Callable[[Color, float, str], Color]) -> None:
         """Draw horizontal lines representing the score with top-to-bottom animation.
         
         Args:
             score: Current score
-            current_time: Current time in milliseconds
             flash_intensity: Intensity of the flash effect (0.0 to 1.0)
             flash_type: Type of flash effect (e.g., "red", "blue")
             score_line_color: Base color for score lines
-            high_score_threshold: Threshold for high score rainbow effect
-            score_flash_duration_ms: Duration of flash effect in milliseconds
-            score_line_animation_time_ms: Time between line animations in milliseconds
             score_line_height: Height of each score line
             score_line_spacing: Spacing between score lines
-            get_rainbow_color_func: Function to get rainbow color based on time and index
             get_score_line_color_func: Function to get score line color during flash
         """        
         if not self.pygame_surface:
