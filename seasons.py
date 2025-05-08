@@ -124,11 +124,6 @@ class GameState:
         self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
         self.current_led_position: Optional[int] = None  # Track current LED position
         
-    @property
-    def score(self) -> float:
-        """Get the current score."""
-        return self.score_manager.score
-        
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position."""
         # Track if we're in a scoring window
@@ -199,18 +194,6 @@ class GameState:
             self.last_beat = target_beats - 1
             
             self.audio_manager.play_music(start_pos_s=target_time_s)
-
-    def update_score(self, new_score: float, beat_float: float) -> None:
-        """Update score and trigger flash effect if score increased."""
-        self.score_manager.update_score(new_score, beat_float)
-    
-    def get_score_flash_intensity(self, beat_float: float) -> float:
-        """Calculate the intensity of the score flash effect based on musical beats."""
-        return self.score_manager.get_score_flash_intensity(beat_float)
-
-    def calculate_led_position(self, beat_in_phrase: int, fractional_beat: float) -> int:
-        """Calculate the current LED position based on beat timing."""
-        return LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
 
 def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
@@ -321,7 +304,7 @@ async def run_game() -> None:
     logger.info("Showing main trail")
         
     # Set up hit colors based on score (simulate multiple hits)
-    hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping
+    hit_trail_visualizer.score = game_state.score_manager.score  # Let the visualizer handle color mapping
     logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     
     try:
@@ -373,7 +356,7 @@ async def run_game() -> None:
     
             current_time_ms: int = pygame.time.get_ticks()
             
-            led_position: int = game_state.calculate_led_position(beat_in_phrase, fractional_beat)
+            led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
             
             if not game_state.button_handler.is_in_valid_window(led_position):
                 missed_target = game_state.button_handler.missed_target()
@@ -381,7 +364,7 @@ async def run_game() -> None:
                     new_score = max(0, game_state.score_manager.score - 0.25)
                     print(f"PENALTY New score: {new_score}, target hit: {target_hit}")
 
-                    game_state.update_score(new_score, beat_float)
+                    game_state.score_manager.update_score(new_score, beat_float)
                     hit_trail_visualizer.remove_hit(missed_target)
             
             game_state.reset_flags(led_position)
@@ -400,10 +383,10 @@ async def run_game() -> None:
                     print(f"beat_score_offset: {beat_score_offset}")
                 print(f"target_hit: {target_hit}")
                     
-                if new_score > game_state.score:
+                if new_score > game_state.score_manager.score:
                     hit_trail_visualizer.add_hit(target_hit)
             
-                game_state.update_score(new_score, target_hit, beat_float)
+                game_state.score_manager.update_score(new_score, beat_float)
             
             # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
@@ -421,7 +404,7 @@ async def run_game() -> None:
             hit_trail_visualizer.sync_with_game_state(game_state, led_position)
             
             if not IS_RASPBERRY_PI:
-                flash_intensity: float = game_state.get_score_flash_intensity(beat_float)
+                flash_intensity: float = game_state.score_manager.get_score_flash_intensity(beat_float)
                 display.draw_score_lines(
                     score=game_state.score_manager.score,
                     current_time=current_time_ms,
