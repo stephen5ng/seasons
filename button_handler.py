@@ -19,7 +19,8 @@ class ButtonHandler:
     GREEN_TARGET_PERCENT = 0.25   # 3 o'clock
     BLUE_TARGET_PERCENT = 0.5     # 6 o'clock
     YELLOW_TARGET_PERCENT = 0.75  # 9 o'clock
-    
+    INTERESTING_KEYS = [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y,
+                        pygame.K_UP, pygame.K_DOWN, pygame.K_RIGHT, pygame.K_LEFT]
     def __init__(self, error_sound: pygame.mixer.Sound,
                 number_of_leds: int = 80, target_window_size: int = 4,
                 auto_score: bool = False) -> None:
@@ -66,7 +67,7 @@ class ButtonHandler:
         """
         return self.get_target_type(led_position) is not None
     
-    def apply_penalty(self, score: float) -> float:
+    def missed_target(self) -> bool:
         """Apply penalty if button wasn't pressed in valid window.
         
         Args:
@@ -75,10 +76,10 @@ class ButtonHandler:
         Returns:
             Updated score after penalty
         """
-        if not any(self.button_states.values()) and not self.penalty_applied:
-            score = ButtonHandler.calculate_penalty_score(score)
+        if not self.button_states[self.last_target_type] and not self.penalty_applied:
             self.penalty_applied = True
-        return score
+            return self.last_target_type
+        return None
     
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position.
@@ -114,102 +115,44 @@ class ButtonHandler:
             self.last_target_type = target_type
         return target_type
 
-    def handle_keypress(self, led_position: int, current_time: int) -> Tuple[Optional[bool], Optional[TargetType]]:
+    def handle_keypress(self, led_position: int) -> Tuple[Optional[bool], Optional[TargetType]]:
         """Handle keypress and update score if in valid window with correct key.
         
         Args:
             led_position: Current LED position
-            current_time: Current time in milliseconds
             
         Returns:
             Tuple of (successful_hit, target_hit) where:
-            - successful_hit: True if correct key was pressed, False if wrong key, None if no key
+            - successful_hit: True if correct key was pressed, False otherwise
             - target_hit: The target type that was hit, or None if no target
         """
-        # TODO(sng): handle multiple keys/buttons pressed at once
-
-        # Get the current keyboard state
-        keys_pressed: Dict[int, bool] = pygame.key.get_pressed()
-        
         target_type: Optional[TargetType] = self.get_target_type(led_position)        
-        if not target_type:
-            return None, None
+        
+        all_pressed_keys = pygame.key.get_pressed()
+        keys_pressed = []
+        for key in ButtonHandler.INTERESTING_KEYS:
+            if all_pressed_keys[key]:
+                keys_pressed.append(key)
+        
+        target_keys = ButtonHandler.get_keys_for_target(target_type)
+        # print(f"target_keys: {target_keys}")
+        good_key_pressed = False
+        for key_pressed in keys_pressed:
+            print(key_pressed)
+            if key_pressed in target_keys:
+                if not self.button_states[target_type]:
+                    self.button_states[target_type] = True
+                    self.penalty_applied = False
+                    good_key_pressed = True
+                    # print(f"good key: {key_pressed}")
+            else:
+                # print(f"wrong key: {key_pressed}")
+                # print(f"looking for: {target_keys} for target: {target_type}")
+                self.error_sound.play()
 
-        # Check for key presses outside their windows
-        error_result = self._check_for_out_of_window_presses(keys_pressed, led_position)
-        if error_result:
-            return error_result
-
-        # Check for wrong key presses in this window
-        error_result = self._check_for_wrong_key_in_window(keys_pressed, target_type, led_position)
-        if error_result:
-            return error_result
-
-        # Check for correct key press
-        keys = ButtonHandler.get_keys_for_target(target_type)
-        if (any(keys_pressed[key] for key in keys) or self.auto_score) and not self.button_states[target_type]:
-            self.button_states[target_type] = True
-            self.penalty_applied = False
+        if good_key_pressed:
             return True, target_type
-
-        return None, target_type
-
-    
-    def _check_for_out_of_window_presses(self, keys_pressed: Dict[int, bool], led_position: int) -> Optional[Tuple[bool, TargetType]]:
-        """Check for key presses outside their target windows.
-        
-        Args:
-            keys_pressed: Dictionary of key states
-            led_position: Current LED position
-            
-        Returns:
-            Error result tuple if an out-of-window press is detected, None otherwise.
-            The tuple contains (False, target_type)
-        """
-        for target_type in TargetType:
-            keys = ButtonHandler.get_keys_for_target(target_type)
-            if any(keys_pressed[key] for key in keys):
-                window_pos = self.get_window_position_for_target(target_type)
-                
-                # If we're not in this key's window, show error and apply penalty
-                if abs(led_position - window_pos) > self.target_window_size:
-                    return self._create_error_feedback(target_type)
-        return None
-
-    def _check_for_wrong_key_in_window(self, keys_pressed: Dict[int, bool], correct_target: TargetType, 
-                                     led_position: int) -> Optional[Tuple[bool, TargetType]]:
-        """Check for wrong key presses in a target window.
-        
-        Args:
-            keys_pressed: Dictionary of key states
-            correct_target: The correct target type for this window
-            led_position: Current LED position
-            
-        Returns:
-            Error result tuple if a wrong key press is detected, None otherwise.
-            The tuple contains (False, target_type)
-        """
-        for wrong_target in TargetType:
-            if wrong_target != correct_target:
-                wrong_keys = ButtonHandler.get_keys_for_target(wrong_target)
-                
-                if any(keys_pressed[key] for key in wrong_keys):
-                    error_pos = self.get_window_position_for_target(wrong_target)
-                    return self._create_error_feedback(wrong_target)
-        return None
-
-    def _create_error_feedback(self, target_type: TargetType) -> Tuple[bool, TargetType]:
-        """Create error feedback for incorrect key presses.
-        
-        Args:
-            target_type: The target type that was incorrectly pressed
-            error_pos: The position where the error occurred
-            
-        Returns:
-            Tuple containing (False, target_type)
-        """
-        self.error_sound.play()
-        return False, target_type
+        return None, None
     
     def get_window_position_for_target(self, target_type: TargetType) -> int:
         """Get the center position of a target window.
@@ -239,12 +182,7 @@ class ButtonHandler:
         Returns:
             Score after penalty
         """
-        # Calculate score after 25% reduction
-        reduced_score: float = score * 0.75
-        # Make sure it's at least 0.25 less than original score
-        reduced_score = min(reduced_score, score - 0.25)
-        # Round to nearest 0.25 and ensure score doesn't go below 0
-        return max(0, round(reduced_score * 4) / 4)
+        return max(0, score - 0.25)
     
     @staticmethod
     def get_target_type_for_position(position: int, led_count: int, window_size: int,
@@ -292,9 +230,12 @@ class ButtonHandler:
         """
         if target_type == TargetType.RED:
             return [pygame.K_r, pygame.K_UP]
-        elif target_type == TargetType.BLUE:
+        if target_type == TargetType.BLUE:
             return [pygame.K_b, pygame.K_DOWN]
-        elif target_type == TargetType.GREEN:
+        if target_type == TargetType.GREEN:
             return [pygame.K_g, pygame.K_RIGHT]
-        else:  # YELLOW
+        if target_type == TargetType.YELLOW:
             return [pygame.K_y, pygame.K_LEFT]
+        
+        return []
+        

@@ -83,7 +83,6 @@ IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith
 if IS_RASPBERRY_PI:
     from rpi_ws281x import PixelStrip, Color as LEDColor
 # LED strip configuration:
-LED_COUNT = number_of_leds  # Number of LED pixels
 LED_PIN = 18  # GPIO pin connected to the pixels (must support PWM)
 LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
 LED_DMA = 10  # DMA channel to use for generating signal
@@ -343,7 +342,7 @@ async def run_game() -> None:
 
         last_beat = -1
         target_hit: Optional[TargetType] = None
-        ending_measure = 3 if args.one_loop else 37
+        ending_phrase = 1 if args.one_loop else 18
         phrase = 0
         beat_score_offset = 0
         while True:
@@ -361,8 +360,8 @@ async def run_game() -> None:
                 beat_score_offset = 0
                 last_beat = beat
                 if beat % BEATS_PER_PHRASE == 0:
-                    print(f"beat_in_phrase: {beat_in_phrase}, measure: {measure}, beat: {beat}")
-                if measure >= ending_measure:
+                    print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}, measure: {measure}, beat: {beat}")
+                if phrase >= ending_phrase:
                     return
             game_state.handle_music_loop(beat_in_phrase)
  
@@ -377,24 +376,26 @@ async def run_game() -> None:
             led_position: int = game_state.calculate_led_position(beat_in_phrase, fractional_beat)
             
             if not game_state.button_handler.is_in_valid_window(led_position):
-                new_score: float = game_state.button_handler.apply_penalty(game_state.score_manager.score)
-                if new_score != game_state.score_manager.score:
+                missed_target = game_state.button_handler.missed_target()
+                if missed_target:
+                    new_score = max(0, game_state.score_manager.score - 0.25)
                     print(f"PENALTY New score: {new_score}, target hit: {target_hit}")
+
                     # TODO: remove second argument after refactoring normal trail.
                     game_state.update_score(new_score, None, beat_float)
-                    hit_trail_visualizer.remove_hit(game_state.button_handler.last_target_type)
+                    hit_trail_visualizer.remove_hit(missed_target)
             
             game_state.reset_flags(led_position)
             
             successful_hit, target_hit = game_state.button_handler.handle_keypress(
-                led_position, current_time_ms)
+                led_position)
+            # print(f"successful_hit: {successful_hit}, target_hit: {target_hit}")
 
             if successful_hit is not None and target_hit is not None:
                 new_score = game_state.score_manager.score + 0.25 if successful_hit else 0
                 new_led_position = led_position
                 if led_position > number_of_leds / 2:
                     new_led_position = led_position - number_of_leds
-                print(f"new_led_position: {new_led_position}, window_position: {game_state.button_handler.get_window_position_for_target(target_hit)}")
                 if new_led_position < game_state.button_handler.get_window_position_for_target(target_hit):
                     beat_score_offset = -0.25
                     print(f"beat_score_offset: {beat_score_offset}")
