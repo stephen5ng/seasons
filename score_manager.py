@@ -24,7 +24,6 @@ class ScoreManager:
             initial_score: Starting score value
         """
         self.score: float = initial_score
-        self.previous_score: float = 0.0
         self.score_flash_start_beat: Optional[float] = None
         self.hit_spacing: int = INITIAL_HIT_SPACING
         self.hit_trail_cleared: bool = False
@@ -41,7 +40,6 @@ class ScoreManager:
         if new_score > self.score:
             self._handle_score_increase(target_type, beat_float)
                         
-        self.previous_score = self.score
         self.score = new_score
     
     def _handle_score_increase(self, target_type: TargetType, beat_float: float) -> None:
@@ -95,19 +93,3 @@ class ScoreManager:
             Modified color for score lines
         """
         return ScoreEffects.get_score_line_color(base_color, flash_intensity, flash_type)
-    
-    @staticmethod
-    def calculate_trail_positions(led_position: int, hit_colors: List[Color], 
-                                 hit_spacing: int, led_count: int) -> Dict[int, Color]:
-        """Calculate positions and colors for the hit trail.
-        
-        Args:
-            led_position: Current LED position
-            hit_colors: List of colors for the hit trail
-            hit_spacing: Spacing between hit trail elements
-            led_count: Total number of LEDs
-            
-        Returns:
-            Dictionary mapping positions to colors
-        """
-        return HitTrail.calculate_trail_positions(led_position, hit_colors, hit_spacing, led_count)

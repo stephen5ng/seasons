@@ -131,11 +131,6 @@ class GameState:
         return self.score_manager.score
         
     @property
-    def previous_score(self) -> float:
-        """Get the previous score."""
-        return self.score_manager.previous_score
-        
-    @property
     def hit_colors(self) -> List[Color]:
         """Get the hit colors list."""
         return self.score_manager.hit_colors
