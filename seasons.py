@@ -337,22 +337,21 @@ async def run_game() -> None:
             beat_in_phrase, beat_float, fractional_beat = await game_state.update_timing()
             phrase = max(0, int(game_state.score_manager.score - 0.25 + beat_score_offset))
             # print(f"beat: {beat}, beat_in_measure: {beat_in_measure}, beat_float: {beat_float}, fractional_beat: {fractional_beat}")
-            measure = 1 + (beat_float / BEATS_PER_MEASURE)
 
             if last_beat != int(beat_float):
                 beat_score_offset = 0
                 last_beat = int(beat_float)
                 if int(beat_float) % BEATS_PER_PHRASE == 0:
-                    print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}, measure: {measure}")
+                    print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}")
                 if phrase >= ending_phrase:
                     return
             game_state.handle_music_loop(beat_in_phrase)
  
-            # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}, measure: {measure}")
+            # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}")
             if not IS_RASPBERRY_PI:
                 score_based_measure = 1+phrase*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + (beat_in_phrase + fractional_beat)/BEATS_PER_MEASURE
                 draw_fifth_lines(display, score_based_measure)
-                # print(f"phrase: {phrase}, measure: {measure}, beat_in_phrase: {beat_in_phrase}, fractional_beat: {fractional_beat}, score: {game_state.score_manager.score + beat_score_offset}, score_based_measure: {score_based_measure}")
+                # print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}, fractional_beat: {fractional_beat}, score: {game_state.score_manager.score + beat_score_offset}, score_based_measure: {score_based_measure}")
     
             current_time_ms: int = pygame.time.get_ticks()
             
@@ -388,7 +387,6 @@ async def run_game() -> None:
             
                 game_state.score_manager.update_score(new_score, beat_float)
             
-            # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
