@@ -75,7 +75,7 @@ else:
 number_of_leds = args.leds
 
 # Calculate target_window_size based on the number of LEDs
-target_window_size = number_of_leds // 20
+target_window_size = number_of_leds // 18
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")

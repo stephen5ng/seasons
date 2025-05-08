@@ -68,13 +68,21 @@ class DisplayManager:
         else:
             self.pygame_surface.fill((0, 0, 0))
     
-    # Original-style methods for backward compatibility
+    def _convert_to_led_color(self, color: Color) -> Optional[Any]:
+        """Convert Pygame color to WS281x color.
+        
+        Args:
+            color: Pygame Color object
+            
+        Returns:
+            WS281x Color object or None if not on Raspberry Pi
+        """
+        return LEDColor(color.r, color.g, color.b) if LEDColor else None
+
     def set_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in target ring."""
         if IS_RASPBERRY_PI:
-            # Convert Pygame color to WS281x color (RGB order)
-            ws_color = LEDColor(color.r, color.g, color.b) if LEDColor else None
-            self.strip.setPixelColor(pos, ws_color)
+            self.strip.setPixelColor(pos, self._convert_to_led_color(color))
         else:
             # Avoid circular import
             import game_constants
@@ -90,10 +98,9 @@ class DisplayManager:
         if IS_RASPBERRY_PI:
             led_pos = pos % self.led_count
             led_pos += self.led_count
-            print(f"setting target {pos}")
-            ws_color: Optional[Any] = LEDColor(color.r, color.g, color.b)
-            self.strip.setPixelColor(led_pos, ws_color)
-        else:            # Avoid circular import
+            self.strip.setPixelColor(led_pos, self._convert_to_led_color(color))
+        else:
+            # Avoid circular import
             import game_constants
             x, y = self._get_ring_position(pos, 
                                          self.screen_width // 2, 
@@ -155,35 +162,17 @@ class DisplayManager:
             score_line_spacing: Spacing between score lines
             get_rainbow_color_func: Function to get rainbow color based on time and index
             get_score_line_color_func: Function to get score line color during flash
-        """
+        """        
         if not self.pygame_surface:
             return
             
         num_lines: int = int(score * 2)
-        current_line: int = num_lines  # Default to all lines unlit
-        
-        if flash_intensity > 0:
-            # Calculate which line should be lit based on time since flash started
-            time_since_flash: float = score_flash_duration_ms * (1 - flash_intensity)
-            current_line = int(time_since_flash / score_line_animation_time_ms)
-            # Ensure we start from the top (line 0) and move downward
-            current_line = min(current_line, num_lines - 1)
         
         for i in range(num_lines):
             y: int = self.screen_height - 1 - ((num_lines - 1 - i) * (score_line_height + score_line_spacing))
-            if y >= 0:  # Only draw if we haven't gone off the top of the screen
-                # Only use rainbow effect when not flashing
-                base_color: Color
-                line_color: Color
-                if flash_intensity > 0 and i <= current_line:
-                    # During flash animation, use base color for flash effect
-                    base_color = score_line_color
-                    line_color = get_score_line_color_func(base_color, flash_intensity, flash_type)
-                elif flash_intensity == 0:
-                    # When not flashing, use rainbow effect for high scores
-                    base_color = get_rainbow_color_func(current_time, i) if score > high_score_threshold else score_line_color
-                    line_color = base_color
-                    
+            if y >= 0:  # Only draw if we haven't gone off the top of the screen  
+                base_color = score_line_color
+                line_color = get_score_line_color_func(base_color, flash_intensity, flash_type)
                 pygame.draw.line(self.pygame_surface, line_color, (0, y), (10, y))
     
     @staticmethod

@@ -22,8 +22,8 @@ class ButtonHandler:
     INTERESTING_KEYS = [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y,
                         pygame.K_UP, pygame.K_DOWN, pygame.K_RIGHT, pygame.K_LEFT]
     def __init__(self, error_sound: pygame.mixer.Sound,
-                number_of_leds: int = 80, target_window_size: int = 4,
-                auto_score: bool = False) -> None:
+                number_of_leds: int, target_window_size: int,
+                auto_score: bool) -> None:
         """Initialize the button handler.
         
         Args:
@@ -106,10 +106,7 @@ class ButtonHandler:
         target_type = ButtonHandler.get_target_type_for_position(
             position,
             self.number_of_leds,
-            self.target_window_size,
-            self.blue_target_pos,
-            self.green_target_pos,
-            self.yellow_target_pos
+            self.target_window_size
         )
         if target_type:
             self.last_target_type = target_type
@@ -135,6 +132,8 @@ class ButtonHandler:
                 keys_pressed.append(key)
         
         target_keys = ButtonHandler.get_keys_for_target(target_type)
+        if target_type and self.auto_score:
+            keys_pressed = [target_keys[0]]
         # print(f"target_keys: {target_keys}")
         good_key_pressed = False
         for key_pressed in keys_pressed:
@@ -185,17 +184,13 @@ class ButtonHandler:
         return max(0, score - 0.25)
     
     @staticmethod
-    def get_target_type_for_position(position: int, led_count: int, window_size: int,
-                                    mid_pos: float, right_pos: float, left_pos: float) -> Optional[TargetType]:
+    def get_target_type_for_position(position: int, led_count: int, window_size: int) -> Optional[TargetType]:
         """Determine which target window the position is in, if any.
         
         Args:
             position: LED position to check
             led_count: Total number of LEDs
             window_size: Size of the target window
-            mid_pos: Middle target position
-            right_pos: Right target position
-            left_pos: Left target position
             
         Returns:
             TargetType if position is in a target window, None otherwise
