@@ -139,17 +139,17 @@ class GameState:
         if is_in_window and not was_in_window:
             print(f"Entered scoring window at position {led_position}")
 
-    async def update_timing(self) -> Tuple[int, int, float, float]:
+    async def update_timing(self) -> Tuple[int, float, float]:
         """Calculate current timing values."""
         current_time_ms: int = pygame.time.get_ticks()
-        beat, beat_in_phrase, beat_float, fractional_beat = MusicTiming.calculate_beat_timing(
+        beat_in_phrase, beat_float, fractional_beat = MusicTiming.calculate_beat_timing(
             current_time_ms, self.start_ticks_ms
         )
 
         # Update total beats when we cross a beat boundary
-        if beat > self.last_beat:
+        if int(beat_float) > self.last_beat:
             self.total_beats += 1
-            self.last_beat = beat
+            self.last_beat = int(beat_float)
             # print(f"Total beats in song: {self.total_beats}")
             
             if not args.disable_wled:
@@ -159,7 +159,7 @@ class GameState:
         if beat_in_phrase == 0:
             self.beat_start_time_ms = pygame.time.get_ticks()
         
-        return beat, beat_in_phrase, beat_float, fractional_beat
+        return beat_in_phrase, beat_float, fractional_beat
     
     def handle_music_loop(self, beat_in_phrase: int) -> None:
         """Handle music looping and position updates."""
@@ -334,23 +334,23 @@ async def run_game() -> None:
             beat_in_phrase: int
             beat_float: float
             fractional_beat: float
-            beat, beat_in_phrase, beat_float, fractional_beat = await game_state.update_timing()
+            beat_in_phrase, beat_float, fractional_beat = await game_state.update_timing()
             phrase = max(0, int(game_state.score_manager.score - 0.25 + beat_score_offset))
             # print(f"beat: {beat}, beat_in_measure: {beat_in_measure}, beat_float: {beat_float}, fractional_beat: {fractional_beat}")
-            measure = 1 + (beat_float / 4)
+            measure = 1 + (beat_float / BEATS_PER_MEASURE)
 
-            if last_beat != beat:
+            if last_beat != int(beat_float):
                 beat_score_offset = 0
-                last_beat = beat
-                if beat % BEATS_PER_PHRASE == 0:
-                    print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}, measure: {measure}, beat: {beat}")
+                last_beat = int(beat_float)
+                if int(beat_float) % BEATS_PER_PHRASE == 0:
+                    print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}, measure: {measure}")
                 if phrase >= ending_phrase:
                     return
             game_state.handle_music_loop(beat_in_phrase)
  
             # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}, measure: {measure}")
             if not IS_RASPBERRY_PI:
-                score_based_measure = 1+phrase*2 + (beat_in_phrase + fractional_beat)/BEATS_PER_MEASURE
+                score_based_measure = 1+phrase*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + (beat_in_phrase + fractional_beat)/BEATS_PER_MEASURE
                 draw_fifth_lines(display, score_based_measure)
                 # print(f"phrase: {phrase}, measure: {measure}, beat_in_phrase: {beat_in_phrase}, fractional_beat: {fractional_beat}, score: {game_state.score_manager.score + beat_score_offset}, score_based_measure: {score_based_measure}")
     

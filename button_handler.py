@@ -138,7 +138,7 @@ class ButtonHandler:
         # print(f"target_keys: {target_keys}")
         good_key_pressed = False
         for key_pressed in keys_pressed:
-            print(key_pressed)
+            # print(key_pressed)
             if key_pressed in target_keys:
                 if not self.button_states[target_type]:
                     self.button_states[target_type] = True

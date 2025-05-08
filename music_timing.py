@@ -21,11 +21,10 @@ class MusicTiming:
         """
         duration_ms: int = current_time_ms - start_time_ms
         beat_float: float = duration_ms * BEAT_PER_MS
-        beat: int = int(beat_float)
-        beat_in_phrase: int = beat % BEATS_PER_PHRASE
+        beat_in_phrase: int = int(beat_float) % BEATS_PER_PHRASE
         fractional_beat: float = beat_float % 1
         
-        return beat, beat_in_phrase, beat_float, fractional_beat
+        return beat_in_phrase, beat_float, fractional_beat
     
     @staticmethod
     def should_sync_music(current_pos_s: float, target_pos_s: float, threshold: float = 0.2) -> bool:
