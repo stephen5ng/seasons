@@ -36,10 +36,8 @@ def parse_args():
                       help='Number of LEDs in the strip (default: 80)')
     
     # Display mode options
-    display_group = parser.add_argument_group('Display options')
-    display_group.add_argument('--hit-trail-strategy', type=str, choices=['normal', 'simple'], default='normal',
-                      help='Strategy for hit trail visualization (normal=traditional trail, simple=single LED fade)')
-    
+    display_group = parser.add_argument_group('Display options')    
+
     # Debug options
     debug_group = parser.add_argument_group('Debug options')
     debug_group.add_argument('--score', type=float, default=0.0,
@@ -84,14 +82,14 @@ IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith
 
 if IS_RASPBERRY_PI:
     from rpi_ws281x import PixelStrip, Color as LEDColor
-    # LED strip configuration:
-    LED_COUNT = number_of_leds  # Number of LED pixels
-    LED_PIN = 18  # GPIO pin connected to the pixels (must support PWM)
-    LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
-    LED_DMA = 10  # DMA channel to use for generating signal
-    LED_BRIGHTNESS = 255  # Set to 0 for darkest and 255 for brightest
-    LED_INVERT = False  # True to invert the signal (when using NPN transistor level shift)
-    LED_CHANNEL = 0  # PWM channel
+# LED strip configuration:
+LED_COUNT = number_of_leds  # Number of LED pixels
+LED_PIN = 18  # GPIO pin connected to the pixels (must support PWM)
+LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+LED_DMA = 10  # DMA channel to use for generating signal
+LED_BRIGHTNESS = 255  # Set to 0 for darkest and 255 for brightest
+LED_INVERT = False  # True to invert the signal (when using NPN transistor level shift)
+LED_CHANNEL = 0  # PWM channel
 
 # Global state
 quit_app = False
@@ -156,7 +154,7 @@ class GameState:
     @property
     def last_hit_target(self) -> str:
         """Get the last hit target."""
-        return self.score_manager.last_hit_target
+        return None
         
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position."""
@@ -231,7 +229,7 @@ class GameState:
 
     def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
         """Update score and trigger flash effect if score increased."""
-        self.score_manager.update_score(new_score, target_type, beat_float, number_of_leds)
+        self.score_manager.update_score(new_score, target_type, beat_float)
     
     def get_score_flash_intensity(self, beat_float: float) -> float:
         """Calculate the intensity of the score flash effect based on musical beats."""
@@ -333,24 +331,19 @@ async def run_game() -> None:
         screen_height=SCREEN_HEIGHT,
         scaling_factor=SCALING_FACTOR,
         led_count=number_of_leds,
-        led_pin=18,  # Default GPIO pin
-        led_freq_hz=800000,  # Default frequency
-        led_dma=10,  # Default DMA channel
-        led_invert=False,  # Default invert setting
-        led_brightness=255,  # Default brightness
-        led_channel=0  # Default channel
+        led_pin=LED_PIN,  # Default GPIO pin
+        led_freq_hz=LED_FREQ_HZ,  # Default frequency
+        led_dma=LED_DMA,  # Default DMA channel
+        led_invert=LED_INVERT,  # Default invert setting
+        led_brightness=LED_BRIGHTNESS,  # Default brightness
+        led_channel=LED_CHANNEL  # Default channel
     )
     
-    # Initialize game state
     game_state: GameState = GameState()
-    # Initialize hit trail visualization based on strategy
     hit_trail_visualizer = TrailVisualizer.create_visualizer(
-        strategy=args.hit_trail_strategy,
         led_count=number_of_leds,
-        initial_score=args.score,
         auto_mode=args.auto_score,
-        speed=1,  # Speed is controlled by the game
-        hit_spacing=INITIAL_HIT_SPACING
+        speed=1
     )
     
     hit_trail_visualizer.display = display
@@ -360,9 +353,7 @@ async def run_game() -> None:
         game_state.score_manager.score = args.score
         hit_trail_visualizer.score = args.score  # Let each visualizer handle the score
     
-    # Debug setup for different display modes
     logger.info("Showing main trail")
-    logger.info(f"Showing hit trail using {args.hit_trail_strategy} strategy")
         
     # Set up hit colors based on score (simulate multiple hits)
     hit_trail_visualizer.score = game_state.score  # Let the visualizer handle color mapping

@@ -75,21 +75,14 @@ class TrailVisualizer:
             game_state: The current game state
             led_position: Current LED position
         """
-        # Update position
-        self.current_position = led_position
-        
-        # Draw hit trail
+        self.current_position = led_position        
         self.draw_hit_trail()
     
     @classmethod
     def create_visualizer(cls, 
-                         strategy: str,
                          led_count: int,
-                         initial_score: float = 0.0,
-                         auto_mode: bool = False,
-                         speed: int = 1,
-                         hit_spacing: int = game_constants.INITIAL_HIT_SPACING,
-                         fade_duration_ms: int = 500) -> 'TrailVisualizer':
+                         auto_mode: bool,
+                         speed: int) -> 'TrailVisualizer':
         """Create a trail visualizer based on the specified strategy.
         
         Args:
@@ -104,20 +97,11 @@ class TrailVisualizer:
         Returns:
             A TrailVisualizer instance configured with the specified strategy
         """
-        if strategy == 'simple':
-            return SimpleTrailVisualizer(
-                led_count=led_count,
-                auto_mode=auto_mode,
-                speed=speed
-            )
-        else:
-            return HitTrailVisualizer(
-                led_count=led_count,
-                initial_score=initial_score,
-                auto_mode=auto_mode,
-                speed=speed,
-                hit_spacing=hit_spacing
-            )
+        return SimpleTrailVisualizer(
+            led_count=led_count,
+            auto_mode=auto_mode,
+            speed=speed
+        )
     
     def _handle_keydown(self, key: int) -> None:
         """Handle keydown events.
@@ -187,144 +171,6 @@ class TrailVisualizer:
             List of colors in the hit trail
         """
         return []
-
-
-class HitTrailVisualizer(TrailVisualizer):
-    """Specialized visualizer for hit trails."""
-    
-    def __init__(self, 
-                 led_count: int = 80, 
-                 initial_score: float = 0.0,
-                 auto_mode: bool = False, 
-                 speed: int = 1,
-                 hit_spacing: int = game_constants.INITIAL_HIT_SPACING) -> None:
-        """Initialize the hit trail visualizer.
-        
-        Args:
-            led_count: Number of LEDs in the strip
-            initial_score: Starting score value
-            auto_mode: When True, automatically adds hits on a timer
-            speed: Speed of LED movement (1-10)
-            hit_spacing: Initial spacing between hit trail elements
-        """
-        super().__init__(led_count)
-        
-        # Manage hit trail state directly
-        self.score = initial_score
-        self._hit_colors: List[Color] = []
-        self.hit_spacing = hit_spacing
-        self.hit_trail_cleared = False
-        
-        # Hit trail specific settings
-        self.auto_mode = auto_mode
-        self.auto_timer = 0
-        self.speed = max(1, min(10, speed))  # Clamp between 1 and 10
-        self.target_types = [
-            game_constants.TargetType.RED,
-            game_constants.TargetType.GREEN,
-            game_constants.TargetType.BLUE,
-            game_constants.TargetType.YELLOW
-        ]
-        self.next_target = 0
-        
-        # Initialize hit trail colors based on starting score
-        self._init_hit_trail_colors(initial_score)
-    
-    @property
-    def hit_colors(self) -> List[Color]:
-        """Get the current hit colors.
-        
-        Returns:
-            List of colors in the hit trail
-        """
-        return self._hit_colors
-    
-    @hit_colors.setter
-    def hit_colors(self, value: List[Color]) -> None:
-        """Set the current hit colors.
-        
-        Args:
-            value: List of colors to set for the hit trail
-        """
-        self._hit_colors = value
-    
-    def _init_hit_trail_colors(self, initial_score: float) -> None:
-        """Initialize hit trail colors based on the starting score.
-        
-        Args:
-            initial_score: Starting score value
-        """
-        hit_colors_count = int(initial_score * 4)  # 4 colors per score point
-        for i in range(min(hit_colors_count, 40)):  # Max 40 colors
-            if i % 4 == 0:
-                self._hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.RED])
-            elif i % 4 == 1:
-                self._hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.GREEN])
-            elif i % 4 == 2:
-                self._hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.BLUE])
-            else:
-                self._hit_colors.append(game_constants.TARGET_COLORS[game_constants.TargetType.YELLOW])
-                
-        print(f"Created hit trail with {len(self._hit_colors)} colors")
-    
-    def sync_with_game_state(self, game_state: 'GameState', led_position: int) -> None:
-        """Synchronize the visualizer's state with the game state.
-        
-        Args:
-            game_state: The current game state
-            led_position: Current LED position
-        """
-        # Update position
-        self.current_position = led_position
-        
-        # Sync hit colors and spacing with game state
-        if self._hit_colors != game_state.hit_colors:
-            self._hit_colors = game_state.hit_colors.copy()
-            self.hit_spacing = game_state.hit_spacing
-        
-        # Draw hit trail
-        self.draw_hit_trail()
-    
-    def add_hit(self, target_type: game_constants.TargetType) -> None:
-        """Add a hit of the specified target type to the hit trail.
-        
-        Args:
-            target_type: Type of target to add
-        """
-        # Update score (0.25 points per hit)
-        self.score += 0.25
-     
-        # Add hit color to beginning of trail
-        self._hit_colors = HitTrail.add_hit_color(
-            self._hit_colors, 
-            game_constants.TARGET_COLORS[target_type]
-        )
-        
-        # Limit trail length based on score
-        max_trail_length = int(self.score * 4)
-        self._hit_colors = HitTrail.limit_trail_length(self._hit_colors, max_trail_length)
-        
-        print(f"Added {target_type.name} hit, score: {self.score}, "
-              f"trail length: {len(self._hit_colors)}")
-    
-    def clear_hit_trail(self) -> None:
-        """Clear the hit trail."""
-        self._hit_colors = []
-        self.hit_spacing = game_constants.INITIAL_HIT_SPACING
-        self.hit_trail_cleared = True
-        print("Hit trail cleared manually")
-    
-    def draw_hit_trail(self) -> None:
-        """Draw the hit trail on the display."""
-        trail_positions = HitTrail.calculate_trail_positions(
-            self.current_position, 
-            self._hit_colors,
-            self.hit_spacing, 
-            self.led_count
-        )
-        for pos, color in trail_positions.items():
-            self.display.set_hit_trail_pixel(pos, color)
-
 
 class SimpleTrailVisualizer(TrailVisualizer):
     """Visualizer using the SimpleHitTrail strategy."""

@@ -26,46 +26,33 @@ class ScoreManager:
         self.score: float = initial_score
         self.previous_score: float = 0.0
         self.score_flash_start_beat: Optional[float] = None
-        self.last_hit_target: str = "none"
-        self.hit_colors: List[Color] = []
         self.hit_spacing: int = INITIAL_HIT_SPACING
         self.hit_trail_cleared: bool = False
     
-    def update_score(self, new_score: float, target_type: str, beat_float: float, led_count: int) -> None:
+    def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
         """Update score and trigger flash effect if score increased.
         
         Args:
             new_score: New score value
             target_type: Type of target hit (e.g., "red", "blue", "none")
             beat_float: Current beat position as a float
-            led_count: Total number of LEDs
         """
         # print(f"new_score: {new_score}, self.score: {self.score}")
         if new_score > self.score:
-            self._handle_score_increase(new_score, target_type, beat_float, led_count)
-        
-        # Always update trail length based on new score
-        max_trail_length: int = int(new_score * 4)
-        self.hit_colors = HitTrail.limit_trail_length(self.hit_colors, max_trail_length)
-                
+            self._handle_score_increase(target_type, beat_float)
+                        
         self.previous_score = self.score
         self.score = new_score
     
-    def _handle_score_increase(self, new_score: float, target_type: TargetType, beat_float: float, led_count: int) -> None:
+    def _handle_score_increase(self, target_type: TargetType, beat_float: float) -> None:
         """Handle logic when score increases.
         
         Args:
-            new_score: New score value
             target_type: Type of target hit
             beat_float: Current beat position
-            led_count: Total number of LEDs
         """
         self.score_flash_start_beat = beat_float
-        self.last_hit_target = target_type
-
-        # Add hit color to beginning of trail
-        self.hit_colors = HitTrail.add_hit_color(self.hit_colors, TARGET_COLORS[target_type])
-        # print(f"Hit colors: {len(self.hit_colors)}")
+        # self.last_hit_target = target_type
     
     def get_score_flash_intensity(self, beat_float: float) -> float:
         """Calculate the intensity of the score flash effect based on musical beats.
