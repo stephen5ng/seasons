@@ -166,13 +166,13 @@ class GameState:
         
         return beat, beat_in_phrase, beat_float, fractional_beat
     
-    def handle_music_loop(self, beat_in_measure: int) -> None:
+    def handle_music_loop(self, beat_in_phrase: int) -> None:
         """Handle music looping and position updates."""
-        if beat_in_measure == self.last_beat_in_measure:
+        if beat_in_phrase == self.last_beat_in_measure:
             return
-        self.last_beat_in_measure = beat_in_measure
+        self.last_beat_in_measure = beat_in_phrase
         
-        if beat_in_measure != 0:
+        if beat_in_phrase != 0:
             return
             
         self.beat_start_time_ms = pygame.time.get_ticks()
@@ -200,9 +200,9 @@ class GameState:
             
             self.audio_manager.play_music(start_pos_s=target_time_s)
 
-    def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
+    def update_score(self, new_score: float, beat_float: float) -> None:
         """Update score and trigger flash effect if score increased."""
-        self.score_manager.update_score(new_score, target_type, beat_float)
+        self.score_manager.update_score(new_score, beat_float)
     
     def get_score_flash_intensity(self, beat_float: float) -> float:
         """Calculate the intensity of the score flash effect based on musical beats."""
@@ -381,8 +381,7 @@ async def run_game() -> None:
                     new_score = max(0, game_state.score_manager.score - 0.25)
                     print(f"PENALTY New score: {new_score}, target hit: {target_hit}")
 
-                    # TODO: remove second argument after refactoring normal trail.
-                    game_state.update_score(new_score, None, beat_float)
+                    game_state.update_score(new_score, beat_float)
                     hit_trail_visualizer.remove_hit(missed_target)
             
             game_state.reset_flags(led_position)

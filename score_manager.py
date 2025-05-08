@@ -26,29 +26,26 @@ class ScoreManager:
         self.score: float = initial_score
         self.score_flash_start_beat: Optional[float] = None
     
-    def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
+    def update_score(self, new_score: float, beat_float: float) -> None:
         """Update score and trigger flash effect if score increased.
         
         Args:
             new_score: New score value
-            target_type: Type of target hit (e.g., "red", "blue", "none")
             beat_float: Current beat position as a float
         """
         # print(f"new_score: {new_score}, self.score: {self.score}")
         if new_score > self.score:
-            self._handle_score_increase(target_type, beat_float)
+            self._handle_score_increase(beat_float)
                         
         self.score = new_score
     
-    def _handle_score_increase(self, target_type: TargetType, beat_float: float) -> None:
+    def _handle_score_increase(self, beat_float: float) -> None:
         """Handle logic when score increases.
         
         Args:
-            target_type: Type of target hit
             beat_float: Current beat position
         """
         self.score_flash_start_beat = beat_float
-        # self.last_hit_target = target_type
     
     def get_score_flash_intensity(self, beat_float: float) -> float:
         """Calculate the intensity of the score flash effect based on musical beats.
