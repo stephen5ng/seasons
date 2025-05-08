@@ -126,18 +126,19 @@ class ButtonHandler:
             - successful_hit: True if correct key was pressed, False if wrong key, None if no key
             - target_hit: The target type that was hit, or None if no target
         """
+        # TODO(sng): handle multiple keys/buttons pressed at once
+
         # Get the current keyboard state
         keys_pressed: Dict[int, bool] = pygame.key.get_pressed()
         
         target_type: Optional[TargetType] = self.get_target_type(led_position)        
         if not target_type:
-            return None, target_type
+            return None, None
 
         # Check for key presses outside their windows
         error_result = self._check_for_out_of_window_presses(keys_pressed, led_position)
         if error_result:
             return error_result
-        
 
         # Check for wrong key presses in this window
         error_result = self._check_for_wrong_key_in_window(keys_pressed, target_type, led_position)

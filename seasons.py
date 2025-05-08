@@ -22,12 +22,9 @@ from score_manager import ScoreManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
 from trail_visualization import (
-    SimpleTrailVisualizer,
     TrailVisualizer
 )
 
-# Import remaining constants
-import game_constants
 from game_constants import *
 
 import logging
@@ -179,26 +176,24 @@ class GameState:
     async def update_timing(self) -> Tuple[int, int, float, float]:
         """Calculate current timing values."""
         current_time_ms: int = pygame.time.get_ticks()
-        beat, beat_in_measure, beat_float, fractional_beat = MusicTiming.calculate_beat_timing(
-            current_time_ms, self.start_ticks_ms, BEAT_PER_MS, BEATS_PER_MEASURE
+        beat, beat_in_phrase, beat_float, fractional_beat = MusicTiming.calculate_beat_timing(
+            current_time_ms, self.start_ticks_ms
         )
-        
+
         # Update total beats when we cross a beat boundary
-        if beat_float > self.last_beat:
+        if beat > self.last_beat:
             self.total_beats += 1
-            self.last_beat = int(beat_float)
+            self.last_beat = beat
             # print(f"Total beats in song: {self.total_beats}")
             
-            # Update WLED based on current measure and score
-            # Skip if WLED is disabled
             if not args.disable_wled:
-                wled_measure: int = self.total_beats // BEATS_PER_MEASURE
+                wled_measure: int = self.total_beats // BEATS_PER_PHRASE
                 await self.wled_manager.update_wled(wled_measure, self.score_manager.score)
             
-        if beat_in_measure == 0:
+        if beat_in_phrase == 0:
             self.beat_start_time_ms = pygame.time.get_ticks()
         
-        return beat, beat_in_measure, beat_float, fractional_beat
+        return beat, beat_in_phrase, beat_float, fractional_beat
     
     def handle_music_loop(self, beat_in_measure: int) -> None:
         """Handle music looping and position updates."""
@@ -211,17 +206,12 @@ class GameState:
             
         self.beat_start_time_ms = pygame.time.get_ticks()
         current_time_ms: int = pygame.time.get_ticks()
-        
-        # Skip music handling if in debug mode with a score set
-        if args.score > 0:
-            return
             
         # Calculate target music time
         target_time_s: float = self.audio_manager.get_target_music_time(
             self.score_manager.score,
             self.beat_start_time_ms,
-            current_time_ms,
-            SECONDS_PER_MEASURE_S
+            current_time_ms
         )
         
         # Get current music position for logging
@@ -229,7 +219,6 @@ class GameState:
         print(f"Current music position: {current_music_pos_s}, Score: {self.score_manager.score}")
         print(f"Target time: {target_time_s}")
 
-        # Check if we need to synchronize music
         if self.audio_manager.should_sync_music(current_music_pos_s, target_time_s):
             print(f"difference {abs(current_music_pos_s - target_time_s)}")
             
@@ -238,7 +227,6 @@ class GameState:
             self.total_beats = target_beats
             self.last_beat = target_beats - 1
             
-            # Play music from the target position
             self.audio_manager.play_music(start_pos_s=target_time_s)
 
     def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
@@ -249,9 +237,9 @@ class GameState:
         """Calculate the intensity of the score flash effect based on musical beats."""
         return self.score_manager.get_score_flash_intensity(beat_float)
 
-    def calculate_led_position(self, beat_in_measure: int, fractional_beat: float) -> int:
+    def calculate_led_position(self, beat_in_phrase: int, fractional_beat: float) -> int:
         """Calculate the current LED position based on beat timing."""
-        return LEDPosition.calculate_position(beat_in_measure, fractional_beat, BEATS_PER_MEASURE, number_of_leds)
+        return LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
     
     def update_loop_count(self, percent_of_measure: float) -> None:
         """Update the loop count based on measure progress."""
@@ -301,7 +289,7 @@ def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
     FIFTH_LINE_EASE = easing_functions.QuadEaseInOut(start=0.0, end=1.0, duration=1.0)
     
     fifth_color = Color(128, 128, 128)
-    CENTER_X = 96
+    CENTER_X = SCREEN_WIDTH // 2
     eased_percent_complete = FIFTH_LINE_EASE(min(percent_complete, 1.0))
     position_x = int(CENTER_X * eased_percent_complete)
     if percent_complete > 0.9:
@@ -323,9 +311,9 @@ def draw_fifth_lines(display: DisplayManager, measure: float) -> None:
     """
     TARGET_MEASURES = [9, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35]
     TARGET_BUFFER = 1
-    
     for target in TARGET_MEASURES:
         if measure > target - TARGET_BUFFER and measure <= target + TARGET_BUFFER/2:
+            # print(f"draw_fifth_lines measure: {measure}")
             percent_complete = (measure - (target - TARGET_BUFFER)) / TARGET_BUFFER
             draw_fifth_line(display, percent_complete)
             break
@@ -362,7 +350,7 @@ async def run_game() -> None:
         initial_score=args.score,
         auto_mode=args.auto_score,
         speed=1,  # Speed is controlled by the game
-        hit_spacing=game_constants.INITIAL_HIT_SPACING
+        hit_spacing=INITIAL_HIT_SPACING
     )
     
     hit_trail_visualizer.display = display
@@ -399,35 +387,38 @@ async def run_game() -> None:
         last_beat = -1
         target_hit: Optional[TargetType] = None
         ending_measure = 3 if args.one_loop else 37
+        phrase = 0
+        beat_score_offset = 0
         while True:
             display.clear()
-            # Update timing and music
-            beat_in_measure: int
+
+            beat_in_phrase: int
             beat_float: float
             fractional_beat: float
-            beat, beat_in_measure, beat_float, fractional_beat = await game_state.update_timing()
+            beat, beat_in_phrase, beat_float, fractional_beat = await game_state.update_timing()
+            phrase = max(0, int(game_state.score_manager.score - 0.25 + beat_score_offset))
+            # print(f"beat: {beat}, beat_in_measure: {beat_in_measure}, beat_float: {beat_float}, fractional_beat: {fractional_beat}")
             measure = 1 + (beat_float / 4)
-            # print(f"measure: {measure}, beat: {beat}")
+
             if last_beat != beat:
+                beat_score_offset = 0
                 last_beat = beat
-                if beat % 8 == 0:
-                    print(f"measure: {measure}, beat: {beat}")
-                # Quit if beat count exceeds 320
+                if beat % BEATS_PER_PHRASE == 0:
+                    print(f"beat_in_phrase: {beat_in_phrase}, measure: {measure}, beat: {beat}")
                 if measure >= ending_measure:
                     return
-            game_state.handle_music_loop(beat_in_measure)
+            game_state.handle_music_loop(beat_in_phrase)
  
-            # Handle input (only for quit)
+            # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}, measure: {measure}")
             if not IS_RASPBERRY_PI:
-                draw_fifth_lines(display, measure)
-
+                score_based_measure = 1+phrase*2 + (beat_in_phrase + fractional_beat)/BEATS_PER_MEASURE
+                draw_fifth_lines(display, score_based_measure)
+                # print(f"phrase: {phrase}, measure: {measure}, beat_in_phrase: {beat_in_phrase}, fractional_beat: {fractional_beat}, score: {game_state.score_manager.score + beat_score_offset}, score_based_measure: {score_based_measure}")
+    
             current_time_ms: int = pygame.time.get_ticks()
             
-            # Calculate LED position and update loop count
-            led_position: int = game_state.calculate_led_position(beat_in_measure, fractional_beat)
-            game_state.update_loop_count(led_position / number_of_leds)
+            led_position: int = game_state.calculate_led_position(beat_in_phrase, fractional_beat)
             
-            # Handle scoring and penalties
             if not game_state.button_handler.is_in_valid_window(led_position):
                 new_score: float = game_state.button_handler.apply_penalty(game_state.score_manager.score)
                 if new_score != game_state.score_manager.score:
@@ -436,24 +427,27 @@ async def run_game() -> None:
                     game_state.update_score(new_score, None, beat_float)
                     hit_trail_visualizer.remove_hit(game_state.button_handler.last_target_type)
             
-            # Always reset flags
             game_state.reset_flags(led_position)
             
-            # Check for scoring (both manual and auto)
             successful_hit, target_hit = game_state.button_handler.handle_keypress(
                 led_position, current_time_ms)
-                        
+
             if successful_hit is not None and target_hit is not None:
                 new_score = game_state.score_manager.score + 0.25 if successful_hit else 0
+                new_led_position = led_position
+                if led_position > number_of_leds / 2:
+                    new_led_position = led_position - number_of_leds
+                print(f"new_led_position: {new_led_position}, window_position: {game_state.button_handler.get_window_position_for_target(target_hit)}")
+                if new_led_position < game_state.button_handler.get_window_position_for_target(target_hit):
+                    beat_score_offset = -0.25
+                    print(f"beat_score_offset: {beat_score_offset}")
                 print(f"target_hit: {target_hit}")
                     
                 if new_score > game_state.score:
                     hit_trail_visualizer.add_hit(target_hit)
             
-                # Update score after hit trail check
                 game_state.update_score(new_score, target_hit, beat_float)
             
-            # Handle hit trail cleared state synchronization
             if game_state.hit_trail_cleared:
                 hit_trail_visualizer.hit_trail_cleared = True
             
@@ -470,10 +464,8 @@ async def run_game() -> None:
                 lambda pos, color: display.set_pixel(pos, color)
             )
                         
-            # Draw hit trail in outer circle using the selected strategy
             hit_trail_visualizer.sync_with_game_state(game_state, led_position)
             
-            # Draw score lines with flash effect (only in Pygame mode)
             if not IS_RASPBERRY_PI:
                 flash_intensity: float = game_state.get_score_flash_intensity(beat_float)
                 display.draw_score_lines(
@@ -498,13 +490,11 @@ async def run_game() -> None:
                 error_color = TARGET_COLORS[target_hit]
                 display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
 
-            # Handle input (only for quit)
             if not IS_RASPBERRY_PI:
                 for key, keydown in get_key():
                     if key == "quit":
                         return
                 
-            # Update display
             display.update()
             await clock.tick(60)
     finally:

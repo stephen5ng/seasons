@@ -4,6 +4,7 @@ import pygame
 from typing import Optional, Tuple, Dict, Any
 
 from music_timing import MusicTiming
+from game_constants import *
 
 
 class AudioManager:
@@ -104,21 +105,19 @@ class AudioManager:
         return self._should_sync_music(current_pos_s, target_pos_s)
         
     def get_target_music_time(self, score: float, beat_start_time_ms: int, 
-                             current_time_ms: int, seconds_per_measure_s: float) -> float:
+                             current_time_ms: int) -> float:
         """Calculate target music time based on score and timing.
         
         Args:
             score: Current game score
             beat_start_time_ms: Time when the current beat started
             current_time_ms: Current time in milliseconds
-            seconds_per_measure_s: Duration of one measure in seconds
             
         Returns:
             Target music time in seconds
         """
-        return MusicTiming.calculate_target_music_time(
-            score, beat_start_time_ms, current_time_ms, seconds_per_measure_s
-        )
+        measure_offset_s: float = (current_time_ms - beat_start_time_ms) / 1000.0
+        return int(score) * SECONDS_PER_MEASURE_S + measure_offset_s
         
     @staticmethod
     def calculate_target_beats(target_time_s: float, beat_per_ms: float) -> int:

@@ -33,7 +33,8 @@ HIT_TRAIL_RADIUS = CIRCLE_RADIUS - 4  # Radius for hit trail (inner circle)
 TARGET_TRAIL_RADIUS = CIRCLE_RADIUS + 4  # Radius for target trail (outer circle)
 
 # Game timing constants
-BEATS_PER_MEASURE = 8
+BEATS_PER_MEASURE = 4
+BEATS_PER_PHRASE = 8
 BEAT_PER_MS = 13.0 / 6000.0
 SECONDS_PER_MEASURE_S = 3.7
 
