@@ -25,8 +25,6 @@ class ScoreManager:
         """
         self.score: float = initial_score
         self.score_flash_start_beat: Optional[float] = None
-        self.hit_spacing: int = INITIAL_HIT_SPACING
-        self.hit_trail_cleared: bool = False
     
     def update_score(self, new_score: float, target_type: str, beat_float: float) -> None:
         """Update score and trigger flash effect if score increased.

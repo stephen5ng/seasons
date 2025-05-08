@@ -130,26 +130,6 @@ class GameState:
         """Get the current score."""
         return self.score_manager.score
         
-    @property
-    def hit_colors(self) -> List[Color]:
-        """Get the hit colors list."""
-        return self.score_manager.hit_colors
-        
-    @property
-    def hit_spacing(self) -> int:
-        """Get the current hit spacing."""
-        return self.score_manager.hit_spacing
-        
-    @property
-    def hit_trail_cleared(self) -> bool:
-        """Check if the hit trail has been cleared."""
-        return self.score_manager.hit_trail_cleared
-        
-    @property
-    def last_hit_target(self) -> str:
-        """Get the last hit target."""
-        return None
-        
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position."""
         # Track if we're in a scoring window
@@ -425,9 +405,6 @@ async def run_game() -> None:
             
                 game_state.update_score(new_score, target_hit, beat_float)
             
-            if game_state.hit_trail_cleared:
-                hit_trail_visualizer.hit_trail_cleared = True
-            
             # Update trail state when LED position changes
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
@@ -449,7 +426,7 @@ async def run_game() -> None:
                     score=game_state.score_manager.score,
                     current_time=current_time_ms,
                     flash_intensity=flash_intensity,
-                    flash_type=game_state.last_hit_target,
+                    flash_type=target_hit,
                     score_line_color=SCORE_LINE_COLOR,
                     high_score_threshold=HIGH_SCORE_THRESHOLD,
                     score_flash_duration_ms=SCORE_FLASH_DURATION_MS,
