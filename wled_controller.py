@@ -18,32 +18,17 @@ class WLEDController:
         self.current_http_task: Optional[asyncio.Task] = None
     
     @staticmethod
-    def build_command_url(ip_address: str, command: str, score_param: int) -> str:
+    def build_command_url(ip_address: str, command: str) -> str:
         """Build the full URL for a WLED command.
         
         Args:
             ip_address: IP address of the WLED device
             command: WLED command string (without base URL)
-            score_param: Score parameter to include in the command
             
         Returns:
             Complete URL for the WLED command
         """
-        return f"http://{ip_address}/win&{command}&S2={score_param}"
-    
-    @staticmethod
-    def calculate_score_param(score: float, base: int = 2, multiplier: int = 6) -> int:
-        """Calculate the score parameter for WLED commands.
-        
-        Args:
-            score: Current game score
-            base: Base value for the score parameter
-            multiplier: Multiplier for the score
-            
-        Returns:
-            Calculated score parameter
-        """
-        return base + int(score * multiplier)
+        return f"http://{ip_address}/win&{command}"
     
     async def _send_command_inner(self, url: str) -> bool:
         """Internal method to send WLED command.
@@ -71,12 +56,11 @@ class WLEDController:
             print(f"Error: Unexpected error connecting to WLED: {e}")
             return False
     
-    async def send_command(self, command: str, score: float) -> bool:
+    async def send_command(self, command: str) -> bool:
         """Send a command to the WLED device, canceling any outstanding request.
         
         Args:
             command: WLED command string (without base URL)
-            score: Current game score
             
         Returns:
             True if a new command was sent, False if skipped or failed
@@ -85,23 +69,20 @@ class WLEDController:
         if self.current_http_task and not self.current_http_task.done():
             return False
         
-        # Build the URL with score parameter
-        score_param = self.calculate_score_param(score)
-        url = self.build_command_url(self.ip_address, command, score_param)
+        url = self.build_command_url(self.ip_address, command)
         
-        # Start new request
         self.current_http_task = asyncio.create_task(self._send_command_inner(url))
         return True
     
     @staticmethod
-    def get_command_for_measure(measure: int, command_settings: Dict[int, str]) -> Optional[str]:
-        """Get the appropriate WLED command for the current measure.
+    def get_command_for_phrase(phrase: int, command_settings: Dict[int, str]) -> Optional[str]:
+        """Get the appropriate WLED command for the current phrase.
         
         Args:
-            measure: Current measure number
-            command_settings: Dictionary mapping measures to commands
+            phrase: Current phrase number
+            command_settings: Dictionary mapping phrases to commands
             
         Returns:
             Command string if found for the measure, None otherwise
         """
-        return command_settings.get(measure)
+        return command_settings.get(phrase)

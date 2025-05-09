@@ -75,7 +75,7 @@ else:
 number_of_leds = args.leds
 
 # Calculate target_window_size based on the number of LEDs
-target_window_size = number_of_leds // 18
+target_window_size = int(number_of_leds * TARGET_WINDOW_PERCENT)
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
@@ -126,16 +126,12 @@ class GameState:
         
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position."""
-        # Track if we're in a scoring window
         was_in_window: bool = self.button_handler.round_active
         
-        # Let the button handler reset its flags
         self.button_handler.reset_flags(led_position)
         
-        # Update our local tracking of scoring window
         is_in_window: bool = self.button_handler.round_active
         
-        # If we just entered a scoring window, print debug info
         if is_in_window and not was_in_window:
             print(f"Entered scoring window at position {led_position}")
 
@@ -152,9 +148,6 @@ class GameState:
             self.last_beat = int(beat_float)
             # print(f"Total beats in song: {self.total_beats}")
             
-            if not args.disable_wled:
-                wled_measure: int = self.total_beats // BEATS_PER_PHRASE
-                await self.wled_manager.update_wled(wled_measure, self.score_manager.score)
             
         if beat_in_phrase == 0:
             self.beat_start_time_ms = pygame.time.get_ticks()
@@ -341,8 +334,10 @@ async def run_game() -> None:
             if last_beat != int(beat_float):
                 beat_score_offset = 0
                 last_beat = int(beat_float)
-                if int(beat_float) % BEATS_PER_PHRASE == 0:
-                    print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}")
+                
+                if not args.disable_wled:
+                    await game_state.wled_manager.update_wled(phrase)
+
                 if phrase >= ending_phrase:
                     return
             game_state.handle_music_loop(beat_in_phrase)
@@ -402,15 +397,8 @@ async def run_game() -> None:
             hit_trail_visualizer.sync_with_game_state(game_state, led_position)
             
             if not IS_RASPBERRY_PI:
-                flash_intensity: float = game_state.score_manager.get_score_flash_intensity(beat_float)
                 display.draw_score_lines(
-                    score=game_state.score_manager.score,
-                    flash_intensity=flash_intensity,
-                    flash_type=target_hit,
-                    score_line_color=SCORE_LINE_COLOR,
-                    score_line_height=SCORE_LINE_HEIGHT,
-                    score_line_spacing=SCORE_LINE_SPACING,
-                    get_score_line_color_func=get_score_line_color
+                    score=game_state.score_manager.score
                 )
             
             # Draw current LED in white (unless hit-trail-only mode)

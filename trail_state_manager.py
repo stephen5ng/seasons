@@ -6,8 +6,7 @@ from pygame import Color
 import easing_functions
 
 from game_constants import (
-    TARGET_WINDOW_SIZE, TARGET_COLORS, TargetType,
-    TRAIL_FADE_DURATION_S, TRAIL_EASE
+    TARGET_COLORS, TargetType
 )
 
 class TrailStateManager:

@@ -8,7 +8,7 @@ import easing_functions
 NUMBER_OF_LEDS = 80  # Default number of LEDs - will be overridden by command line
 
 # Target constants - will be calculated at runtime based on actual LED count
-TARGET_WINDOW_SIZE = NUMBER_OF_LEDS // 20  # Window size proportional to number of LEDs
+TARGET_WINDOW_PERCENT = 0.05
 
 # Target positions as fixed percentages (clock positions)
 RED_TARGET_PERCENT = 0.0    # 12 o'clock (0%)

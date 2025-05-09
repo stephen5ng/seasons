@@ -3,6 +3,7 @@ import pygame
 import math
 from typing import Optional, Tuple, Callable, List, Any
 from pygame import Color, Surface
+from game_constants import *
 
 # For Raspberry Pi mode
 try:
@@ -141,20 +142,11 @@ class DisplayManager:
             )
             pygame.display.update()
     
-    def draw_score_lines(self, score: float, flash_intensity: float, 
-                         flash_type: str, score_line_color: Color,
-                         score_line_height: float, score_line_spacing: float,
-                         get_score_line_color_func: Callable[[Color, float, str], Color]) -> None:
+    def draw_score_lines(self, score: float) -> None:
         """Draw horizontal lines representing the score with top-to-bottom animation.
         
         Args:
             score: Current score
-            flash_intensity: Intensity of the flash effect (0.0 to 1.0)
-            flash_type: Type of flash effect (e.g., "red", "blue")
-            score_line_color: Base color for score lines
-            score_line_height: Height of each score line
-            score_line_spacing: Spacing between score lines
-            get_score_line_color_func: Function to get score line color during flash
         """        
         if not self.pygame_surface:
             return
@@ -162,11 +154,8 @@ class DisplayManager:
         num_lines: int = int(score * 2)
         
         for i in range(num_lines):
-            y: int = self.screen_height - 1 - ((num_lines - 1 - i) * (score_line_height + score_line_spacing))
-            if y >= 0:  # Only draw if we haven't gone off the top of the screen  
-                base_color = score_line_color
-                line_color = get_score_line_color_func(base_color, flash_intensity, flash_type)
-                pygame.draw.line(self.pygame_surface, line_color, (0, y), (10, y))
+            y: int = max(0, self.screen_height - 1 - ((num_lines - 1 - i) * (SCORE_LINE_HEIGHT + SCORE_LINE_SPACING)))
+            pygame.draw.line(self.pygame_surface, SCORE_LINE_COLOR, (0, y), (10, y))
     
     @staticmethod
     def _get_ring_position(i: int, center_x: int, center_y: int, 
