@@ -80,8 +80,6 @@ target_window_size = int(number_of_leds * TARGET_WINDOW_PERCENT)
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
 
-if IS_RASPBERRY_PI:
-    from rpi_ws281x import PixelStrip, Color as LEDColor
 # LED strip configuration:
 LED_PIN = 18  # GPIO pin connected to the pixels (must support PWM)
 LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
@@ -118,7 +116,7 @@ class GameState:
         self.score_manager = ScoreManager()
         self.audio_manager = AudioManager()
         self.audio_manager.load_sound_effect("error", ERROR_SOUND)
-        self.wled_manager = WLEDManager(WLED_IP, self.http_session, WLED_SETTINGS)
+        self.wled_manager = WLEDManager(not args.disable_wled, WLED_IP, self.http_session, WLED_SETTINGS)
         
         # Trail state manager (replaces individual trail state variables)
         self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
@@ -335,8 +333,7 @@ async def run_game() -> None:
                 beat_score_offset = 0
                 last_beat = int(beat_float)
                 
-                if not args.disable_wled:
-                    await game_state.wled_manager.update_wled(phrase)
+                await game_state.wled_manager.update_wled(phrase)
 
                 if phrase >= ending_phrase:
                     return

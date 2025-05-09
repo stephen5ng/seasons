@@ -6,7 +6,7 @@ from pygame import Color
 
 # Import only the enum and colors, but not the position constants
 from game_constants import TARGET_COLORS, TargetType
-
+from gpiozero import Button
 class ButtonHandler:
     """Handles button press logic and scoring.
     

@@ -73,16 +73,3 @@ class WLEDController:
         
         self.current_http_task = asyncio.create_task(self._send_command_inner(url))
         return True
-    
-    @staticmethod
-    def get_command_for_phrase(phrase: int, command_settings: Dict[int, str]) -> Optional[str]:
-        """Get the appropriate WLED command for the current phrase.
-        
-        Args:
-            phrase: Current phrase number
-            command_settings: Dictionary mapping phrases to commands
-            
-        Returns:
-            Command string if found for the measure, None otherwise
-        """
-        return command_settings.get(phrase)

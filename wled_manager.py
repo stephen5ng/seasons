@@ -11,14 +11,16 @@ class WLEDManager:
     sent measure and score, and determining when to send new commands.
     """
     
-    def __init__(self, ip_address: str, http_session: aiohttp.ClientSession, command_settings: Dict[int, str]) -> None:
+    def __init__(self, enabled: bool, ip_address: str, http_session: aiohttp.ClientSession, command_settings: Dict[int, str]) -> None:
         """Initialize the WLED manager.
         
         Args:
+            enabled: Whether WLED is enabled
             ip_address: IP address of the WLED device
             http_session: Shared HTTP session for making requests
             command_settings: Dictionary mapping measures to WLED commands
         """
+        self.enabled = enabled
         self.wled_controller = WLEDController(ip_address, http_session)
         self.command_settings = command_settings
         self.last_wled_command: str = ""
@@ -32,7 +34,10 @@ class WLEDManager:
         Args:
             current_measure: Current measure number
         """
-        wled_command = WLEDController.get_command_for_phrase(current_phrase, self.command_settings)
+        if not self.enabled:
+            return
+
+        wled_command = self.command_settings.get(current_phrase)
         if wled_command != self.last_wled_command:
             print(f"wled_command: {wled_command}")
             self.last_wled_command = wled_command
