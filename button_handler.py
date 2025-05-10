@@ -56,8 +56,8 @@ class ButtonHandler:
         
         Args:
             error_sound: Sound to play when an error occurs
-            number_of_leds: Number of LEDs in the strip (default: 80)
-            target_window_size: Size of target windows (default: 4)
+            number_of_leds: Number of LEDs in the strip
+            target_window_size: Size of target windows
             auto_score: When True, automatically scores on every round
         """
         self.button_states: Dict[TargetType, bool] = {
@@ -96,7 +96,7 @@ class ButtonHandler:
                 button.when_pressed = lambda k=config.key: self.simulated_keys.add(k)
                 button.when_released = lambda k=config.key: self.simulated_keys.discard(k)
                 self.gpio_buttons[target_type] = button
-        
+    
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
         
@@ -108,14 +108,11 @@ class ButtonHandler:
         """
         return self.get_target_type(led_position) is not None
     
-    def missed_target(self) -> bool:
+    def missed_target(self) -> Optional[TargetType]:
         """Apply penalty if button wasn't pressed in valid window.
         
-        Args:
-            score: Current score
-            
         Returns:
-            Updated score after penalty
+            TargetType if a penalty was applied, None otherwise
         """
         if not self.button_states[self.last_target_type] and not self.penalty_applied:
             self.penalty_applied = True
@@ -161,7 +158,7 @@ class ButtonHandler:
             
         Returns:
             Tuple of (successful_hit, target_hit) where:
-            - successful_hit: True if correct key was pressed, False otherwise
+            - successful_hit: True if correct key was pressed, False if wrong key, None if no key
             - target_hit: The target type that was hit, or None if no target
         """
         target_type: Optional[TargetType] = self.get_target_type(led_position)        
