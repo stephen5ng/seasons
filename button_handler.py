@@ -1,6 +1,6 @@
 """Button handling utilities for the rhythm game."""
 
-from typing import Dict, List, Optional, Tuple, Callable, Any, Set, NamedTuple
+from typing import Dict, List, Optional, Tuple, Callable, Any, Set, NamedTuple, Sequence
 import pygame
 from pygame import Color
 import platform
@@ -46,8 +46,11 @@ class ButtonHandler:
         TargetType.YELLOW: ButtonConfig(23, pygame.K_LEFT, TargetType.YELLOW)
     }
     
-    INTERESTING_KEYS = [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y,
-                        pygame.K_UP, pygame.K_DOWN, pygame.K_RIGHT, pygame.K_LEFT]
+    # Static mapping of keys to target types for fast lookups
+    KEY_TO_TARGET = {
+        config.key: config.target
+        for config in BUTTON_CONFIGS.values()
+    }
     
     def __init__(self, error_sound: pygame.mixer.Sound,
                 number_of_leds: int, target_window_size: int,
@@ -150,48 +153,50 @@ class ButtonHandler:
             self.last_target_type = target_type
         return target_type
 
-    def handle_keypress(self, led_position: int) -> Tuple[Optional[bool], Optional[TargetType]]:
-        """Handle keypress and update score if in valid window with correct key.
+    def handle_keypress(self, led_position: int) -> Tuple[Sequence[TargetType], Sequence[TargetType]]:
+        """Handle keypress and return sequences of hits and misses.
         
         Args:
             led_position: Current LED position
             
         Returns:
-            Tuple of (successful_hit, target_hit) where:
-            - successful_hit: True if correct key was pressed, False if wrong key, None if no key
-            - target_hit: The target type that was hit, or None if no target
+            Tuple of (hits, misses) where:
+            - hits: Sequence of target types that were hit correctly
+            - misses: Sequence of target types corresponding to incorrectly pressed keys
         """
         target_type: Optional[TargetType] = self.get_target_type(led_position)        
+        hits: List[TargetType] = []
+        misses: List[TargetType] = []
         
         all_pressed_keys = pygame.key.get_pressed()
         keys_pressed = []
-        for key in ButtonHandler.INTERESTING_KEYS:
+        for key in [config.key for config in self.BUTTON_CONFIGS.values()]:
             if all_pressed_keys[key]:
                 keys_pressed.append(key)
         
         keys_pressed.extend(self.simulated_keys)
             
-        target_keys = ButtonHandler.get_keys_for_target(target_type)
+        target_keys = ButtonHandler.get_keys_for_target(target_type) if target_type else []
         if target_type and self.auto_score:
             keys_pressed = [target_keys[0]]
-        # print(f"target_keys: {target_keys}")
-        good_key_pressed = False
+                
         for key_pressed in keys_pressed:
-            # print(key_pressed)
-            if key_pressed in target_keys:
+            key_target = ButtonHandler.KEY_TO_TARGET.get(key_pressed)
+            
+            print(f"key_pressed: {key_pressed}, target_keys: {target_keys}")
+            if target_type and key_pressed in target_keys:
                 if not self.button_states[target_type]:
                     self.button_states[target_type] = True
                     self.penalty_applied = False
-                    good_key_pressed = True
-                    # print(f"good key: {key_pressed}")
+                    hits.append(target_type)
             else:
-                # print(f"wrong key: {key_pressed}")
-                # print(f"looking for: {target_keys} for target: {target_type}")
-                self.error_sound.play()
+                # self.error_sound.play()
+                print(f"key_target: {key_target}")
+                if key_target is not None:
+                    print(f"miss: {key_target}")
+                    misses.append(key_target)
 
-        if good_key_pressed:
-            return True, target_type
-        return None, None
+        return hits, misses
     
     def get_window_position_for_target(self, target_type: TargetType) -> int:
         """Get the center position of a target window.
@@ -263,14 +268,5 @@ class ButtonHandler:
         Returns:
             List of key codes for the target
         """
-        if target_type == TargetType.RED:
-            return [pygame.K_r, pygame.K_UP]
-        if target_type == TargetType.BLUE:
-            return [pygame.K_b, pygame.K_DOWN]
-        if target_type == TargetType.GREEN:
-            return [pygame.K_g, pygame.K_RIGHT]
-        if target_type == TargetType.YELLOW:
-            return [pygame.K_y, pygame.K_LEFT]
-        
-        return []
+        return [ButtonHandler.BUTTON_CONFIGS[target_type].key]
         

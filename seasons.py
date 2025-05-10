@@ -144,8 +144,7 @@ class GameState:
         if int(beat_float) > self.last_beat:
             self.total_beats += 1
             self.last_beat = int(beat_float)
-            # print(f"Total beats in song: {self.total_beats}")
-            
+            # print(f"Total beats in song: {self.total_beats}")            
             
         if beat_in_phrase == 0:
             self.beat_start_time_ms = pygame.time.get_ticks()
@@ -165,6 +164,7 @@ class GameState:
         current_time_ms: int = pygame.time.get_ticks()
             
         # Calculate target music time
+        print(f"beat_start_time_ms: {self.beat_start_time_ms}, current_time_ms: {current_time_ms}, score: {self.score_manager.score}")
         target_time_s: float = self.audio_manager.get_target_music_time(
             self.score_manager.score,
             self.beat_start_time_ms,
@@ -340,8 +340,8 @@ async def run_game() -> None:
             game_state.handle_music_loop(beat_in_phrase)
  
             # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}")
+            score_based_measure = 1+phrase*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + (beat_in_phrase + fractional_beat)/BEATS_PER_MEASURE
             if not IS_RASPBERRY_PI:
-                score_based_measure = 1+phrase*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + (beat_in_phrase + fractional_beat)/BEATS_PER_MEASURE
                 draw_fifth_lines(display, score_based_measure)
                 # print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}, fractional_beat: {fractional_beat}, score: {game_state.score_manager.score + beat_score_offset}, score_based_measure: {score_based_measure}")
     
@@ -352,20 +352,18 @@ async def run_game() -> None:
             if not game_state.button_handler.is_in_valid_window(led_position):
                 missed_target = game_state.button_handler.missed_target()
                 if missed_target:
-                    new_score = max(0, game_state.score_manager.score - 0.25)
-                    print(f"PENALTY New score: {new_score}, target hit: {target_hit}")
+                    # new_score = max(0, game_state.score_manager.score - 0.25)
+                    # print(f"PENALTY New score: {new_score}, target hit: {target_hit}")
 
-                    game_state.score_manager.update_score(new_score, beat_float)
                     hit_trail_visualizer.remove_hit(missed_target)
             
             game_state.reset_flags(led_position)
             
-            successful_hit, target_hit = game_state.button_handler.handle_keypress(
-                led_position)
-            # print(f"successful_hit: {successful_hit}, target_hit: {target_hit}")
-
-            if successful_hit is not None and target_hit is not None:
-                new_score = game_state.score_manager.score + 0.25 if successful_hit else 0
+            hits, misses = game_state.button_handler.handle_keypress(led_position)
+            
+            # Handle successful hits
+            for target_hit in hits:
+                new_score = game_state.score_manager.score + 0.25
                 new_led_position = led_position
                 if led_position > number_of_leds / 2:
                     new_led_position = led_position - number_of_leds
@@ -374,10 +372,18 @@ async def run_game() -> None:
                     print(f"beat_score_offset: {beat_score_offset}")
                 print(f"target_hit: {target_hit}")
                     
-                if new_score > game_state.score_manager.score:
-                    hit_trail_visualizer.add_hit(target_hit)
+                hit_trail_visualizer.add_hit(target_hit)
+                # game_state.score_manager.update_score(new_score, beat_float)
+            game_state.score_manager.update_score(hit_trail_visualizer.simple_hit_trail.total_hits/4, beat_float)
             
-                game_state.score_manager.update_score(new_score, beat_float)
+            # Handle misses
+            for target_miss in misses:
+                print(f"miss: {target_miss}")
+                error_pos = game_state.button_handler.get_window_position_for_target(target_miss)
+                error_color = TARGET_COLORS[target_miss]
+                display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
+                display.set_pixel(error_pos-1, error_color)  # Use the color of the wrong key that was pressed
+                display.set_pixel(error_pos+1, error_color)  # Use the color of the wrong key that was pressed
             
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
@@ -397,13 +403,6 @@ async def run_game() -> None:
                 display.draw_score_lines(
                     score=game_state.score_manager.score
                 )
-            
-            # Draw current LED in white (unless hit-trail-only mode)
-            if successful_hit is False:
-                print(f"successful_hit: {successful_hit}, target_type: {target_hit}")
-                error_pos = game_state.button_handler.get_window_position_for_target(target_hit)
-                error_color = TARGET_COLORS[target_hit]
-                display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
 
             if not IS_RASPBERRY_PI:
                 for key, keydown in get_key():

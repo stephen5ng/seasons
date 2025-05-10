@@ -73,3 +73,4 @@ class WLEDController:
         
         self.current_http_task = asyncio.create_task(self._send_command_inner(url))
         return True
+

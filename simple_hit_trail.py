@@ -43,13 +43,14 @@ class SimpleHitTrail(HitTrailBase):
         Args:
             target_type: Type of the hit to remove
         """
-        self.total_hits -= 1
         if target_type in self.number_of_hits_by_type:
             self.number_of_hits_by_type[target_type] -= 1
         if target_type in self.hits_by_type and self.hits_by_type[target_type]:
             position = self.hits_by_type[target_type].pop()
             
             if position in self.active_hits:
+                self.total_hits = max(0, self.total_hits - 1)
+                print(f"total_hits: {self.total_hits}")
                 del self.active_hits[position]
 
     def draw(self, display_func) -> None:
