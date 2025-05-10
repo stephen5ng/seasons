@@ -1,12 +1,30 @@
 """Button handling utilities for the rhythm game."""
 
-from typing import Dict, List, Optional, Tuple, Callable, Any
+from typing import Dict, List, Optional, Tuple, Callable, Any, Set, NamedTuple
 import pygame
 from pygame import Color
+import platform
+import os
 
 # Import only the enum and colors, but not the position constants
 from game_constants import TARGET_COLORS, TargetType
 from gpiozero import Button
+
+# Check if we're on Raspberry Pi
+IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
+
+class ButtonConfig(NamedTuple):
+    """Configuration for a GPIO button.
+    
+    Attributes:
+        pin: GPIO pin number
+        key: Pygame key code to simulate
+        target: Target type this button corresponds to
+    """
+    pin: int
+    key: int
+    target: TargetType
+
 class ButtonHandler:
     """Handles button press logic and scoring.
     
@@ -19,8 +37,18 @@ class ButtonHandler:
     GREEN_TARGET_PERCENT = 0.25   # 3 o'clock
     BLUE_TARGET_PERCENT = 0.5     # 6 o'clock
     YELLOW_TARGET_PERCENT = 0.75  # 9 o'clock
+    
+    # GPIO button configuration
+    BUTTON_CONFIGS = {
+        TargetType.RED: ButtonConfig(17, pygame.K_UP, TargetType.RED),
+        TargetType.BLUE: ButtonConfig(27, pygame.K_DOWN, TargetType.BLUE),
+        TargetType.GREEN: ButtonConfig(22, pygame.K_RIGHT, TargetType.GREEN),
+        TargetType.YELLOW: ButtonConfig(23, pygame.K_LEFT, TargetType.YELLOW)
+    }
+    
     INTERESTING_KEYS = [pygame.K_r, pygame.K_b, pygame.K_g, pygame.K_y,
                         pygame.K_UP, pygame.K_DOWN, pygame.K_RIGHT, pygame.K_LEFT]
+    
     def __init__(self, error_sound: pygame.mixer.Sound,
                 number_of_leds: int, target_window_size: int,
                 auto_score: bool) -> None:
@@ -55,6 +83,19 @@ class ButtonHandler:
         self.yellow_target_pos = int(number_of_leds * self.YELLOW_TARGET_PERCENT)
     
         self.last_target_type = TargetType.RED
+        
+        # Initialize GPIO buttons
+        self.simulated_keys: Set[int] = set()
+        self.gpio_buttons: Dict[TargetType, Button] = {}
+        
+        # Only initialize GPIO buttons on Raspberry Pi
+        if IS_RASPBERRY_PI:
+            # Create buttons from configuration
+            for target_type, config in self.BUTTON_CONFIGS.items():
+                button = Button(config.pin)
+                button.when_pressed = lambda k=config.key: self.simulated_keys.add(k)
+                button.when_released = lambda k=config.key: self.simulated_keys.discard(k)
+                self.gpio_buttons[target_type] = button
         
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
@@ -131,6 +172,8 @@ class ButtonHandler:
             if all_pressed_keys[key]:
                 keys_pressed.append(key)
         
+        keys_pressed.extend(self.simulated_keys)
+            
         target_keys = ButtonHandler.get_keys_for_target(target_type)
         if target_type and self.auto_score:
             keys_pressed = [target_keys[0]]
