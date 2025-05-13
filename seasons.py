@@ -115,7 +115,7 @@ class GameState:
         self.current_led_position: Optional[int] = None  # Track current LED position
         
         # Track miss timestamps for fade effect
-        self.miss_timestamps: Dict[Tuple[int, TargetType], float] = {}  # (position, target_type) -> timestamp
+        self.miss_timestamps: Dict[Tuple[int, TargetType], Tuple[float, float]] = {}  # (position, target_type) -> (timestamp, initial_intensity)
 
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position."""
@@ -195,24 +195,28 @@ class GameState:
             print(f"miss: {target_miss}")
             error_pos = self.button_handler.get_window_position_for_target(target_miss)
             print(f"error_pos: {error_pos}")
-            self.miss_timestamps[(error_pos, target_miss)] = current_time
-            self.miss_timestamps[(error_pos-1, target_miss)] = current_time
-            self.miss_timestamps[(error_pos+1, target_miss)] = current_time
-            self.miss_timestamps[(error_pos+2, target_miss)] = current_time
-            self.miss_timestamps[(error_pos-2, target_miss)] = current_time
+            
+            # Calculate initial brightness based on distance from error_pos
+            MAX_DISTANCE = 4  # Maximum distance for fade effect
+            for offset in range(-MAX_DISTANCE, MAX_DISTANCE + 1):
+                pos = error_pos + offset
+                # Calculate distance-based intensity using quadratic ease out
+                distance = abs(offset) / MAX_DISTANCE
+                initial_intensity = 1.0 - (distance ** 2)  # Quadratic ease out
+                self.miss_timestamps[(pos, target_miss)] = (current_time, initial_intensity)
         
         # Draw and fade out existing misses
         MISS_FADE_DURATION = 0.5  # Duration of fade in seconds
         to_remove = []
         
-        for (pos, target_type), timestamp in self.miss_timestamps.items():
+        for (pos, target_type), (timestamp, initial_intensity) in self.miss_timestamps.items():
             elapsed = current_time - timestamp
             if elapsed >= MISS_FADE_DURATION:
                 to_remove.append((pos, target_type))
                 continue
                 
             # Calculate fade intensity using quadratic ease out
-            fade_intensity = 1.0 - (elapsed / MISS_FADE_DURATION) ** 2
+            fade_intensity = (1.0 - (elapsed / MISS_FADE_DURATION) ** 2) * initial_intensity
             error_color = TARGET_COLORS[target_type]
             
             # Apply fade to color

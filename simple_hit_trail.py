@@ -69,5 +69,5 @@ class SimpleHitTrail(HitTrailBase):
             self.rotate_speed = 0.0
         # elif self.total_hits > 40:
         #     self.rotate_speed = 0.1
-        self.rotate_speed = 0.
+
         self._display(display_func) 
