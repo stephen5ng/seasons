@@ -52,7 +52,13 @@ class TrailVisualizer:
             screen_width=screen_width,
             screen_height=screen_height,
             scaling_factor=scaling_factor,
-            led_count=led_count
+            led_count=led_count,
+            led_pin=game_constants.LED_PIN,
+            led_freq_hz=game_constants.LED_FREQ_HZ,
+            led_dma=game_constants.LED_DMA,
+            led_invert=game_constants.LED_INVERT,
+            led_brightness=game_constants.LED_BRIGHTNESS,
+            led_channel=game_constants.LED_CHANNEL
         )
         
         # Common state

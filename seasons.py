@@ -80,14 +80,6 @@ target_window_size = int(number_of_leds * TARGET_WINDOW_PERCENT)
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
 
-# LED strip configuration:
-LED_PIN = 18  # GPIO pin connected to the pixels (must support PWM)
-LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
-LED_DMA = 10  # DMA channel to use for generating signal
-LED_BRIGHTNESS = 255  # Set to 0 for darkest and 255 for brightest
-LED_INVERT = False  # True to invert the signal (when using NPN transistor level shift)
-LED_CHANNEL = 0  # PWM channel
-
 # Global state
 quit_app = False
 
@@ -270,12 +262,12 @@ async def run_game() -> None:
         screen_height=SCREEN_HEIGHT,
         scaling_factor=SCALING_FACTOR,
         led_count=number_of_leds,
-        led_pin=LED_PIN,  # Default GPIO pin
-        led_freq_hz=LED_FREQ_HZ,  # Default frequency
-        led_dma=LED_DMA,  # Default DMA channel
-        led_invert=LED_INVERT,  # Default invert setting
-        led_brightness=LED_BRIGHTNESS,  # Default brightness
-        led_channel=LED_CHANNEL  # Default channel
+        led_pin=LED_PIN,
+        led_freq_hz=LED_FREQ_HZ,
+        led_dma=LED_DMA,
+        led_invert=LED_INVERT,
+        led_brightness=LED_BRIGHTNESS,
+        led_channel=LED_CHANNEL
     )
     
     game_state: GameState = GameState()
@@ -378,6 +370,7 @@ async def run_game() -> None:
             for target_miss in misses:
                 print(f"miss: {target_miss}")
                 error_pos = game_state.button_handler.get_window_position_for_target(target_miss)
+                print(f"error_pos: {error_pos}")
                 error_color = TARGET_COLORS[target_miss]
                 display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
                 display.set_pixel(error_pos-1, error_color)  # Use the color of the wrong key that was pressed

@@ -14,6 +14,7 @@ except ImportError:
     PixelStrip = None
     LEDColor = None
 
+LED_OFFSET = 10
 class DisplayManager:
     """Handles LED display output for both Pygame and WS281x."""
     
@@ -21,13 +22,13 @@ class DisplayManager:
                  screen_width: int, 
                  screen_height: int, 
                  scaling_factor: int,
-                 led_count: int = 0,
-                 led_pin: int = 18,
-                 led_freq_hz: int = 800000,
-                 led_dma: int = 10,
-                 led_invert: bool = False,
-                 led_brightness: int = 255,
-                 led_channel: int = 0) -> None:
+                 led_count: int,
+                 led_pin: int,
+                 led_freq_hz: int,
+                 led_dma: int,
+                 led_invert: bool,
+                 led_brightness: int,
+                 led_channel: int) -> None:
         """Initialize the display manager.
         
         Args:
@@ -83,6 +84,7 @@ class DisplayManager:
     def set_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in target ring."""
         if IS_RASPBERRY_PI:
+            pos = (pos + LED_OFFSET) % self.led_count
             self.strip.setPixelColor(pos, self._convert_to_led_color(color))
         else:
             # Avoid circular import
@@ -110,26 +112,6 @@ class DisplayManager:
                                          self.led_count)
             self.pygame_surface.set_at((x, y), color)
             
-    # New-style methods
-    def set_target_pixel(self, pos: int, color: Color, 
-                         center_x: int, center_y: int, radius: int, led_count: int) -> None:
-        """Set pixel color at position in target ring.
-        
-        Args:
-            pos: LED position index
-            color: Color to set
-            center_x: X coordinate of the circle center
-            center_y: Y coordinate of the circle center
-            radius: Radius of the circle
-            led_count: Total number of LEDs in the circle
-        """
-        if IS_RASPBERRY_PI:
-            ws_color = LEDColor(color.r, color.g, color.b) if LEDColor else None
-            self.strip.setPixelColor(pos, ws_color)
-        else:
-            x, y = self._get_ring_position(pos, center_x, center_y, radius, led_count)
-            self.pygame_surface.set_at((x, y), color)
-    
     def update(self) -> None:
         """Update the display."""
         if IS_RASPBERRY_PI:

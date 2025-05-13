@@ -19,8 +19,18 @@ class DisplayManagerTest(unittest.TestCase):
         self.screen_width = 100
         self.screen_height = 100
         self.scaling_factor = 2
+        self.led_count = 60
         self.display_manager = DisplayManager(
-            self.screen_width, self.screen_height, self.scaling_factor
+            screen_width=self.screen_width,
+            screen_height=self.screen_height,
+            scaling_factor=self.scaling_factor,
+            led_count=self.led_count,
+            led_pin=18,
+            led_freq_hz=800000,
+            led_dma=10,
+            led_invert=False,
+            led_brightness=255,
+            led_channel=0
         )
     
     def tearDown(self):
