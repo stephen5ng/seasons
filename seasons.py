@@ -363,7 +363,6 @@ async def run_game() -> None:
             
             # Handle successful hits
             for target_hit in hits:
-                new_score = game_state.score_manager.score + 0.25
                 new_led_position = led_position
                 if led_position > number_of_leds / 2:
                     new_led_position = led_position - number_of_leds
@@ -373,7 +372,6 @@ async def run_game() -> None:
                 print(f"target_hit: {target_hit}")
                     
                 hit_trail_visualizer.add_hit(target_hit)
-                # game_state.score_manager.update_score(new_score, beat_float)
             game_state.score_manager.update_score(hit_trail_visualizer.simple_hit_trail.total_hits/4, beat_float)
             
             # Handle misses

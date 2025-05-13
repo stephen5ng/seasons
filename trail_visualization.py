@@ -74,19 +74,7 @@ class TrailVisualizer:
         ]
         self.next_target = 0
         
-        self._score = 0.0
-        
         print(f"TrailVisualizer initialized with auto_mode={auto_mode}")
-    
-    @property
-    def score(self) -> float:
-        """Get the current score."""
-        return self._score
-    
-    @score.setter
-    def score(self, value: float) -> None:
-        """Set the current score."""
-        self._score = value
     
     def sync_with_game_state(self, game_state: 'GameState', led_position: int) -> None:
         """Synchronize the visualizer's state with the game state.
@@ -191,9 +179,6 @@ class TrailVisualizer:
             
         # Add the hit at the target position
         self.simple_hit_trail.add_hit(target_pos, target_type)
-
-        # Update score
-        self._score += 0.25
     
     def clear_hit_trail(self) -> None:
         """Clear the hit trail."""
