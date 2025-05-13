@@ -181,28 +181,28 @@ class GameState:
             
             self.audio_manager.play_music(start_pos_s=target_time_s)
 
-    def handle_misses(self, misses: List[TargetType], display: DisplayManager) -> None:
+    def handle_misses(self, misses: List[TargetType], max_distance: int, display: DisplayManager) -> None:
         """Handle visualization of missed targets with fade out effect.
         
         Args:
             misses: List of target types that were missed
             display: Display manager instance to draw on
         """
+        # if misses:
+        #     print(f"misses: {misses}, handle_misses max_distance: {max_distance}")
         current_time = pygame.time.get_ticks() / 1000.0  # Convert to seconds
         
         # Add new misses
         for target_miss in misses:
-            print(f"miss: {target_miss}")
             error_pos = self.button_handler.get_window_position_for_target(target_miss)
-            print(f"error_pos: {error_pos}")
             
             # Calculate initial brightness based on distance from error_pos
-            MAX_DISTANCE = 4  # Maximum distance for fade effect
-            for offset in range(-MAX_DISTANCE, MAX_DISTANCE + 1):
+            for offset in range(-max_distance, max_distance + 1):
                 pos = error_pos + offset
                 # Calculate distance-based intensity using quadratic ease out
-                distance = abs(offset) / MAX_DISTANCE
+                distance = abs(offset) / max_distance
                 initial_intensity = 1.0 - (distance ** 2)  # Quadratic ease out
+                # print(f"pos: {pos}, initial_intensity: {initial_intensity}")
                 self.miss_timestamps[(pos, target_miss)] = (current_time, initial_intensity)
         
         # Draw and fade out existing misses
@@ -225,7 +225,7 @@ class GameState:
                 int(error_color.g * fade_intensity),
                 int(error_color.b * fade_intensity)
             )
-            display.set_pixel(pos, faded_color)
+            display.set_target_trail_pixel(pos, faded_color)
         
         # Remove expired misses
         for key in to_remove:
@@ -433,7 +433,7 @@ async def run_game() -> None:
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
             beat_score_offset = game_state.handle_hits(hits, led_position, hit_trail_visualizer, beat_float)
-            game_state.handle_misses(misses, display)
+            game_state.handle_misses(misses, 3, display)
             
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
@@ -444,7 +444,7 @@ async def run_game() -> None:
                 TRAIL_FADE_DURATION_S,
                 TRAIL_EASE,
                 game_state.button_handler,
-                lambda pos, color: display.set_pixel(pos, color)
+                lambda pos, color: display.set_target_trail_pixel(pos, color)
             )
                         
             hit_trail_visualizer.sync_with_game_state(game_state, led_position)

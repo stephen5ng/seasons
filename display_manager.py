@@ -81,7 +81,7 @@ class DisplayManager:
         """
         return LEDColor(color.r, color.g, color.b) if LEDColor else None
 
-    def set_pixel(self, pos: int, color: Color) -> None:
+    def set_target_trail_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in target ring."""
         if IS_RASPBERRY_PI:
             pos = (pos + LED_OFFSET) % self.led_count
