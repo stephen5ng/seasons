@@ -114,6 +114,9 @@ class GameState:
         self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
         self.current_led_position: Optional[int] = None  # Track current LED position
         
+        # Track miss timestamps for fade effect
+        self.miss_timestamps: Dict[Tuple[int, TargetType], float] = {}  # (position, target_type) -> timestamp
+
     def reset_flags(self, led_position: int) -> None:
         """Reset state flags based on LED position."""
         was_in_window: bool = self.button_handler.round_active
@@ -179,20 +182,50 @@ class GameState:
             self.audio_manager.play_music(start_pos_s=target_time_s)
 
     def handle_misses(self, misses: List[TargetType], display: DisplayManager) -> None:
-        """Handle visualization of missed targets.
+        """Handle visualization of missed targets with fade out effect.
         
         Args:
             misses: List of target types that were missed
             display: Display manager instance to draw on
         """
+        current_time = pygame.time.get_ticks() / 1000.0  # Convert to seconds
+        
+        # Add new misses
         for target_miss in misses:
             print(f"miss: {target_miss}")
             error_pos = self.button_handler.get_window_position_for_target(target_miss)
             print(f"error_pos: {error_pos}")
-            error_color = TARGET_COLORS[target_miss]
-            display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
-            display.set_pixel(error_pos-1, error_color)  # Use the color of the wrong key that was pressed
-            display.set_pixel(error_pos+1, error_color)  # Use the color of the wrong key that was pressed
+            self.miss_timestamps[(error_pos, target_miss)] = current_time
+            self.miss_timestamps[(error_pos-1, target_miss)] = current_time
+            self.miss_timestamps[(error_pos+1, target_miss)] = current_time
+            self.miss_timestamps[(error_pos+2, target_miss)] = current_time
+            self.miss_timestamps[(error_pos-2, target_miss)] = current_time
+        
+        # Draw and fade out existing misses
+        MISS_FADE_DURATION = 0.5  # Duration of fade in seconds
+        to_remove = []
+        
+        for (pos, target_type), timestamp in self.miss_timestamps.items():
+            elapsed = current_time - timestamp
+            if elapsed >= MISS_FADE_DURATION:
+                to_remove.append((pos, target_type))
+                continue
+                
+            # Calculate fade intensity using quadratic ease out
+            fade_intensity = 1.0 - (elapsed / MISS_FADE_DURATION) ** 2
+            error_color = TARGET_COLORS[target_type]
+            
+            # Apply fade to color
+            faded_color = Color(
+                int(error_color.r * fade_intensity),
+                int(error_color.g * fade_intensity),
+                int(error_color.b * fade_intensity)
+            )
+            display.set_pixel(pos, faded_color)
+        
+        # Remove expired misses
+        for key in to_remove:
+            del self.miss_timestamps[key]
 
     def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail_visualizer: 'TrailVisualizer', beat_float: float) -> float:
         """Handle successful hits and update score.

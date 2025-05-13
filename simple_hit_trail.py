@@ -28,8 +28,8 @@ class SimpleHitTrail(HitTrailBase):
             target_type: The type of target that was hit
         """
         self.total_hits += 1
+        new_position = position + self.number_of_hits_by_type.get(target_type, 0)
         self.number_of_hits_by_type[target_type] = self.number_of_hits_by_type.get(target_type, 0) + 1
-        new_position = position + self.number_of_hits_by_type[target_type]
         self.active_hits[new_position] = (target_type, pygame.time.get_ticks())
         
         if target_type not in self.hits_by_type:
@@ -69,5 +69,5 @@ class SimpleHitTrail(HitTrailBase):
             self.rotate_speed = 0.0
         # elif self.total_hits > 40:
         #     self.rotate_speed = 0.1
-            
+        self.rotate_speed = 0.
         self._display(display_func) 
