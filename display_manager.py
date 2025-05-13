@@ -50,6 +50,26 @@ class DisplayManager:
         self.led_count = led_count
         # New dict to track active pixels: (pos, trail_type) -> (color, set_time, duration, setter)
         self._active_pixels = {}
+        
+        # Create setter functions once at initialization
+        def create_trail_setter(is_target: bool) -> Callable[[int, Color], None]:
+            """Create a setter function for a trail type.
+            
+            Args:
+                is_target: True for target trail, False for hit trail
+                
+            Returns:
+                A function that sets a pixel on the specified trail
+            """
+            def setter(pos: int, color: Color) -> None:
+                rpi_calc = lambda p, lc: (p + LED_OFFSET) % lc if is_target else (p + LED_OFFSET) % lc + lc
+                radius = game_constants.TARGET_TRAIL_RADIUS if is_target else game_constants.HIT_TRAIL_RADIUS
+                self._set_pixel_on_trail(pos, color, rpi_calc, radius)
+            return setter
+            
+        self._target_setter = create_trail_setter(True)
+        self._hit_setter = create_trail_setter(False)
+        
         if IS_RASPBERRY_PI:
             self.strip: PixelStrip = PixelStrip(
                 led_count*2, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
@@ -110,13 +130,8 @@ class DisplayManager:
             trail_type: A string ('target' or 'hit') indicating the trail.
             duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
         """
-        now = pygame.time.get_ticks() / 1000.0        
-        
-        if trail_type == 'target':
-            setter = lambda c: self._set_pixel_on_trail(pos, c, lambda p, lc: (p + LED_OFFSET) % lc, game_constants.TARGET_TRAIL_RADIUS)
-        else:
-            setter = lambda c: self._set_pixel_on_trail(pos, c, lambda p, lc: (p + LED_OFFSET) % lc + lc, game_constants.HIT_TRAIL_RADIUS)
-            
+        now = pygame.time.get_ticks() / 1000.0
+        setter = self._target_setter if trail_type == 'target' else self._hit_setter
         self._active_pixels[pos, trail_type] = (color, now, duration, setter)
 
     def set_target_trail_pixel(self, pos: int, color: Color, duration: float = -1) -> None:
@@ -146,26 +161,22 @@ class DisplayManager:
         
         # First pass: update all pixels and collect ones to remove
         for (pos, trail_type), (color, set_time, duration, setter) in self._active_pixels.items():
-            if duration == -1:
-                # For permanent pixels, just display them
-                setter(color)
-                continue
-                
             elapsed = now - set_time
-            if elapsed >= duration:
+            if duration != -1 and elapsed >= duration:
                 # Fade out: set the pixel to black
                 faded_color = Color(0, 0, 0)
-                setter(faded_color)  # Call setter with just the color
+                setter(pos, faded_color)
                 to_remove.append((pos, trail_type))
+                continue
             elif duration > 0:
                 # Interpolate for smooth fade out
                 fade_ratio = 1 - (elapsed / duration)
-                faded_color = Color(
+                color = Color(
                     int(color.r * fade_ratio),
                     int(color.g * fade_ratio),
                     int(color.b * fade_ratio)
                 )
-                setter(faded_color)  # Call setter with just the color
+            setter(pos, color)
         
         # Second pass: remove expired pixels
         for key in to_remove:
