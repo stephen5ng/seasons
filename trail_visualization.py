@@ -193,5 +193,5 @@ class TrailVisualizer:
     def draw_hit_trail(self) -> None:
         """Draw the hit trail on the display."""
         # Draw the simple hit trail using the SimpleHitTrail implementation
-        self.simple_hit_trail.draw(lambda pos, color: self.display.set_hit_trail_pixel(pos, color))
+        self.simple_hit_trail.draw(lambda pos, color: self.display.set_hit_trail_pixel(pos, color, -1))
         
