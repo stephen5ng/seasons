@@ -48,7 +48,8 @@ class DisplayManager:
         self.screen_height = screen_height
         self.scaling_factor = scaling_factor
         self.led_count = led_count
-        
+        # New dict to track active pixels: (pos, trail_type) -> (color, set_time, duration, setter)
+        self._active_pixels = {}
         if IS_RASPBERRY_PI:
             self.strip: PixelStrip = PixelStrip(
                 led_count*2, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
@@ -82,42 +83,76 @@ class DisplayManager:
         """
         return LEDColor(color.r, color.g, color.b) if LEDColor else None
 
-    def _set_pixel_on_trail(self, pos: int, color: Color, rpi_pos_calculator: Callable[[int, int], int], pygame_radius: int) -> None:
-        """Set pixel color at a position on a specific trail (target or hit).
-
+    def _set_pixel_on_trail(self, pos: int, color: Color, rpi_pos_calculator: Callable[[int, int], int], pygame_radius: int, trail_type: str, duration: float = -1) -> None:
+        """Set pixel color at a position on a specific trail (target or hit) with an optional duration.
+        
         Args:
             pos: The logical position of the LED.
             color: The Pygame Color for the LED.
             rpi_pos_calculator: A function to calculate the actual LED index for Raspberry Pi.
             pygame_radius: The radius of the trail ring for Pygame display.
+            trail_type: A string ('target' or 'hit') indicating the trail.
+            duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
         """
+        now = pygame.time.get_ticks() / 1000.0
+        # Store the setter function along with other pixel data
+        setter = self.set_target_trail_pixel if trail_type == 'target' else self.set_hit_trail_pixel
+        self._active_pixels[(pos, trail_type)] = (color, now, duration, setter)
         if IS_RASPBERRY_PI:
             actual_led_pos = rpi_pos_calculator(pos, self.led_count)
             self.strip.setPixelColor(actual_led_pos, self._convert_to_led_color(color))
         else:
-            x, y = self._get_ring_position(pos,
-                                            self.screen_width // 2,
-                                            self.screen_height // 2,
-                                            pygame_radius,
-                                            self.led_count)
+            x, y = self._get_ring_position(pos, self.screen_width // 2, self.screen_height // 2, pygame_radius, self.led_count)
             self.pygame_surface.set_at((x, y), color)
 
-    def set_target_trail_pixel(self, pos: int, color: Color) -> None:
-        """Set pixel color at position in target ring."""
+    def set_target_trail_pixel(self, pos: int, color: Color, duration: float = -1) -> None:
+        """Set pixel color at position in target ring with an optional duration.
+        
+        Args:
+            pos: The logical position of the LED.
+            color: The Pygame Color for the LED.
+            duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
+        """
         def rpi_target_pos_calculator(p: int, lc: int) -> int:
             return (p + LED_OFFSET) % lc
-
-        self._set_pixel_on_trail(pos, color, rpi_target_pos_calculator, game_constants.TARGET_TRAIL_RADIUS)
+        self._set_pixel_on_trail(pos, color, rpi_target_pos_calculator, game_constants.TARGET_TRAIL_RADIUS, 'target', duration)
     
-    def set_hit_trail_pixel(self, pos: int, color: Color) -> None:
-        """Set pixel color at position in hit trail ring."""
+    def set_hit_trail_pixel(self, pos: int, color: Color, duration: float = -1) -> None:
+        """Set pixel color at position in hit trail ring with an optional duration.
+        
+        Args:
+            pos: The logical position of the LED.
+            color: The Pygame Color for the LED.
+            duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
+        """
         def rpi_hit_pos_calculator(p: int, lc: int) -> int:
             return (p + LED_OFFSET) % lc + lc
-
-        self._set_pixel_on_trail(pos, color, rpi_hit_pos_calculator, game_constants.HIT_TRAIL_RADIUS)
+        self._set_pixel_on_trail(pos, color, rpi_hit_pos_calculator, game_constants.HIT_TRAIL_RADIUS, 'hit', duration)
             
     def update(self) -> None:
-        """Update the display."""
+        """Update the display and fade out pixels if their duration has expired."""
+        now = pygame.time.get_ticks() / 1000.0
+        to_remove = []
+        for (pos, trail_type), (color, set_time, duration, setter) in self._active_pixels.items():
+            if duration == -1:
+                continue
+            elapsed = now - set_time
+            if elapsed >= duration:
+                # Fade out: set the pixel to black (or interpolate if desired)
+                faded_color = Color(0, 0, 0)
+                setter(pos, faded_color, -1)
+                to_remove.append((pos, trail_type))
+            elif duration > 0:
+                # Optionally, interpolate (linear fade) for a smooth fade out
+                fade_ratio = 1 - (elapsed / duration)
+                faded_color = Color(
+                    int(color.r * fade_ratio),
+                    int(color.g * fade_ratio),
+                    int(color.b * fade_ratio)
+                )
+                setter(pos, faded_color, duration)
+        for key in to_remove:
+            del self._active_pixels[key]
         if IS_RASPBERRY_PI:
             self.strip.show()
         else:

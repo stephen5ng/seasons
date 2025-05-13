@@ -195,15 +195,20 @@ class GameState:
         # Add new misses
         for target_miss in misses:
             error_pos = self.button_handler.get_window_position_for_target(target_miss)
-            
-            # Calculate initial brightness based on distance from error_pos
             for offset in range(-max_distance, max_distance + 1):
                 pos = error_pos + offset
+                error_color = TARGET_COLORS[target_miss]
+
                 # Calculate distance-based intensity using quadratic ease out
                 distance = abs(offset) / max_distance
                 initial_intensity = 1.0 - (distance ** 2)  # Quadratic ease out
-                # print(f"pos: {pos}, initial_intensity: {initial_intensity}")
-                self.miss_timestamps[(pos, target_miss)] = (current_time, initial_intensity)
+                faded_color = Color(
+                    int(TARGET_COLORS[target_miss].r * initial_intensity),
+                    int(TARGET_COLORS[target_miss].g * initial_intensity),
+                    int(TARGET_COLORS[target_miss].b * initial_intensity)
+                )
+                display.set_target_trail_pixel(pos, faded_color, 1.0)
+        return
         
         # Draw and fade out existing misses
         MISS_FADE_DURATION = 0.5  # Duration of fade in seconds
@@ -440,12 +445,12 @@ async def run_game() -> None:
                 # Store the timestamp and base white color for the new position
                 game_state.trail_state_manager.update_position(led_position, current_time_ms / 1000.0)
             
-            game_state.trail_state_manager.draw_main_trail(
-                TRAIL_FADE_DURATION_S,
-                TRAIL_EASE,
-                game_state.button_handler,
-                lambda pos, color: display.set_target_trail_pixel(pos, color)
-            )
+            
+            target_trail_color = Color(255, 255, 255)
+            if game_state.button_handler.is_in_valid_window(led_position):
+                pos_target_type = game_state.button_handler.get_target_type(led_position)
+                target_trail_color = TARGET_COLORS[pos_target_type]            
+            display.set_target_trail_pixel(led_position, target_trail_color, 0.8)
                         
             hit_trail_visualizer.sync_with_game_state(game_state, led_position)
             
