@@ -178,6 +178,48 @@ class GameState:
             
             self.audio_manager.play_music(start_pos_s=target_time_s)
 
+    def handle_misses(self, misses: List[TargetType], display: DisplayManager) -> None:
+        """Handle visualization of missed targets.
+        
+        Args:
+            misses: List of target types that were missed
+            display: Display manager instance to draw on
+        """
+        for target_miss in misses:
+            print(f"miss: {target_miss}")
+            error_pos = self.button_handler.get_window_position_for_target(target_miss)
+            print(f"error_pos: {error_pos}")
+            error_color = TARGET_COLORS[target_miss]
+            display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
+            display.set_pixel(error_pos-1, error_color)  # Use the color of the wrong key that was pressed
+            display.set_pixel(error_pos+1, error_color)  # Use the color of the wrong key that was pressed
+
+    def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail_visualizer: 'TrailVisualizer', beat_float: float) -> float:
+        """Handle successful hits and update score.
+        
+        Args:
+            hits: List of target types that were hit
+            led_position: Current LED position
+            hit_trail_visualizer: Visualizer for hit trails
+            beat_float: Current beat position as float
+            
+        Returns:
+            float: Beat score offset to apply
+        """
+        beat_score_offset = 0
+        for target_hit in hits:
+            new_led_position = led_position
+            if led_position > self.button_handler.number_of_leds / 2:
+                new_led_position = led_position - self.button_handler.number_of_leds
+            if new_led_position < self.button_handler.get_window_position_for_target(target_hit):
+                beat_score_offset = -0.25
+                print(f"beat_score_offset: {beat_score_offset}")
+            print(f"target_hit: {target_hit}")
+                
+            hit_trail_visualizer.add_hit(target_hit)
+        self.score_manager.update_score(hit_trail_visualizer.simple_hit_trail.total_hits/4, beat_float)
+        return beat_score_offset
+
 def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
     x, y = LEDPosition.get_ring_position(i, radius, number_of_leds)
@@ -353,28 +395,8 @@ async def run_game() -> None:
             
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
-            # Handle successful hits
-            for target_hit in hits:
-                new_led_position = led_position
-                if led_position > number_of_leds / 2:
-                    new_led_position = led_position - number_of_leds
-                if new_led_position < game_state.button_handler.get_window_position_for_target(target_hit):
-                    beat_score_offset = -0.25
-                    print(f"beat_score_offset: {beat_score_offset}")
-                print(f"target_hit: {target_hit}")
-                    
-                hit_trail_visualizer.add_hit(target_hit)
-            game_state.score_manager.update_score(hit_trail_visualizer.simple_hit_trail.total_hits/4, beat_float)
-            
-            # Handle misses
-            for target_miss in misses:
-                print(f"miss: {target_miss}")
-                error_pos = game_state.button_handler.get_window_position_for_target(target_miss)
-                print(f"error_pos: {error_pos}")
-                error_color = TARGET_COLORS[target_miss]
-                display.set_pixel(error_pos, error_color)  # Use the color of the wrong key that was pressed
-                display.set_pixel(error_pos-1, error_color)  # Use the color of the wrong key that was pressed
-                display.set_pixel(error_pos+1, error_color)  # Use the color of the wrong key that was pressed
+            beat_score_offset = game_state.handle_hits(hits, led_position, hit_trail_visualizer, beat_float)
+            game_state.handle_misses(misses, display)
             
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
