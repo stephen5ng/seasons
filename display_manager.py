@@ -4,6 +4,7 @@ import math
 from typing import Optional, Tuple, Callable, List, Any
 from pygame import Color, Surface
 from game_constants import *
+import game_constants
 
 # For Raspberry Pi mode
 try:
@@ -81,36 +82,39 @@ class DisplayManager:
         """
         return LEDColor(color.r, color.g, color.b) if LEDColor else None
 
+    def _set_pixel_on_trail(self, pos: int, color: Color, rpi_pos_calculator: Callable[[int, int], int], pygame_radius: int) -> None:
+        """Set pixel color at a position on a specific trail (target or hit).
+
+        Args:
+            pos: The logical position of the LED.
+            color: The Pygame Color for the LED.
+            rpi_pos_calculator: A function to calculate the actual LED index for Raspberry Pi.
+            pygame_radius: The radius of the trail ring for Pygame display.
+        """
+        if IS_RASPBERRY_PI:
+            actual_led_pos = rpi_pos_calculator(pos, self.led_count)
+            self.strip.setPixelColor(actual_led_pos, self._convert_to_led_color(color))
+        else:
+            x, y = self._get_ring_position(pos,
+                                            self.screen_width // 2,
+                                            self.screen_height // 2,
+                                            pygame_radius,
+                                            self.led_count)
+            self.pygame_surface.set_at((x, y), color)
+
     def set_target_trail_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in target ring."""
-        if IS_RASPBERRY_PI:
-            pos = (pos + LED_OFFSET) % self.led_count
-            self.strip.setPixelColor(pos, self._convert_to_led_color(color))
-        else:
-            # Avoid circular import
-            import game_constants
-            x, y = self._get_ring_position(pos, 
-                                         self.screen_width // 2, 
-                                         self.screen_height // 2, 
-                                         game_constants.TARGET_TRAIL_RADIUS, 
-                                         self.led_count)
-            self.pygame_surface.set_at((x, y), color)
+        def rpi_target_pos_calculator(p: int, lc: int) -> int:
+            return (p + LED_OFFSET) % lc
+
+        self._set_pixel_on_trail(pos, color, rpi_target_pos_calculator, game_constants.TARGET_TRAIL_RADIUS)
     
     def set_hit_trail_pixel(self, pos: int, color: Color) -> None:
         """Set pixel color at position in hit trail ring."""
-        if IS_RASPBERRY_PI:
-            led_pos = pos % self.led_count
-            led_pos += self.led_count
-            self.strip.setPixelColor(led_pos, self._convert_to_led_color(color))
-        else:
-            # Avoid circular import
-            import game_constants
-            x, y = self._get_ring_position(pos, 
-                                         self.screen_width // 2, 
-                                         self.screen_height // 2, 
-                                         game_constants.HIT_TRAIL_RADIUS, 
-                                         self.led_count)
-            self.pygame_surface.set_at((x, y), color)
+        def rpi_hit_pos_calculator(p: int, lc: int) -> int:
+            return (p + LED_OFFSET) % lc + lc
+
+        self._set_pixel_on_trail(pos, color, rpi_hit_pos_calculator, game_constants.HIT_TRAIL_RADIUS)
             
     def update(self) -> None:
         """Update the display."""
