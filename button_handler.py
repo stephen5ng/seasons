@@ -52,13 +52,11 @@ class ButtonHandler:
         for config in BUTTON_CONFIGS.values()
     }
     
-    def __init__(self, error_sound: pygame.mixer.Sound,
-                number_of_leds: int, target_window_size: int,
+    def __init__(self, number_of_leds: int, target_window_size: int,
                 auto_score: bool) -> None:
         """Initialize the button handler.
         
         Args:
-            error_sound: Sound to play when an error occurs
             number_of_leds: Number of LEDs in the strip
             target_window_size: Size of target windows
             auto_score: When True, automatically scores on every round
@@ -71,7 +69,6 @@ class ButtonHandler:
         }
         self.penalty_applied: bool = False
         self.round_active: bool = False
-        self.error_sound: pygame.mixer.Sound = error_sound
         self.auto_score: bool = auto_score
 
         # Store LED configuration
@@ -199,14 +196,12 @@ class ButtonHandler:
         for key_pressed in keys_pressed:
             key_target = ButtonHandler.KEY_TO_TARGET.get(key_pressed)
             
-            # print(f"key_pressed: {key_pressed}, target_keys: {target_keys}")
             if target_type and key_pressed in target_keys:
                 if not self.button_states[target_type]:
                     self.button_states[target_type] = True
                     self.penalty_applied = False
                     hits.append(target_type)
             else:
-                # self.error_sound.play()
                 print(f"key_target: {key_target}")
                 if key_target is not None:
                     print(f"miss: {key_target}")

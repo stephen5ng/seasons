@@ -4,6 +4,7 @@ import pygame
 from typing import Optional, Tuple, Dict, Any
 
 from game_constants import *
+MS_PER_SEC = 1000.0  # Convert seconds to milliseconds
 
 
 class AudioManager:
@@ -12,7 +13,6 @@ class AudioManager:
     This class handles all audio-related functionality including:
     - Music loading and playback
     - Music synchronization with game timing
-    - Sound effect management
     - Beat timing calculations
     """
     
@@ -24,7 +24,6 @@ class AudioManager:
         """
         self.last_music_start_time_s: float = 0.0  # Track when we last started playing music
         self.last_music_start_pos_s: float = 0.0   # Track from what position we started playing
-        self.sound_effects: Dict[str, pygame.mixer.Sound] = {}
         pygame.mixer.music.load(music_file)
         
     def play_music(self, start_pos_s: float = 0.0) -> None:
@@ -62,7 +61,7 @@ class AudioManager:
         
         return beat_in_phrase, beat_float, fractional_beat
     
-    def should_sync_music(self, current_pos_s: float, target_pos_s: float, threshold: float = 0.2) -> bool:
+    def should_sync_music(self, current_pos_s: float, target_pos_s: float, threshold_s: float) -> bool:
         """Determine if music should be synchronized based on position difference.
         
         Args:
@@ -73,7 +72,7 @@ class AudioManager:
         Returns:
             True if music should be synchronized, False otherwise
         """
-        return abs(current_pos_s - target_pos_s) > threshold
+        return abs(current_pos_s - target_pos_s) > threshold_s
     
     def calculate_target_beats(self, target_time_s: float) -> int:
         """Calculate target beat count based on target time.
@@ -98,7 +97,7 @@ class AudioManager:
         Returns:
             Target music time in seconds
         """
-        measure_offset_s: float = (current_time_ms - beat_start_time_ms) / 1000.0
+        measure_offset_s: float = (current_time_ms - beat_start_time_ms) / MS_PER_SEC
         return int(score) * SECONDS_PER_MEASURE_S + measure_offset_s
     
     def _sync_music(self, target_pos_s: float) -> None:
@@ -109,47 +108,5 @@ class AudioManager:
         """
         print(f"Starting music at {target_pos_s} seconds")
         self.last_music_start_pos_s = target_pos_s
-        self.last_music_start_time_s = pygame.time.get_ticks() / 1000.0
+        self.last_music_start_time_s = pygame.time.get_ticks() / MS_PER_SEC
         pygame.mixer.music.play(start=target_pos_s)
-    
-    def load_sound_effect(self, name: str, sound_file: str) -> None:
-        """Load a sound effect for later playback.
-        
-        Args:
-            name: Name to identify the sound effect
-            sound_file: Path to the sound effect file
-        """
-        self.sound_effects[name] = pygame.mixer.Sound(sound_file)
-    
-    def play_sound_effect(self, name: str) -> None:
-        """Play a previously loaded sound effect.
-        
-        Args:
-            name: Name of the sound effect to play
-        """
-        if name in self.sound_effects:
-            self.sound_effects[name].play()
-    
-    @staticmethod
-    def set_volume(volume: float) -> None:
-        """Set the music volume.
-        
-        Args:
-            volume: Volume level (0.0 to 1.0)
-        """
-        pygame.mixer.music.set_volume(volume)
-    
-    @staticmethod
-    def pause_music() -> None:
-        """Pause music playback."""
-        pygame.mixer.music.pause()
-    
-    @staticmethod
-    def unpause_music() -> None:
-        """Resume music playback."""
-        pygame.mixer.music.unpause()
-    
-    @staticmethod
-    def stop_music() -> None:
-        """Stop music playback."""
-        pygame.mixer.music.stop()

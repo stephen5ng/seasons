@@ -129,26 +129,6 @@ class TestAudioManager(unittest.TestCase):
         # Test with non-existent sound effect
         self.audio_manager.play_sound_effect("non_existent")
         # No exception should be raised
-    
-    def test_set_volume(self):
-        """Test set_volume static method."""
-        AudioManager.set_volume(0.5)
-        self.mock_pygame_mixer_music.set_volume.assert_called_once_with(0.5)
-    
-    def test_pause_music(self):
-        """Test pause_music static method."""
-        AudioManager.pause_music()
-        self.mock_pygame_mixer_music.pause.assert_called_once()
-    
-    def test_unpause_music(self):
-        """Test unpause_music static method."""
-        AudioManager.unpause_music()
-        self.mock_pygame_mixer_music.unpause.assert_called_once()
-    
-    def test_stop_music(self):
-        """Test stop_music static method."""
-        AudioManager.stop_music()
-        self.mock_pygame_mixer_music.stop.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

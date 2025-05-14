@@ -13,9 +13,6 @@ class TestButtonHandler(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        # Mock sound
-        self.mock_sound = MagicMock()
-        
         # Mock constants for testing
         self.led_count = 80
         self.window_size = 4
@@ -25,9 +22,9 @@ class TestButtonHandler(unittest.TestCase):
         
         # Create button handler with our test values
         self.button_handler = ButtonHandler(
-            error_sound=self.mock_sound,
             number_of_leds=self.led_count,
-            target_window_size=self.window_size
+            target_window_size=self.window_size,
+            auto_score=False
         )
         
         # Override the calculated target positions for testing

@@ -22,8 +22,11 @@ class TestButtonHandler(unittest.TestCase):
         pygame.quit()
 
     def setUp(self):
-        self.error_sound = pygame.mixer.Sound("music/error.mp3")
-        self.handler = ButtonHandler(self.error_sound)
+        self.handler = ButtonHandler(
+            number_of_leds=NUMBER_OF_LEDS,
+            target_window_size=TARGET_WINDOW_SIZE,
+            auto_score=False
+        )
 
     def test_is_in_valid_window(self):
         # Test positions within each target window
