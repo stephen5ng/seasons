@@ -40,7 +40,7 @@ class WLEDController:
             True if command was sent successfully, False otherwise
         """
         try:
-            async with self.http_session.get(url, timeout=1.0) as response:
+            async with self.http_session.get(url) as response:
                 if response.status != 200:
                     print(f"Error: HTTP {response.status} for {url}")
                     return False

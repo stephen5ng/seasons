@@ -102,7 +102,11 @@ class GameState:
         self.beat_start_time_ms: int = 0
         self.total_beats: int = 0  # Track total beats in song
         self.last_beat: int = -1  # Track last beat for increment
-        self.http_session = aiohttp.ClientSession()  # Create a single session for all HTTP requests
+        
+        # Create a single session for all HTTP requests with better DNS settings
+        connector = aiohttp.TCPConnector(use_dns_cache=True, ttl_dns_cache=300)
+        timeout = aiohttp.ClientTimeout(total=5.0, connect=3.0)
+        self.http_session = aiohttp.ClientSession(connector=connector, timeout=timeout)
         
         # Component managers
         self.score_manager = ScoreManager()
