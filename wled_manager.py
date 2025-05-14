@@ -38,7 +38,7 @@ class WLEDManager:
             return
 
         wled_command = self.command_settings.get(current_phrase)
-        if wled_command != self.last_wled_command:
+        if wled_command and wled_command != self.last_wled_command:
             print(f"wled_command: {wled_command}")
             self.last_wled_command = wled_command
             await self.wled_controller.send_command(wled_command) 
