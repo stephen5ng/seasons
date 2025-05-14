@@ -41,7 +41,6 @@ class HitTrailBase:
         current_time = pygame.time.get_ticks()
         positions_to_remove = []
         
-        # Display all active hits
         for pos, (target_type, start_time) in self.active_hits.items():
             elapsed_ms = current_time - start_time
             
@@ -51,7 +50,6 @@ class HitTrailBase:
                 
             brightness = self.easing(elapsed_ms)
             
-            # Get the color for this target type and apply brightness
             hit_color = game_constants.TARGET_COLORS[target_type]
             faded_color = Color(
                 int(hit_color.r * brightness),

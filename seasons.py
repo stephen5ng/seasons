@@ -212,33 +212,7 @@ class GameState:
                     int(TARGET_COLORS[target_miss].b * initial_intensity)
                 )
                 display.set_target_trail_pixel(pos, faded_color, 1.0)
-        return
         
-        # Draw and fade out existing misses
-        MISS_FADE_DURATION = 0.5  # Duration of fade in seconds
-        to_remove = []
-        
-        for (pos, target_type), (timestamp, initial_intensity) in self.miss_timestamps.items():
-            elapsed = current_time - timestamp
-            if elapsed >= MISS_FADE_DURATION:
-                to_remove.append((pos, target_type))
-                continue
-                
-            # Calculate fade intensity using quadratic ease out
-            fade_intensity = (1.0 - (elapsed / MISS_FADE_DURATION) ** 2) * initial_intensity
-            error_color = TARGET_COLORS[target_type]
-            
-            # Apply fade to color
-            faded_color = Color(
-                int(error_color.r * fade_intensity),
-                int(error_color.g * fade_intensity),
-                int(error_color.b * fade_intensity)
-            )
-            display.set_target_trail_pixel(pos, faded_color)
-        
-        # Remove expired misses
-        for key in to_remove:
-            del self.miss_timestamps[key]
 
     def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail_visualizer: 'TrailVisualizer', beat_float: float) -> float:
         """Handle successful hits and update score.
