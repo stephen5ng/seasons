@@ -89,16 +89,14 @@ class ButtonHandler:
         
         # Initialize GPIO buttons
         self.simulated_keys: Set[int] = set()
-        self.gpio_buttons: Dict[TargetType, Button] = {}
+        self.gpio_buttons: Dict[int, Button] = {}
         
         # Only initialize GPIO buttons on Raspberry Pi
         if IS_RASPBERRY_PI:
             # Create buttons from configuration
             for target_type, config in self.BUTTON_CONFIGS.items():
                 button = Button(config.pin)
-#                button.when_pressed = lambda k=config.key: self.simulated_keys.add(k)
-#                button.when_released = lambda k=config.key: self.simulated_keys.discard(k)
-                self.gpio_buttons[target_type] = button
+                self.gpio_buttons[config.key] = button
     
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
