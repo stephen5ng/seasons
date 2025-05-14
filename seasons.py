@@ -449,13 +449,9 @@ async def run_game() -> None:
                 display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], 0.8)
                 display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], 0.8)
             
-            target_trail_color = Color(255, 255, 255)
-            if game_state.button_handler.is_in_valid_window(led_position):
-                pos_target_type = game_state.button_handler.get_target_type(led_position)
-                target_trail_color = TARGET_COLORS[pos_target_type]
-            else:
+            display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8)
+            if not game_state.button_handler.is_in_valid_window(led_position):
                 stable_score = game_state.score_manager.score
-            display.set_target_trail_pixel(led_position, target_trail_color, 0.8)
                         
             hit_trail_visualizer.sync_with_game_state(game_state, led_position)
             

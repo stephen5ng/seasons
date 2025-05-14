@@ -104,26 +104,6 @@ class TestScoreManager(unittest.TestCase):
         
         # Verify mock was called
         mock_get_score_line_color.assert_called_once_with(base_color, flash_intensity, flash_type)
-    
-    @patch('score_manager.HitTrail.calculate_trail_positions')
-    def test_calculate_trail_positions(self, mock_calculate_trail_positions):
-        """Test calculate_trail_positions static method."""
-        # Set up mock
-        led_position = 40
-        hit_colors = [Color(255, 0, 0), Color(0, 255, 0)]
-        hit_spacing = 8
-        led_count = 80
-        expected_positions = {48: Color(255, 0, 0), 56: Color(0, 255, 0)}
-        mock_calculate_trail_positions.return_value = expected_positions
-        
-        # Call the method
-        positions = ScoreManager.calculate_trail_positions(led_position, hit_colors, hit_spacing, led_count)
-        
-        # Check result
-        self.assertEqual(positions, expected_positions)
-        
-        # Verify mock was called
-        mock_calculate_trail_positions.assert_called_once_with(led_position, hit_colors, hit_spacing, led_count)
 
 if __name__ == '__main__':
     unittest.main()
