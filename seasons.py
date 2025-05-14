@@ -77,6 +77,9 @@ number_of_leds = args.leds
 # Calculate target_window_size based on the number of LEDs
 target_window_size = int(number_of_leds * TARGET_WINDOW_PERCENT)
 
+# Time conversion constants
+MS_PER_SEC = 1000.0  # Convert seconds to milliseconds
+
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
 
@@ -308,6 +311,17 @@ def draw_fifth_lines(display: DisplayManager, measure: float) -> None:
             draw_fifth_line(display, percent_complete)
             break
 
+def get_effective_window_size(phrase: int) -> int:
+    """Calculate the effective window size based on the current phrase.
+    
+    Args:
+        phrase: Current phrase number (0-based)
+        
+    Returns:
+        The window size to use for scoring
+    """
+    return target_window_size // 2 if phrase > 8 else target_window_size
+
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
     # Configure file logging for hit trail behavior
@@ -387,6 +401,9 @@ async def run_game() -> None:
                 last_beat = int(beat_float)
                 
                 await game_state.wled_manager.update_wled(phrase)
+                # Update window size based on phrase
+                effective_window = get_effective_window_size(phrase)
+                game_state.button_handler.set_window_size(effective_window)
 
                 if phrase >= ending_phrase:
                     print("sleeping 10 to finish wled commands")
@@ -423,8 +440,7 @@ async def run_game() -> None:
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
-                game_state.trail_state_manager.update_position(led_position, current_time_ms / 1000.0)
-            
+                game_state.trail_state_manager.update_position(led_position, current_time_ms / MS_PER_SEC)
             
             target_trail_color = Color(255, 255, 255)
             if game_state.button_handler.is_in_valid_window(led_position):

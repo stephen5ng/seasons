@@ -99,6 +99,14 @@ class ButtonHandler:
                 button = Button(config.pin)
                 self.gpio_buttons[config.key] = button
     
+    def set_window_size(self, window_size: int) -> None:
+        """Update the window size for scoring.
+        
+        Args:
+            window_size: New window size to use
+        """
+        self.target_window_size = window_size
+
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
         
