@@ -198,7 +198,7 @@ class GameState:
         
         # Add new misses
         for target_miss in misses:
-            error_pos = self.button_handler.get_window_position_for_target(target_miss)
+            error_pos = self.button_handler.target_positions[target_miss]
             for offset in range(-max_distance, max_distance + 1):
                 pos = error_pos + offset
                 error_color = TARGET_COLORS[target_miss]
@@ -228,10 +228,9 @@ class GameState:
         """
         beat_score_offset = 0
         for target_hit in hits:
-            new_led_position = led_position
             if led_position > self.button_handler.number_of_leds / 2:
-                new_led_position = led_position - self.button_handler.number_of_leds
-            if new_led_position < self.button_handler.get_window_position_for_target(target_hit):
+                led_position -= self.button_handler.number_of_leds
+            if led_position < self.button_handler.target_positions[target_hit]:
                 beat_score_offset = -0.25
                 print(f"beat_score_offset: {beat_score_offset}")
             print(f"target_hit: {target_hit}")

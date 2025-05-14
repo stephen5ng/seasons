@@ -78,11 +78,13 @@ class ButtonHandler:
         self.number_of_leds = number_of_leds
         self.target_window_size = target_window_size
         
-        # Calculate target positions using percentages
-        self.red_target_pos = 0
-        self.blue_target_pos = int(number_of_leds * self.BLUE_TARGET_PERCENT)
-        self.green_target_pos = int(number_of_leds * self.GREEN_TARGET_PERCENT)
-        self.yellow_target_pos = int(number_of_leds * self.YELLOW_TARGET_PERCENT)
+        # Calculate and store target positions
+        self.target_positions = {
+            TargetType.RED: int(number_of_leds * self.RED_TARGET_PERCENT),
+            TargetType.BLUE: int(number_of_leds * self.BLUE_TARGET_PERCENT),
+            TargetType.GREEN: int(number_of_leds * self.GREEN_TARGET_PERCENT),
+            TargetType.YELLOW: int(number_of_leds * self.YELLOW_TARGET_PERCENT)
+        }
     
         self.last_target_type = TargetType.RED
         
@@ -204,36 +206,6 @@ class ButtonHandler:
 
         return hits, misses
     
-    def get_window_position_for_target(self, target_type: TargetType) -> int:
-        """Get the center position of a target window.
-        
-        Args:
-            target_type: Target type to get position for
-            
-        Returns:
-            Center position of the target window
-        """
-        if target_type == TargetType.RED:
-            return self.red_target_pos
-        elif target_type == TargetType.BLUE:
-            return self.blue_target_pos
-        elif target_type == TargetType.GREEN:
-            return self.green_target_pos
-        else:  # YELLOW
-            return self.yellow_target_pos
-    
-    @staticmethod
-    def calculate_penalty_score(score: float) -> float:
-        """Calculate score after applying a penalty.
-        
-        Args:
-            score: Current score
-            
-        Returns:
-            Score after penalty
-        """
-        return max(0, score - 0.25)
-    
     def get_target_type_for_position(self, position: int, led_count: int, window_size: int) -> Optional[TargetType]:
         """Determine which target window the position is in, if any.
         
@@ -245,22 +217,9 @@ class ButtonHandler:
         Returns:
             TargetType if position is in a target window, None otherwise
         """
-        # Calculate target positions
-        red_pos = 0
-        blue_pos = int(led_count * ButtonHandler.BLUE_TARGET_PERCENT)
-        green_pos = int(led_count * ButtonHandler.GREEN_TARGET_PERCENT)
-        yellow_pos = int(led_count * ButtonHandler.YELLOW_TARGET_PERCENT)
-     
-        # Check if position is near a target, with wrapping for the red target
-        if (position <= window_size or 
-            position >= (led_count - window_size)):
-            return TargetType.RED
-        elif abs(position - blue_pos) <= window_size:
-            return TargetType.BLUE
-        elif abs(position - green_pos) <= window_size:
-            return TargetType.GREEN
-        elif abs(position - yellow_pos) <= window_size:
-            return TargetType.YELLOW
+        for target_type, target_pos in self.target_positions.items():
+            if self.mod_distance(position, target_pos, led_count) <= window_size:
+                return target_type
         return None
     
     @staticmethod
@@ -274,4 +233,7 @@ class ButtonHandler:
             List of key codes for the target
         """
         return [ButtonHandler.BUTTON_CONFIGS[target_type].key]
-        
+    
+    @staticmethod
+    def mod_distance(a, b, mod):
+        return min((a - b) % mod, (b - a) % mod)
