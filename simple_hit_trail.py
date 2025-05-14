@@ -4,24 +4,31 @@ This module provides a simplified hit trail visualization where each hit
 simply lights up the closest LED, rather than creating a trailing effect.
 """
 import pygame
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Callable
 from pygame import Color
-from game_constants import TargetType
-from hit_trail_base import HitTrailBase
+from game_constants import TargetType, TARGET_COLORS
+from easing_functions import QuadEaseOut  # type: ignore
 
-class SimpleHitTrail(HitTrailBase):
+class SimpleHitTrail:
     """A simple hit trail implementation that lights up a single LED position."""
     
-    def __init__(self) -> None:
-        """Initialize the simple hit trail."""
-        super().__init__(90000000000)
+    def __init__(self, fade_duration_ms: int = 90000000000) -> None:
+        """Initialize the simple hit trail.
+        
+        Args:
+            fade_duration_ms: Duration in milliseconds for the fade-out effect
+        """
+        self.easing = QuadEaseOut(start=1.0, end=0.0, duration=fade_duration_ms)
+        self.active_hits: Dict[int, Tuple[TargetType, int]] = {}  # position -> (target_type, start_time)
+        self.rotate = 0.0
+        self.rotate_speed = 0.0
         self.hit_position: Optional[Tuple[int, TargetType]] = None  # (position, target_type)        
         self.number_of_hits_by_type: Dict[TargetType, int] = {}
         self.hits_by_type: Dict[TargetType, List[int]] = {}
         self.total_hits: int = 0
 
     def add_hit(self, position: int, target_type: TargetType) -> None:
-        """Implementation of add_hit for subclasses.
+        """Add a hit to the trail.
         
         Args:
             position: The LED position to light up
@@ -53,7 +60,7 @@ class SimpleHitTrail(HitTrailBase):
                 print(f"total_hits: {self.total_hits}")
                 del self.active_hits[position]
 
-    def draw(self, display_func) -> None:
+    def draw(self, display_func: Callable[[int, Color], None]) -> None:
         """Draw the simple hit trail.
         
         Args:
@@ -67,7 +74,31 @@ class SimpleHitTrail(HitTrailBase):
             self.rotate_speed = 0.001
         else:
             self.rotate_speed = 0.0
-        # elif self.total_hits > 40:
-        #     self.rotate_speed = 0.1
 
-        self._display(display_func) 
+        current_time = pygame.time.get_ticks()
+        positions_to_remove = []
+        
+        for pos, (target_type, start_time) in self.active_hits.items():
+            elapsed_ms = current_time - start_time
+            
+            if elapsed_ms > self.easing.duration:
+                positions_to_remove.append(pos)
+                continue
+                
+            brightness = self.easing(elapsed_ms)
+            
+            hit_color = TARGET_COLORS[target_type]
+            faded_color = Color(
+                int(hit_color.r * brightness),
+                int(hit_color.g * brightness),
+                int(hit_color.b * brightness),
+                255  # Always full alpha
+            )
+            
+            self.rotate += self.rotate_speed
+            r = int(self.rotate) % 300
+            display_func(pos + r, faded_color)
+        
+        # Remove expired positions
+        for pos in positions_to_remove:
+            del self.active_hits[pos] 
