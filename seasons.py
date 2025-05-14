@@ -210,19 +210,34 @@ class GameState:
                 display.set_target_trail_pixel(pos, faded_color, 1.0)
         
 
-    def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail_visualizer: 'TrailVisualizer', beat_float: float) -> float:
+    def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail_visualizer: 'TrailVisualizer', beat_float: float, display: DisplayManager) -> None:
         """Handle successful hits and update score.
         
         Args:
             hits: List of target types that were hit
             led_position: Current LED position
             hit_trail_visualizer: Visualizer for hit trails
-            beat_float: Current beat position as float            
+            beat_float: Current beat position as float
+            display: Display manager instance to draw on
         """
         for target_hit in hits:
             if led_position > self.button_handler.number_of_leds / 2:
                 led_position -= self.button_handler.number_of_leds
+            
+            # Light up LEDs within the target window
+            target_color = TARGET_COLORS[target_hit]
+            target_pos = self.button_handler.target_positions[target_hit]
+            window_size = self.button_handler.target_window_size
+            
+            window_start = target_pos - window_size
+            window_end = target_pos + window_size
+            
+            if window_start > window_end:
+                window_end += self.button_handler.number_of_leds
                 
+            for i in range(window_start, window_end + 1):
+                display.set_target_trail_pixel(i % self.button_handler.number_of_leds, target_color, 1.0)
+    
             hit_trail_visualizer.add_hit(target_hit)
         self.score_manager.update_score(hit_trail_visualizer.simple_hit_trail.total_hits/4, beat_float)
 
@@ -419,7 +434,7 @@ async def run_game() -> None:
             
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
-            game_state.handle_hits(hits, led_position, hit_trail_visualizer, beat_float)
+            game_state.handle_hits(hits, led_position, hit_trail_visualizer, beat_float, display)
             game_state.handle_misses(misses, 3, display)
             
             if led_position != game_state.current_led_position:
