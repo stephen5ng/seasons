@@ -73,8 +73,7 @@ class ButtonHandler:
         self.round_active: bool = False
         self.error_sound: pygame.mixer.Sound = error_sound
         self.auto_score: bool = auto_score
-        if auto_score:
-            self.target_window_size = 0
+
         # Store LED configuration
         self.number_of_leds = number_of_leds
         self.target_window_size = target_window_size
@@ -142,7 +141,7 @@ class ButtonHandler:
         Returns:
             TargetType if position is in a target window, None otherwise
         """
-        target_type = ButtonHandler.get_target_type_for_position(
+        target_type = self.get_target_type_for_position(
             position,
             self.number_of_leds,
             self.target_window_size
@@ -162,7 +161,8 @@ class ButtonHandler:
             - hits: Sequence of target types that were hit correctly
             - misses: Sequence of target types corresponding to incorrectly pressed keys
         """
-        target_type: Optional[TargetType] = self.get_target_type(led_position)        
+        target_type: Optional[TargetType] = self.get_target_type_for_position(led_position, self.number_of_leds,
+                                                                              1 if self.auto_score else self.target_window_size)        
         hits: List[TargetType] = []
         misses: List[TargetType] = []
         
@@ -234,8 +234,7 @@ class ButtonHandler:
         """
         return max(0, score - 0.25)
     
-    @staticmethod
-    def get_target_type_for_position(position: int, led_count: int, window_size: int) -> Optional[TargetType]:
+    def get_target_type_for_position(self, position: int, led_count: int, window_size: int) -> Optional[TargetType]:
         """Determine which target window the position is in, if any.
         
         Args:
@@ -246,21 +245,21 @@ class ButtonHandler:
         Returns:
             TargetType if position is in a target window, None otherwise
         """
-        # Convert position to percentage around the ring (0-1)
-        position_percent = position / led_count
-        
-        # Calculate window size as percentage
-        window_percent = window_size / led_count
-        
+        # Calculate target positions
+        red_pos = 0
+        blue_pos = int(led_count * ButtonHandler.BLUE_TARGET_PERCENT)
+        green_pos = int(led_count * ButtonHandler.GREEN_TARGET_PERCENT)
+        yellow_pos = int(led_count * ButtonHandler.YELLOW_TARGET_PERCENT)
+     
         # Check if position is near a target, with wrapping for the red target
-        if (position_percent <= window_percent or 
-            position_percent >= (1.0 - window_percent)):
+        if (position <= window_size or 
+            position >= (led_count - window_size)):
             return TargetType.RED
-        elif abs(position_percent - ButtonHandler.BLUE_TARGET_PERCENT) <= window_percent:
+        elif abs(position - blue_pos) <= window_size:
             return TargetType.BLUE
-        elif abs(position_percent - ButtonHandler.GREEN_TARGET_PERCENT) <= window_percent:
+        elif abs(position - green_pos) <= window_size:
             return TargetType.GREEN
-        elif abs(position_percent - ButtonHandler.YELLOW_TARGET_PERCENT) <= window_percent:
+        elif abs(position - yellow_pos) <= window_size:
             return TargetType.YELLOW
         return None
     
