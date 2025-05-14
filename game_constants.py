@@ -52,7 +52,8 @@ SCORE_FLASH_DURATION_MS = 1000  # How long the score flash lasts
 SCORE_LINE_ANIMATION_TIME_MS = 500  # How long the score line animation lasts
 
 # WLED settings
-WLED_IP = "192.168.0.121"
+WLED_IP = "wled-514c80.local"
+
 WLED_SETTINGS = {
     0: "FX=2&FP=67&SX=32",  # BREATHE / BLINK RED 
     4: "FX=54&FP=57&SX=48",  # CHASE 3 / CANDY
