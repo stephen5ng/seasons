@@ -120,17 +120,6 @@ class GameState:
         # Track miss timestamps for fade effect
         self.miss_timestamps: Dict[Tuple[int, TargetType], Tuple[float, float]] = {}  # (position, target_type) -> (timestamp, initial_intensity)
 
-    def reset_flags(self, led_position: int) -> None:
-        """Reset state flags based on LED position."""
-        was_in_window: bool = self.button_handler.round_active
-        
-        self.button_handler.reset_flags(led_position)
-        
-        is_in_window: bool = self.button_handler.round_active
-        
-        # if is_in_window and not was_in_window:
-        #     print(f"Entered scoring window at position {led_position}")
-
     async def update_timing(self) -> Tuple[int, float, float]:
         """Calculate current timing values."""
         current_time_ms: int = pygame.time.get_ticks()
@@ -227,10 +216,7 @@ class GameState:
             # Light up LEDs within the target window
             target_color = TARGET_COLORS[target_hit]
             target_pos = self.button_handler.target_positions[target_hit]
-            window_size = self.button_handler.target_window_size
-            
-            window_start = target_pos - window_size
-            window_end = target_pos + window_size
+            window_start, window_end = self.button_handler.get_window_boundaries(target_pos)
             
             if window_start > window_end:
                 window_end += self.button_handler.number_of_leds
@@ -246,8 +232,8 @@ class GameState:
         
         This method handles cleanup and final WLED commands before exiting.
         """
-        print("sleeping 10 to finish wled commands")
-        await asyncio.sleep(10)
+        print("sleeping to finish wled commands")
+        await asyncio.sleep(3)
         print("Cleanup done, Exiting game")
 
 def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
@@ -425,12 +411,9 @@ async def run_game() -> None:
             if not game_state.button_handler.is_in_valid_window(led_position):
                 missed_target = game_state.button_handler.missed_target()
                 if missed_target:
-                    # new_score = max(0, game_state.score_manager.score - 0.25)
-                    # print(f"PENALTY New score: {new_score}, target hit: {target_hit}")
-
                     hit_trail_visualizer.remove_hit(missed_target)
             
-            game_state.reset_flags(led_position)
+            game_state.button_handler.reset_flags(led_position)
             
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
@@ -444,8 +427,7 @@ async def run_game() -> None:
                         
             # Draw LEDs at the start and end of each target window
             for target_type, target_pos in game_state.button_handler.target_positions.items():
-                window_start = (target_pos - game_state.button_handler.target_window_size) % game_state.button_handler.number_of_leds
-                window_end = (target_pos + game_state.button_handler.target_window_size) % game_state.button_handler.number_of_leds
+                window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos)
                 display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], 0.8)
                 display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], 0.8)
             

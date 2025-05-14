@@ -182,10 +182,10 @@ class ButtonHandler:
         for k, v in self.gpio_buttons.items():
             if v.is_pressed:
                 keys_pressed.append(k)
-                print(f"{v.is_pressed}, {k}")
+                # print(f"{v.is_pressed}, {k}")
 
-        if self.simulated_keys:
-            print(f"gpio: {self.simulated_keys}")        
+        # if self.simulated_keys:
+        #     print(f"gpio: {self.simulated_keys}")        
 
         keys_pressed.extend(self.simulated_keys)
             
@@ -202,9 +202,9 @@ class ButtonHandler:
                     self.penalty_applied = False
                     hits.append(target_type)
             else:
-                print(f"key_target: {key_target}")
+                # print(f"key_target: {key_target}")
                 if key_target is not None:
-                    print(f"miss: {key_target}")
+                    # print(f"miss: {key_target}")
                     misses.append(key_target)
 
         return hits, misses
@@ -240,3 +240,16 @@ class ButtonHandler:
     @staticmethod
     def mod_distance(a, b, mod):
         return min((a - b) % mod, (b - a) % mod)
+
+    def get_window_boundaries(self, target_pos: int) -> Tuple[int, int]:
+        """Calculate the start and end positions of a target window.
+        
+        Args:
+            target_pos: The center position of the target window
+            
+        Returns:
+            Tuple of (window_start, window_end) positions, properly wrapped around the LED strip
+        """
+        window_start = (target_pos - self.target_window_size) % self.number_of_leds
+        window_end = (target_pos + self.target_window_size) % self.number_of_leds
+        return window_start, window_end
