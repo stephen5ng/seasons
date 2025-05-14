@@ -15,7 +15,6 @@ from pygameasync import Clock
 from get_key import get_key
 from button_handler import ButtonHandler
 from led_position import LEDPosition
-from music_timing import MusicTiming
 from wled_manager import WLEDManager
 from display_manager import DisplayManager
 from score_manager import ScoreManager
@@ -113,7 +112,7 @@ class GameState:
         
         # Component managers
         self.score_manager = ScoreManager()
-        self.audio_manager = AudioManager()
+        self.audio_manager = AudioManager("music/Rise Up 4.mp3")
         self.audio_manager.load_sound_effect("error", ERROR_SOUND)
         self.wled_manager = WLEDManager(not args.disable_wled, WLED_IP, self.http_session, WLED_SETTINGS, number_of_leds)
         
@@ -138,7 +137,7 @@ class GameState:
     async def update_timing(self) -> Tuple[int, float, float]:
         """Calculate current timing values."""
         current_time_ms: int = pygame.time.get_ticks()
-        beat_in_phrase, beat_float, fractional_beat = MusicTiming.calculate_beat_timing(
+        beat_in_phrase, beat_float, fractional_beat = self.audio_manager.calculate_beat_timing(
             current_time_ms, self.start_ticks_ms
         )
 
@@ -236,7 +235,7 @@ class GameState:
             if led_position < self.button_handler.target_positions[target_hit]:
                 beat_score_offset = -0.25
                 print(f"beat_score_offset: {beat_score_offset}")
-            print(f"target_hit: {target_hit}")
+            # print(f"target_hit: {target_hit}")
                 
             hit_trail_visualizer.add_hit(target_hit)
         self.score_manager.update_score(hit_trail_visualizer.simple_hit_trail.total_hits/4, beat_float)
@@ -366,8 +365,6 @@ async def run_game() -> None:
     logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     
     try:
-        # Initialize music
-        game_state.audio_manager.load_music("music/Rise Up 4.mp3")
         game_state.audio_manager.play_music(start_pos_s=0.0)
 
         # Variables for tracking if we've completed one full loop in debug mode
@@ -441,9 +438,13 @@ async def run_game() -> None:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
                 game_state.trail_state_manager.update_position(led_position, current_time_ms / MS_PER_SEC)            
-            
-            # Always draw a red LED at position 0
-            display.set_target_trail_pixel(0, TARGET_COLORS[TargetType.RED], 0.8)
+                        
+            # Draw LEDs at the start and end of each target window
+            for target_type, target_pos in game_state.button_handler.target_positions.items():
+                window_start = (target_pos - game_state.button_handler.target_window_size) % game_state.button_handler.number_of_leds
+                window_end = (target_pos + game_state.button_handler.target_window_size) % game_state.button_handler.number_of_leds
+                display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], 0.8)
+                display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], 0.8)
             
             target_trail_color = Color(255, 255, 255)
             if game_state.button_handler.is_in_valid_window(led_position):

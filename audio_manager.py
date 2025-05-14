@@ -3,7 +3,6 @@
 import pygame
 from typing import Optional, Tuple, Dict, Any
 
-from music_timing import MusicTiming
 from game_constants import *
 
 
@@ -14,9 +13,10 @@ class AudioManager:
     - Music loading and playback
     - Music synchronization with game timing
     - Sound effect management
+    - Beat timing calculations
     """
     
-    def __init__(self, music_file: Optional[str] = None) -> None:
+    def __init__(self, music_file: str) -> None:
         """Initialize the audio manager.
         
         Args:
@@ -24,22 +24,9 @@ class AudioManager:
         """
         self.last_music_start_time_s: float = 0.0  # Track when we last started playing music
         self.last_music_start_pos_s: float = 0.0   # Track from what position we started playing
-        self.music_file: Optional[str] = music_file
         self.sound_effects: Dict[str, pygame.mixer.Sound] = {}
-        
-        # Load music if provided
-        if music_file:
-            self.load_music(music_file)
-    
-    def load_music(self, music_file: str) -> None:
-        """Load a music file for playback.
-        
-        Args:
-            music_file: Path to the music file to load
-        """
-        self.music_file = music_file
         pygame.mixer.music.load(music_file)
-    
+        
     def play_music(self, start_pos_s: float = 0.0) -> None:
         """Play the loaded music from the specified position.
         
@@ -58,52 +45,47 @@ class AudioManager:
         """
         return self.last_music_start_pos_s + (pygame.mixer.music.get_pos() / 1000.0)
     
-    def handle_music_loop(self, score: float, beat_start_time_ms: int, 
-                         current_time_ms: int, seconds_per_measure_s: float) -> None:
-        """Handle music looping and synchronization.
+    def calculate_beat_timing(self, current_time_ms: int, start_time_ms: int) -> Tuple[int, float, float]:
+        """Calculate current beat timing values.
         
         Args:
-            score: Current game score
-            beat_start_time_ms: Time when the current beat started
             current_time_ms: Current time in milliseconds
-            seconds_per_measure_s: Duration of one measure in seconds
+            start_time_ms: Start time in milliseconds
+            
+        Returns:
+            Tuple of (beat_in_phrase, beat_float, fractional_beat)
         """
-        # Calculate target music time based on score and timing
-        target_time_s: float = MusicTiming.calculate_target_music_time(
-            score, beat_start_time_ms, current_time_ms, seconds_per_measure_s
-        )
+        duration_ms: int = current_time_ms - start_time_ms
+        beat_float: float = duration_ms * BEAT_PER_MS
+        beat_in_phrase: int = int(beat_float) % BEATS_PER_PHRASE
+        fractional_beat: float = beat_float % 1
         
-        # Get current music position in seconds
-        current_music_pos_s: float = self.get_current_music_position()
-        
-        # Check if we need to synchronize music
-        if self._should_sync_music(current_music_pos_s, target_time_s):
-            self._sync_music(target_time_s)
+        return beat_in_phrase, beat_float, fractional_beat
     
-    def _should_sync_music(self, current_pos_s: float, target_pos_s: float) -> bool:
-        """Determine if music needs to be synchronized.
+    def should_sync_music(self, current_pos_s: float, target_pos_s: float, threshold: float = 0.2) -> bool:
+        """Determine if music should be synchronized based on position difference.
         
         Args:
             current_pos_s: Current music position in seconds
             target_pos_s: Target music position in seconds
+            threshold: Maximum allowed difference before sync is needed
             
         Returns:
-            True if music should be synchronized
+            True if music should be synchronized, False otherwise
         """
-        return MusicTiming.should_sync_music(current_pos_s, target_pos_s)
-        
-    def should_sync_music(self, current_pos_s: float, target_pos_s: float) -> bool:
-        """Public method to determine if music needs to be synchronized.
+        return abs(current_pos_s - target_pos_s) > threshold
+    
+    def calculate_target_beats(self, target_time_s: float) -> int:
+        """Calculate target beat count based on target time.
         
         Args:
-            current_pos_s: Current music position in seconds
-            target_pos_s: Target music position in seconds
+            target_time_s: Target time in seconds
             
         Returns:
-            True if music should be synchronized
+            Target beat count
         """
-        return self._should_sync_music(current_pos_s, target_pos_s)
-        
+        return int(target_time_s * (1000 * BEAT_PER_MS))
+    
     def get_target_music_time(self, score: float, beat_start_time_ms: int, 
                              current_time_ms: int) -> float:
         """Calculate target music time based on score and timing.
@@ -118,19 +100,6 @@ class AudioManager:
         """
         measure_offset_s: float = (current_time_ms - beat_start_time_ms) / 1000.0
         return int(score) * SECONDS_PER_MEASURE_S + measure_offset_s
-        
-    @staticmethod
-    def calculate_target_beats(target_time_s: float, beat_per_ms: float) -> int:
-        """Calculate target beats based on target time.
-        
-        Args:
-            target_time_s: Target time in seconds
-            beat_per_ms: Beats per millisecond
-            
-        Returns:
-            Target beats
-        """
-        return MusicTiming.calculate_target_beats(target_time_s, beat_per_ms)
     
     def _sync_music(self, target_pos_s: float) -> None:
         """Synchronize music to the target position.
