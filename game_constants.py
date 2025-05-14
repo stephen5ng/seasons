@@ -55,7 +55,8 @@ SCORE_LINE_ANIMATION_TIME_MS = 500  # How long the score line animation lasts
 WLED_IP = "wled-514c80.local"
 
 WLED_SETTINGS = {
-    0: "FX=2&FP=67&SX=32",  # BREATHE / BLINK RED 
+    0: "T=0",
+    1: "T=255&FX=2&FP=67&SX=32",  # BREATHE / BLINK RED 
     4: "FX=54&FP=57&SX=48",  # CHASE 3 / CANDY
     8: "FX=19&FP=10&SX=255",  # DISSOLVE RND / FOREST
     12: "FX=66&FP=41&SX=128",  # FIRE 2012 / MAGRED
