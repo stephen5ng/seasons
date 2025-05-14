@@ -55,19 +55,40 @@ SCORE_LINE_ANIMATION_TIME_MS = 500  # How long the score line animation lasts
 WLED_IP = "wled-514c80.local"
 
 WLED_SETTINGS = {
-    0: "T=0",
-    1: "T=255&FX=2&FP=67&SX=32",  # BREATHE / BLINK RED 
-    4: "FX=54&FP=57&SX=48",  # CHASE 3 / CANDY
-    8: "FX=19&FP=10&SX=255",  # DISSOLVE RND / FOREST
-    12: "FX=66&FP=41&SX=128",  # FIRE 2012 / MAGRED
-    16: "FX=9&FP=20&SX=128",  # RAINBOW / PASTEL
-    20: "FX=92&FP=45&SX=192",  # SINELON / CLOUD
-    24: "FX=13&FP=27&SX=96",  # SUNSET / SHERBET
-    32: "FX=3&FP=43&SX=128",  # WIPE / YELBLU
-    35: "FX=34&FP=19&SX=32",  # COLORFUL / TEMPERATURE
-    38: "FX=108&FP=9&SX=128",  # SINE / OCEAN
-    45: "FX=173&FP=34&SX=128",  # TARTAN / TERTIARY
-    48: "FX=34&FP=19&SX=32",  # BREATHE / SPLASH
+    0: {"on": False, 
+        "seg": []},
+    1: {"on": True, 
+        "seg": [
+            {"fx": 2, "pal": 67, "sx": 32}]}, # BREATHE / BLINK RED 
+    4: {"on": True,
+        "seg": [{
+            "fx": 54, "pal": 57, "sx": 48}]},  # CHASE 3 / CANDY
+    8: {"on": True,
+        "seg": [{
+            "fx": 19, "pal": 10, "sx": 255}]},  # DISSOLVE RND / FOREST
+    12: {"on": True,
+        "seg": [{
+            "fx": 66, "pal": 41, "sx": 128}]},  # FIRE 2012 / MAGRED
+    16: {"on": True,
+        "seg": [{
+            "fx": 9, "pal": 20, "sx": 128}]},  # RAINBOW / PASTEL
+    18: {"on": False, 
+        "seg": []},
+    # 20: {"on": True,
+    #     "seg": [{
+    #         "fx": 92, "pal": 45, "sx": 192}]},  # SINELON / CLOUD
+    # 24: {"on": True,
+    #      "seg": [{"fx": 13, "pal": 27, "sx": 96}]},  # SUNSET / SHERBET
+    # 32: {"on": True,
+    #      "seg": [{"fx": 3, "pal": 43, "sx": 128}]},  # WIPE / YELBLU
+    # 35: {"on": True,
+    #      "seg": [{"fx": 34, "pal": 19, "sx": 32}]},  # COLORFUL / TEMPERATURE
+    # 38: {"on": True,
+    #      "seg": [{"fx": 108, "pal": 9, "sx": 128}]},  # SINE / OCEAN
+    # 45: {"on": True,
+    #      "seg": [{"fx": 173, "pal": 34, "sx": 128}]},  # TARTAN / TERTIARY
+    # 48: {"on": True,
+    #      "seg": [{"fx": 34, "pal": 19, "sx": 32}]},  # BREATHE / SPLASH
 }
 
 # LED strip configuration

@@ -1,7 +1,8 @@
 """WLED controller utilities."""
 import asyncio
 import aiohttp
-from typing import Dict, Optional, Any, Callable
+import json
+from typing import Dict, Any, Optional
 
 class WLEDController:
     """Handles WLED device communication and command management."""
@@ -18,30 +19,32 @@ class WLEDController:
         self.current_http_task: Optional[asyncio.Task] = None
     
     @staticmethod
-    def build_command_url(ip_address: str, command: str) -> str:
-        """Build the full URL for a WLED command.
+    def build_json_url(ip_address: str) -> str:
+        """Build the URL for JSON commands.
         
         Args:
             ip_address: IP address of the WLED device
-            command: WLED command string (without base URL)
             
         Returns:
-            Complete URL for the WLED command
+            Complete URL for JSON commands
         """
-        return f"http://{ip_address}/win&{command}"
+        return f"http://{ip_address}/json/state"
     
-    async def _send_command_inner(self, url: str) -> bool:
-        """Internal method to send WLED command.
+    async def _send_json_inner(self, url: str, json_data: Dict[str, Any]) -> bool:
+        """Internal method to send WLED JSON command.
         
         Args:
-            url: Complete URL for the WLED command
+            url: Complete URL for the JSON command
+            json_data: JSON data to send
             
         Returns:
             True if command was sent successfully, False otherwise
         """
         try:
-            print(f"Sending command to WLED: {url}")
-            async with self.http_session.get(url) as response:
+            json_str = json.dumps(json_data)
+            print(f"Sending JSON command to WLED: {json_str}")
+            
+            async with self.http_session.post(url, data=json_str, headers={'Content-Type': 'application/json'}) as response:
                 if response.status != 200:
                     print(f"Error: HTTP {response.status} for {url}")
                     return False
@@ -57,21 +60,19 @@ class WLEDController:
             print(f"Error: Unexpected error connecting to WLED: {e}")
             return False
     
-    async def send_command(self, command: str) -> bool:
-        """Send a command to the WLED device, canceling any outstanding request.
+    async def send_json(self, json_data: Dict[str, Any]) -> bool:
+        """Send a JSON command to the WLED device.
         
         Args:
-            command: WLED command string (without base URL)
+            json_data: JSON data to send
             
         Returns:
-            True if a new command was sent, False if skipped or failed
+            True if command was sent successfully, False otherwise
         """
-        # Don't send multiple requests at once
         if self.current_http_task and not self.current_http_task.done():
             return False
         
-        url = self.build_command_url(self.ip_address, command)
-        
-        self.current_http_task = asyncio.create_task(self._send_command_inner(url))
+        url = self.build_json_url(self.ip_address)
+        self.current_http_task = asyncio.create_task(self._send_json_inner(url, json_data))
         return True
 

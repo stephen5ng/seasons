@@ -112,7 +112,7 @@ class GameState:
         self.score_manager = ScoreManager()
         self.audio_manager = AudioManager()
         self.audio_manager.load_sound_effect("error", ERROR_SOUND)
-        self.wled_manager = WLEDManager(not args.disable_wled, WLED_IP, self.http_session, WLED_SETTINGS)
+        self.wled_manager = WLEDManager(not args.disable_wled, WLED_IP, self.http_session, WLED_SETTINGS, number_of_leds)
         
         # Trail state manager (replaces individual trail state variables)
         self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
@@ -390,6 +390,9 @@ async def run_game() -> None:
                 await game_state.wled_manager.update_wled(phrase)
 
                 if phrase >= ending_phrase:
+                    print("sleeping 10 to finish wled commands")
+                    await asyncio.sleep(10)
+                    print("Cleanup done, Exiting game")
                     return
             game_state.handle_music_loop(beat_in_phrase)
  
