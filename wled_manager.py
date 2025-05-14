@@ -29,7 +29,7 @@ class WLEDManager:
         self.last_wled_command: str = ""
         self.number_of_leds = number_of_leds
 
-    def merge_dicts_with_seg(self, d1, d2, n):
+    def merge_dicts_with_seg(self, d1, d2, n, current_phrase):
         seg1 = d1.get("seg", [])
         seg2 = d2.get("seg", [])
         
@@ -38,7 +38,9 @@ class WLEDManager:
         
         base_seg = {**s1, **s2}
         seg_list = [{**base_seg,
-                     "start": i * self.number_of_leds,
+                     "start": i * 150,
+                     "stop": i*150 + min(150, current_phrase*8),
+                     "id": i
                      } for i in range(n)]
 
         return {
@@ -65,11 +67,10 @@ class WLEDManager:
         
         json_base = {
                  "seg": [{
-                     "len": min(self.number_of_leds, current_phrase*8),
                  }]
                 }
         
-        wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, json_base, 3)
+        wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, json_base, 3, current_phrase)
         if wled_command != self.last_wled_command:
             print(f"wled_command: {wled_command}")
             self.last_wled_command = wled_command

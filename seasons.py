@@ -440,7 +440,10 @@ async def run_game() -> None:
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
-                game_state.trail_state_manager.update_position(led_position, current_time_ms / MS_PER_SEC)
+                game_state.trail_state_manager.update_position(led_position, current_time_ms / MS_PER_SEC)            
+            
+            # Always draw a red LED at position 0
+            display.set_target_trail_pixel(0, TARGET_COLORS[TargetType.RED], 0.8)
             
             target_trail_color = Color(255, 255, 255)
             if game_state.button_handler.is_in_valid_window(led_position):
