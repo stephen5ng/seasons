@@ -435,7 +435,7 @@ async def run_game() -> None:
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
             game_state.handle_hits(hits, led_position, hit_trail_visualizer, beat_float, display)
-            game_state.handle_misses(misses, 3, display)
+            game_state.handle_misses(misses, 8, display)
             
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position

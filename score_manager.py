@@ -4,7 +4,6 @@ from typing import List, Optional, Tuple, Dict, Any
 from pygame import Color
 
 from game_constants import TargetType, TARGET_COLORS, INITIAL_HIT_SPACING
-from hit_trail import HitTrail
 from score_effects import ScoreEffects
 
 
