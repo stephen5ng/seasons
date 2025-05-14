@@ -41,9 +41,9 @@ class ButtonHandler:
     # GPIO button configuration
     BUTTON_CONFIGS = {
         TargetType.RED: ButtonConfig(17, pygame.K_UP, TargetType.RED),
-        TargetType.BLUE: ButtonConfig(27, pygame.K_DOWN, TargetType.BLUE),
-        TargetType.GREEN: ButtonConfig(22, pygame.K_RIGHT, TargetType.GREEN),
-        TargetType.YELLOW: ButtonConfig(23, pygame.K_LEFT, TargetType.YELLOW)
+        TargetType.BLUE: ButtonConfig(23, pygame.K_DOWN, TargetType.BLUE),
+        TargetType.GREEN: ButtonConfig(24, pygame.K_RIGHT, TargetType.GREEN),
+        TargetType.YELLOW: ButtonConfig(27, pygame.K_LEFT, TargetType.YELLOW)
     }
     
     # Static mapping of keys to target types for fast lookups
@@ -96,8 +96,8 @@ class ButtonHandler:
             # Create buttons from configuration
             for target_type, config in self.BUTTON_CONFIGS.items():
                 button = Button(config.pin)
-                button.when_pressed = lambda k=config.key: self.simulated_keys.add(k)
-                button.when_released = lambda k=config.key: self.simulated_keys.discard(k)
+#                button.when_pressed = lambda k=config.key: self.simulated_keys.add(k)
+#                button.when_released = lambda k=config.key: self.simulated_keys.discard(k)
                 self.gpio_buttons[target_type] = button
     
     def is_in_valid_window(self, led_position: int) -> bool:
@@ -173,7 +173,15 @@ class ButtonHandler:
         for key in [config.key for config in self.BUTTON_CONFIGS.values()]:
             if all_pressed_keys[key]:
                 keys_pressed.append(key)
-        
+
+        for k, v in self.gpio_buttons.items():
+            if v.is_pressed:
+                keys_pressed.append(k)
+                print(f"{v.is_pressed}, {k}")
+
+        if self.simulated_keys:
+            print(f"gpio: {self.simulated_keys}")        
+
         keys_pressed.extend(self.simulated_keys)
             
         target_keys = ButtonHandler.get_keys_for_target(target_type) if target_type else []
