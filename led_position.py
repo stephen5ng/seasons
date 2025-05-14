@@ -10,7 +10,7 @@ class LEDPosition:
         """Calculate the current LED position based on beat timing.
         
         Args:
-            beat_in_phrase: Current beat within the measure (0-indexed)
+            beat_in_phrase: Current beat within the phrase (0-indexed)
             fractional_beat: Fractional part of the current beat (0.0-0.99)
             number_of_leds: Total number of LEDs in the strip
             

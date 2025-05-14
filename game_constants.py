@@ -5,7 +5,8 @@ from pygame import Color
 import easing_functions
 
 # Global game constants
-NUMBER_OF_LEDS = 80  # Default number of LEDs - will be overridden by command line
+NUMBER_OF_LEDS: int = 80  # Default number of LEDs - will be overridden by command line
+NUMBER_OF_VICTORY_LEDS: int = 150
 
 # Target constants - will be calculated at runtime based on actual LED count
 TARGET_WINDOW_PERCENT = 0.05

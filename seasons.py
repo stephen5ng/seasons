@@ -120,10 +120,10 @@ class GameState:
         # Track miss timestamps for fade effect
         self.miss_timestamps: Dict[Tuple[int, TargetType], Tuple[float, float]] = {}  # (position, target_type) -> (timestamp, initial_intensity)
 
-    async def update_timing(self) -> Tuple[int, float, float]:
+    async def update_timing(self) -> Tuple[int, float]:
         """Calculate current timing values."""
         current_time_ms: int = pygame.time.get_ticks()
-        beat_in_phrase, beat_float, fractional_beat = self.audio_manager.calculate_beat_timing(
+        beat_in_phrase, beat_float = self.audio_manager.calculate_beat_timing(
             current_time_ms, self.start_ticks_ms
         )
 
@@ -136,7 +136,7 @@ class GameState:
         if beat_in_phrase == 0:
             self.beat_start_time_ms = pygame.time.get_ticks()
         
-        return beat_in_phrase, beat_float, fractional_beat
+        return beat_in_phrase, beat_float
     
     def handle_music_loop(self, beat_in_phrase: int, stable_score: float) -> None:
         """Handle music looping and position updates."""
@@ -381,8 +381,8 @@ async def run_game() -> None:
 
             beat_in_phrase: int
             beat_float: float
-            fractional_beat: float
-            beat_in_phrase, beat_float, fractional_beat = await game_state.update_timing()
+            beat_in_phrase, beat_float = await game_state.update_timing()
+            fractional_beat: float = beat_float % 1
 
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
@@ -399,10 +399,9 @@ async def run_game() -> None:
                 game_state.handle_music_loop(beat_in_phrase, stable_score)
  
             # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}")
-            score_based_measure = 1+stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + (beat_in_phrase + fractional_beat)/BEATS_PER_MEASURE
+            score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + beat_float/BEATS_PER_MEASURE
             if not IS_RASPBERRY_PI:
                 draw_fifth_lines(display, score_based_measure)
-                # print(f"phrase: {phrase}, beat_in_phrase: {beat_in_phrase}, fractional_beat: {fractional_beat}, score: {game_state.score_manager.score + beat_score_offset}, score_based_measure: {score_based_measure}")
     
             current_time_ms: int = pygame.time.get_ticks()
             

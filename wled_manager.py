@@ -4,6 +4,7 @@ import aiohttp
 from typing import Optional, Dict
 
 from wled_controller import WLEDController
+from game_constants import NUMBER_OF_VICTORY_LEDS
 
 class WLEDManager:
     """Manages WLED communication and state tracking.
@@ -38,8 +39,8 @@ class WLEDManager:
         
         base_seg = {**s1, **s2}
         seg_list = [{**base_seg,
-                     "start": i * 150,
-                     "stop": i*150 + min(150, current_phrase*8),
+                     "start": i * NUMBER_OF_VICTORY_LEDS,
+                     "stop": i*NUMBER_OF_VICTORY_LEDS + min(NUMBER_OF_VICTORY_LEDS, current_phrase*8),
                      "id": i
                      } for i in range(n)]
 

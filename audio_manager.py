@@ -52,14 +52,13 @@ class AudioManager:
             start_time_ms: Start time in milliseconds
             
         Returns:
-            Tuple of (beat_in_phrase, beat_float, fractional_beat)
+            Tuple of (beat_in_phrase, beat_float)
         """
         duration_ms: int = current_time_ms - start_time_ms
         beat_float: float = duration_ms * BEAT_PER_MS
         beat_in_phrase: int = int(beat_float) % BEATS_PER_PHRASE
-        fractional_beat: float = beat_float % 1
         
-        return beat_in_phrase, beat_float, fractional_beat
+        return beat_in_phrase, beat_float
     
     def should_sync_music(self, current_pos_s: float, target_pos_s: float, threshold_s: float) -> bool:
         """Determine if music should be synchronized based on position difference.
