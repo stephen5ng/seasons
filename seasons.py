@@ -91,7 +91,6 @@ class GameState:
     
     def __init__(self) -> None:
         self.start_ticks_ms: int = pygame.time.get_ticks()
-        self.last_beat_in_measure: int = 0
         self.next_loop: int = 1
         self.loop_count: int = 0
         self.button_handler = ButtonHandler(
@@ -138,14 +137,8 @@ class GameState:
         
         return beat_in_phrase, beat_float
     
-    def handle_music_loop(self, beat_in_phrase: int, stable_score: float) -> None:
+    def handle_music_loop(self, stable_score: float) -> None:
         """Handle music looping and position updates."""
-        if beat_in_phrase == self.last_beat_in_measure:
-            return
-        self.last_beat_in_measure = beat_in_phrase
-        
-        if beat_in_phrase != 0:
-            return
             
         self.beat_start_time_ms = pygame.time.get_ticks()
         current_time_ms: int = pygame.time.get_ticks()
@@ -279,32 +272,53 @@ def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
     CENTER_X = SCREEN_WIDTH // 2
     eased_percent_complete = FIFTH_LINE_EASE(min(percent_complete, 1.0))
     position_x = int(CENTER_X * eased_percent_complete)
+    print(f"draw_fifth_line percent_complete: {percent_complete}, eased_percent_complete: {eased_percent_complete}, position_x: {position_x}")
     if percent_complete > 0.9:
         fifth_color = Color(255, 0, 0)
     if percent_complete > 1.0:
         # Fade from 100% to 0% between 1.0 and 1.5
-        fade_amount = min(1.0, (percent_complete - 1.0) * 2)  # Reaches 1.0 at 150%
-        fifth_color.r = int(fifth_color.r * (1.0 - fade_amount))
-        fifth_color.g = int(fifth_color.g * (1.0 - fade_amount))
-        fifth_color.b = int(fifth_color.b * (1.0 - fade_amount))
+        brightness = 1 - min(1.0, (percent_complete - 1.0) * 2)  # Reaches 1.0 at 150%
+        fifth_color.r = int(fifth_color.r * brightness)
+        fifth_color.g = int(fifth_color.g * brightness)
+        fifth_color.b = int(fifth_color.b * brightness)
+        if brightness == 0:
+            return False
     pygame.draw.circle(display.pygame_surface, fifth_color, (position_x, 96), 4, 1)
+    return True
 
-def draw_fifth_lines(display: DisplayManager, measure: float) -> None:
+target_fifth_line_beat_float: float = 0
+def draw_fifth_lines(display: DisplayManager, measure: float, beat_float: float) -> None:
     """Draw the fifth line animation based on the current measure.
     
     Args:
         display: The display manager instance to draw on.
         measure: The current measure number in the song.
     """
-    TARGET_MEASURES = [9, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35]
-    TARGET_BUFFER = 1
-    for target in TARGET_MEASURES:
-        if measure > target - TARGET_BUFFER and measure <= target + TARGET_BUFFER/2:
-            # print(f"draw_fifth_lines measure: {measure}")
-            percent_complete = (measure - (target - TARGET_BUFFER)) / TARGET_BUFFER
-            draw_fifth_line(display, percent_complete)
-            break
+    global fifth_line_measure
+    global target_fifth_line_beat_float
+    TARGET_MEASURES = [20, 36, 40, 44]
+    TARGET_BUFFER_MEASURE = 1
+    
+    if target_fifth_line_beat_float == 0:
+        for target_measure in TARGET_MEASURES:
+            starting_measure = target_measure - TARGET_BUFFER_MEASURE
+            ending_measure = target_measure + TARGET_BUFFER_MEASURE/2
+            if measure > starting_measure and measure <= ending_measure:
+                target_fifth_line_beat_float = beat_float + TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE
+                print(f"draw_fifth_lines MATCHED measure: {measure}, target_fifth_line_beat_float: {target_fifth_line_beat_float}, target_measure: {target_measure}, starting_measure: {starting_measure}, ending_measure: {ending_measure}")
+                break
+        else:
+            target_fifth_line_beat_float = 0
 
+    if target_fifth_line_beat_float:
+        percent_remaining = (target_fifth_line_beat_float - beat_float) / (TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
+        percent_complete = 1.0 - percent_remaining
+        if percent_complete > 1.5:
+            target_fifth_line_beat_float = 0
+        
+        # print(f"draw_fifth_lines measure: {measure}, beat_float: {beat_float}, target_fifth_line_beat_float: {target_fifth_line_beat_float}, percent_complete: {percent_complete}")
+        draw_fifth_line(display, percent_complete)
+    
 def get_effective_window_size(phrase: int) -> int:
     """Calculate the effective window size based on the current phrase.
     
@@ -383,7 +397,7 @@ async def run_game() -> None:
             beat_float: float
             beat_in_phrase, beat_float = await game_state.update_timing()
             fractional_beat: float = beat_float % 1
-
+            # print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}, fractional_beat: {fractional_beat}")
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
                 print(f"stable_score: {stable_score}, beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}")
@@ -396,12 +410,14 @@ async def run_game() -> None:
                     await game_state.exit_game()
                     return
     
-                game_state.handle_music_loop(beat_in_phrase, stable_score)
+                if beat_in_phrase == 0:
+                    game_state.handle_music_loop(stable_score)
  
             # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}")
             score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + beat_float/BEATS_PER_MEASURE
+            # print(f"score_based_measure: {score_based_measure}, beat_float: {beat_float}")
             if not IS_RASPBERRY_PI:
-                draw_fifth_lines(display, score_based_measure)
+                draw_fifth_lines(display, score_based_measure, beat_float)
     
             current_time_ms: int = pygame.time.get_ticks()
             
@@ -427,8 +443,8 @@ async def run_game() -> None:
             # Draw LEDs at the start and end of each target window
             for target_type, target_pos in game_state.button_handler.target_positions.items():
                 window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos)
-                display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], 0.8)
-                display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], 0.8)
+                display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], -1)
+                display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], -1)
             
             display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8)
             if not game_state.button_handler.is_in_valid_window(led_position):
@@ -437,11 +453,8 @@ async def run_game() -> None:
             hit_trail_visualizer.sync_with_game_state(game_state, led_position)
             
             if not IS_RASPBERRY_PI:
-                display.draw_score_lines(
-                    score=game_state.score_manager.score
-                )
+                display.draw_score_lines(game_state.score_manager.score)
 
-            if not IS_RASPBERRY_PI:
                 for key, keydown in get_key():
                     if key == "quit":
                         return
