@@ -159,6 +159,9 @@ class DisplayManager:
             
         now = pygame.time.get_ticks() / 1000.0
         
+        # Handle positions that wrap around the LED strip
+        pos = pos % self.led_count
+            
         # Update numpy arrays using enum value directly as index
         trail_idx = trail_type.value
         self._active_colors_np[trail_idx, layer, pos] = [color.r, color.g, color.b]
