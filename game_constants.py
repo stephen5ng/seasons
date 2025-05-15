@@ -28,9 +28,6 @@ CIRCLE_RADIUS = int(SCREEN_WIDTH * 0.3)  # 30% of screen width
 CIRCLE_CENTER_X = SCREEN_WIDTH // 2
 CIRCLE_CENTER_Y = SCREEN_HEIGHT // 2
 
-# Sound settings
-ERROR_SOUND = "music/error.mp3"  # Path to error sound effect
-
 # Hit trail settings
 INITIAL_HIT_SPACING = 16  # Initial spacing between hit trail LEDs
 HIT_TRAIL_RADIUS = CIRCLE_RADIUS - 4  # Radius for hit trail (inner circle)
