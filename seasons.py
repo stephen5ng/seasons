@@ -248,43 +248,41 @@ def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
     """
     FIFTH_LINE_EASE = easing_functions.QuadEaseInOut(start=0.0, end=1.0, duration=1.0)
     
-    fifth_color = Color(128, 128, 128)
-    CENTER_X = SCREEN_WIDTH // 2
-    eased_percent_complete = FIFTH_LINE_EASE(min(percent_complete, 1.0))
-    position_x = int(CENTER_X * eased_percent_complete)
-    # print(f"draw_fifth_line percent_complete: {percent_complete}, eased_percent_complete: {eased_percent_complete}, position_x: {position_x}")
-    if percent_complete > 0.95:
-        fifth_color = Color(255, 0, 0)
+    # Calculate position and color based on completion percentage
+    eased = FIFTH_LINE_EASE(min(percent_complete, 1.0))
+    position_x = int(SCREEN_WIDTH // 2 * eased)
+    
+    # Color transitions: gray (0-95%) -> red (95-100%) -> fade out (100-150%)
     if percent_complete > 1.0:
-        # Fade from 100% to 0% between 1.0 and 1.5
-        brightness = 1 - min(1.0, (percent_complete - 1.0) * 2)  # Reaches 1.0 at 150%
-        fifth_color.r = int(fifth_color.r * brightness)
-        fifth_color.g = int(fifth_color.g * brightness)
-        fifth_color.b = int(fifth_color.b * brightness)
-        if brightness == 0:
-            return False
-    pygame.draw.circle(display.pygame_surface, fifth_color, (position_x, 96), 4, 1)
+        # Fade out from red to black
+        brightness = 1 - min(1.0, (percent_complete - 1.0) * 2)
+        if brightness <= 0:
+            return
+        color = Color(int(255 * brightness), 0, 0)
+    else:
+        color = Color(255, 0, 0) if percent_complete > 0.95 else Color(128, 128, 128)
+    
+    pygame.draw.circle(display.pygame_surface, color, (position_x, 96), 4, 1)
 
 # Stack of target beat floats for fifth line animations
 target_fifth_line_beat_floats: List[float] = []
 
-def maybe_start_fifth_line(measure: float) -> None:
+def maybe_start_fifth_line(measure: int) -> None:
     """Check if we should start a new fifth line animation based on the current measure.
     
     Args:
         measure: The current measure number in the song.
     """
     global target_fifth_line_beat_floats
-    print(f"maybe_start_fifth_line measure: {measure}")
-    for target_measure in FIFTH_LINE_TARGET_MEASURES:
-        starting_measure = target_measure - FIFTH_LINE_TARGET_BUFFER_MEASURE
-        if measure == starting_measure:
-            new_target = target_measure*BEATS_PER_MEASURE
-            # Only add if this exact target doesn't already exist
-            if new_target not in target_fifth_line_beat_floats:
-                target_fifth_line_beat_floats.append(new_target)
-                print(f"maybe_start_fifth_line MATCHED measure: {measure}, new_target: {new_target}, target_measure: {target_measure}, starting_measure: {starting_measure}")
-            break
+    # Calculate target measure for animation start
+    target_measure = measure + FIFTH_LINE_TARGET_BUFFER_MEASURE
+    # print(f"maybe_start_fifth_line measure: {measure}, target_measure: {target_measure}")
+    if target_measure in FIFTH_LINE_TARGET_MEASURES:
+        # print(f"maybe_start_fifth_line target_measure in FIFTH_LINE_TARGET_MEASURES")
+        target_beat = target_measure * BEATS_PER_MEASURE
+        if target_beat not in target_fifth_line_beat_floats:
+            target_fifth_line_beat_floats.append(target_beat)
+            print(f"Starting fifth line animation at measure {target_measure}")
 
 def update_fifth_line(display: DisplayManager, beat_float: float) -> None:
     """Update and draw the fifth line animation if one is active.
@@ -297,15 +295,12 @@ def update_fifth_line(display: DisplayManager, beat_float: float) -> None:
     
     for target_beat in target_fifth_line_beat_floats[:]:  # Copy list to allow modification during iteration
         # print(f"update_fifth_line target_beat: {target_beat}, beat_float: {beat_float}")
-        percent_remaining = (target_beat - beat_float) / (FIFTH_LINE_TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
-        percent_complete = 1.0 - percent_remaining
-        
-        if percent_complete >= 1.5:
-            # Remove completed animation
+        progress = 1.0 - (target_beat - beat_float) / (FIFTH_LINE_TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
+        # print(f"update_fifth_line progress: {progress}")
+        if progress >= 1.5:  # Animation complete
             target_fifth_line_beat_floats.remove(target_beat)
-        else:
-            # Draw this animation
-            draw_fifth_line(display, percent_complete)
+        elif progress >= 0:  # Animation active
+            draw_fifth_line(display, progress)
 
 def get_effective_window_size(phrase: int) -> int:
     """Calculate the effective window size based on the current phrase.
@@ -410,9 +405,8 @@ async def run_game() -> None:
                     game_state.handle_music_loop(int(stable_score), current_time_ms)
  
                 # Start fifth line animation on measure boundaries
-                if beat_in_phrase == 0 or beat_in_phrase == 4:
-                    maybe_start_fifth_line(current_phrase*2 + 
-                                        (1 if beat_in_phrase == 4 else 0))
+                if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
+                    maybe_start_fifth_line(current_phrase * 2 + (1 if beat_in_phrase == 4 else 0))
             # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}")
             score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + beat_float/BEATS_PER_MEASURE
             # print(f"score_based_measure: {score_based_measure}, beat_float: {beat_float}")
