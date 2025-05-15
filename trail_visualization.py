@@ -170,8 +170,8 @@ class TrailVisualizer:
         # Get the position before removing the hit
         if target_type in self.simple_hit_trail.hits_by_type and self.simple_hit_trail.hits_by_type[target_type]:
             position = self.simple_hit_trail.hits_by_type[target_type][-1]
-            # Clear the LED by drawing black
-            self.display.set_hit_trail_pixel(position, Color(0, 0, 0), 0)
+            # Clear the LED by drawing black permanently
+            self.display.set_hit_trail_pixel(position, Color(0, 0, 0), -1)
         
         # Remove the hit from the trail
         self.simple_hit_trail.remove_hit(target_type)
