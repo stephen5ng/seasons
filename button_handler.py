@@ -169,7 +169,7 @@ class ButtonHandler:
             - misses: Sequence of target types corresponding to incorrectly pressed keys
         """
         target_type: Optional[TargetType] = self.get_target_type_for_position(led_position, self.number_of_leds,
-                                                                              1 if self.auto_score else self.target_window_size)        
+                                                                              2 if self.auto_score else self.target_window_size)        
         hits: List[TargetType] = []
         misses: List[TargetType] = []
         
