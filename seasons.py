@@ -27,7 +27,6 @@ from trail_visualization import (
 from game_constants import *
 
 import logging
-import signal
 
 def parse_args():
     """Parse command line arguments."""
@@ -315,34 +314,6 @@ def get_effective_window_size(phrase: int) -> int:
     """
     return target_window_size // 2 if phrase > 8 else target_window_size
 
-async def cleanup(display: DisplayManager, game_state: GameState) -> None:
-    """Clean up resources before exit.
-    
-    Args:
-        display: The display manager instance to clean up.
-        game_state: The game state to clean up.
-    """
-    print("\nCleaning up...")
-    if IS_RASPBERRY_PI:
-        # Turn off all LEDs
-        for i in range(display.strip.numPixels()):
-            display.strip.setPixelColor(i, 0)
-        display.strip.show()
-        for i in range(display.fifth_line_strip.numPixels()):
-            display.fifth_line_strip.setPixelColor(i, 0)
-        display.fifth_line_strip.show()
-    
-    # Stop audio
-    if game_state.audio_manager:
-        game_state.audio_manager.stop_music()
-    
-    # Close HTTP session
-    if game_state.http_session:
-        await game_state.http_session.close()
-    
-    pygame.quit()
-    print("Cleanup complete")
-
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
     # Configure file logging for hit trail behavior
@@ -375,25 +346,18 @@ async def run_game() -> None:
     
     hit_trail_visualizer.display = display
 
-    # Set up signal handler for Ctrl+C
-    def signal_handler(signum, frame):
-        print("\nReceived interrupt signal")
-        asyncio.create_task(cleanup(display, game_state))
-        sys.exit(0)
+    if args.score > 0:
+        logger.info(f"Setting initial score to {args.score}")
+        game_state.score_manager.score = args.score
+        hit_trail_visualizer.score = args.score  # Let each visualizer handle the score
     
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
+    logger.info("Showing main trail")
+        
+    # Set up hit colors based on score (simulate multiple hits)
+    hit_trail_visualizer.score = game_state.score_manager.score  # Let the visualizer handle color mapping
+    logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
+    
     try:
-        if args.score > 0:
-            logger.info(f"Setting initial score to {args.score}")
-            game_state.score_manager.score = args.score
-            hit_trail_visualizer.score = args.score
-        
-        logger.info("Showing main trail")
-        hit_trail_visualizer.score = game_state.score_manager.score
-        logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
-        
         game_state.audio_manager.play_music(start_pos_s=0.0)
 
         # Variables for tracking if we've completed one full loop in debug mode
@@ -490,23 +454,16 @@ async def run_game() -> None:
                 
             display.update()
             await clock.tick(60)
-    except Exception as e:
-        print(f"Error in game loop: {e}")
-        await cleanup(display, game_state)
-        raise
     finally:
-        await cleanup(display, game_state)
+        # Clean up the HTTP session
+        await game_state.http_session.close()
 
 async def main() -> None:
     """Initialize and run the game with MQTT support."""
-    try:
-        await run_game()
-    except KeyboardInterrupt:
-        print("\nReceived keyboard interrupt")
-    except Exception as e:
-        print(f"Error in main: {e}")
-        raise
+    await run_game()
+    pygame.quit()
 
 if __name__ == "__main__":
     pygame.init()
+
     asyncio.run(main())
