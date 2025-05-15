@@ -65,11 +65,21 @@ class DisplayManager:
         self._trail_properties: Dict[TrailType, Dict[str, Any]] = {
             TrailType.TARGET: {
                 'rpi_calc': lambda p, lc: (p + LED_OFFSET) % lc,
-                'radius': game_constants.TARGET_TRAIL_RADIUS
+                'radius': game_constants.TARGET_TRAIL_RADIUS,
+                'setter': lambda pos, color: self._set_pixel_on_trail(
+                    pos, color,
+                    lambda p, lc: (p + LED_OFFSET) % lc,
+                    game_constants.TARGET_TRAIL_RADIUS
+                )
             },
             TrailType.HIT: {
                 'rpi_calc': lambda p, lc: (p + LED_OFFSET) % lc + lc,
-                'radius': game_constants.HIT_TRAIL_RADIUS
+                'radius': game_constants.HIT_TRAIL_RADIUS,
+                'setter': lambda pos, color: self._set_pixel_on_trail(
+                    pos, color,
+                    lambda p, lc: (p + LED_OFFSET) % lc + lc,
+                    game_constants.HIT_TRAIL_RADIUS
+                )
             }
         }
         
@@ -80,24 +90,6 @@ class DisplayManager:
         # Third dimension: [r,g,b] for colors, [set_time, duration] for timing
         self._active_colors_np = np.zeros((2, led_count, 3), dtype=np.uint8)
         self._active_times_np = np.full((2, led_count, 2), [-1.0, -1.0], dtype=np.float32)  # Initialize with -1 for both set_time and duration
-        
-        # Create setter functions once at initialization
-        def create_trail_setter(trail_type: TrailType) -> Callable[[int, Color], None]:
-            """Create a setter function for a trail type.
-            
-            Args:
-                trail_type: The type of trail (TARGET or HIT)
-                
-            Returns:
-                A function that sets a pixel on the specified trail
-            """
-            props = self._trail_properties[trail_type]
-            def setter(pos: int, color: Color) -> None:
-                self._set_pixel_on_trail(pos, color, props['rpi_calc'], props['radius'])
-            return setter
-            
-        # Store setters in a list for fast indexing (0=target, 1=hit)
-        self._setters = [create_trail_setter(TrailType.TARGET), create_trail_setter(TrailType.HIT)]
         
         if IS_RASPBERRY_PI:
             self.strip: PixelStrip = PixelStrip(
@@ -190,39 +182,67 @@ class DisplayManager:
         """
         self._request_pixel_on_trail(pos, color, TrailType.HIT, duration)
 
-    def update(self) -> None:
-        """Update the display and fade out pixels if their duration has expired."""
-        now = pygame.time.get_ticks() / 1000.0
+    def _calculate_faded_colors(self, now: float) -> np.ndarray:
+        """Calculate faded colors for all pixels based on their durations and elapsed time.
         
+        Args:
+            now: Current time in seconds
+            
+        Returns:
+            Array of faded colors with shape (2, led_count, 3)
+        """
         # Get set_times and durations for all pixels
         set_times = self._active_times_np[:, :, 0]  # Shape: (2, led_count)
         durations = self._active_times_np[:, :, 1]  # Shape: (2, led_count)
         elapsed = now - set_times  # Shape: (2, led_count)
         
-        # Calculate faded colors in one step:
-        # - For expired pixels (duration > 0 and elapsed >= duration): 0
-        # - For fading pixels (duration > 0): original * fade_ratio
-        # - For permanent pixels (duration == -1): original color
-        fade_mask = (durations > 0)[..., None]  # Shape: (2, led_count, 1)
-        expired_mask = ((durations > 0) & (elapsed >= durations))[..., None]  # Shape: (2, led_count, 1)
+        # Create masks for different pixel states
+        # Shape: (2, led_count, 1) for broadcasting with colors
+        is_fading = (durations > 0)[..., None]  # Pixels that should fade
+        is_expired = (is_fading & (elapsed >= durations)[..., None])  # Fading pixels that have expired
+        is_permanent = (durations == -1)[..., None]  # Permanent pixels
         
-        faded_colors = np.where(
-            expired_mask,  # expired mask
-            0,  # expired pixels become black
-            np.where(
-                fade_mask,  # fading pixels
-                (self._active_colors_np * (1 - elapsed / durations)[..., None]).astype(np.uint8),  # fade
-                self._active_colors_np  # permanent pixels (duration == -1)
-            )
+        # Calculate fade ratios for fading pixels (1.0 to 0.0)
+        # Shape: (2, led_count, 1)
+        fade_ratios = np.where(
+            is_fading,
+            1.0 - np.clip(elapsed / durations, 0, 1)[..., None],
+            1.0
         )
         
+        # Calculate final colors:
+        # - Expired pixels become black (0)
+        # - Fading pixels are multiplied by fade ratio
+        # - Permanent pixels keep original color
+        return np.where(
+            is_expired,
+            0,  # Expired pixels become black
+            np.where(
+                is_permanent,
+                self._active_colors_np,  # Permanent pixels keep original color
+                (self._active_colors_np * fade_ratios).astype(np.uint8)  # Fading pixels
+            )
+        )
+
+    def _update_display(self, faded_colors: np.ndarray) -> None:
+        """Update the display with faded colors.
+        
+        Args:
+            faded_colors: Array of faded colors with shape (2, led_count, 3)
+        """
         # Update display using numpy implementation
         for trail_type in TrailType:
-            setter = self._setters[trail_type.value]
-            for pos in range(self.led_count):
-                if np.any(faded_colors[trail_type.value, pos] != 0):
-                    color = Color(*faded_colors[trail_type.value, pos])
-                    setter(pos, color)
+            trail_idx = trail_type.value
+            setter = self._trail_properties[trail_type]['setter']
+            
+            # Find positions with non-zero colors
+            non_zero_mask = np.any(faded_colors[trail_idx] != 0, axis=1)
+            non_zero_positions = np.where(non_zero_mask)[0]
+            
+            # Update only non-zero pixels
+            for pos in non_zero_positions:
+                color = Color(*faded_colors[trail_idx, pos])
+                setter(pos, color)
         
         # Update the display
         if IS_RASPBERRY_PI:
@@ -234,6 +254,12 @@ class DisplayManager:
                 self.display_surface
             )
             pygame.display.update()
+
+    def update(self) -> None:
+        """Update the display and fade out pixels if their duration has expired."""
+        now = pygame.time.get_ticks() / 1000.0
+        faded_colors = self._calculate_faded_colors(now)
+        self._update_display(faded_colors)
     
     def draw_score_lines(self, score: float) -> None:
         """Draw horizontal lines representing the score with top-to-bottom animation.
