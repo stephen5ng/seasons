@@ -215,7 +215,7 @@ class GameState:
                 window_end += self.button_handler.number_of_leds
                 
             for i in range(window_start, window_end + 1):
-                display.set_target_trail_pixel(i % self.button_handler.number_of_leds, target_color, 1.0)
+                display.set_target_trail_pixel(i % self.button_handler.number_of_leds, target_color, 1.0, 1)
     
             hit_trail_visualizer.add_hit(target_hit)
         self.score_manager.update_score(hit_trail_visualizer.simple_hit_trail.total_hits/4, beat_float)

@@ -84,12 +84,13 @@ class DisplayManager:
         }
         
         # Numpy arrays to track active pixels in parallel
-        # Shape: (2, led_count, 3) for colors, (2, led_count, 2) for timing
+        # Shape: (2, 1, led_count, 3) for colors, (2, 1, led_count, 2) for timing
         # First dimension: trail_type (0 for target, 1 for hit)
-        # Second dimension: pos (0 to led_count-1)
-        # Third dimension: [r,g,b] for colors, [set_time, duration] for timing
-        self._active_colors_np = np.zeros((2, led_count, 3), dtype=np.uint8)
-        self._active_times_np = np.full((2, led_count, 2), [-1.0, -1.0], dtype=np.float32)  # Initialize with -1 for both set_time and duration
+        # Second dimension: layer
+        # Third dimension: pos (0 to led_count-1)
+        # Fourth dimension: [r,g,b] for colors, [set_time, duration] for timing
+        self._active_colors_np = np.zeros((2, 2, led_count, 3), dtype=np.uint8)
+        self._active_times_np = np.full((2, 2, led_count, 2), [-1.0, -1.0], dtype=np.float32)  # Initialize with -1 for both set_time and duration
         
         if IS_RASPBERRY_PI:
             self.strip: PixelStrip = PixelStrip(
@@ -142,7 +143,7 @@ class DisplayManager:
             x, y = self._get_ring_position(pos, self.screen_width // 2, self.screen_height // 2, pygame_radius, self.led_count)
             self.pygame_surface.set_at((x, y), color)
 
-    def _request_pixel_on_trail(self, pos: int, color: Color, trail_type: TrailType, duration: float) -> None:
+    def _request_pixel_on_trail(self, pos: int, color: Color, trail_type: TrailType, duration: float, layer: int = 0) -> None:
         """Request a pixel to be displayed on a trail with fade management.
         
         Args:
@@ -151,6 +152,7 @@ class DisplayManager:
             trail_type: The type of trail (TARGET or HIT).
             duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
                     Must be either -1 (permanent) or > 0 (fading).
+            layer: The layer to set the pixel on.
         """
         if duration != -1 and duration <= 0:
             raise ValueError("Duration must be either -1 (permanent) or > 0 (fading)")
@@ -159,18 +161,19 @@ class DisplayManager:
         
         # Update numpy arrays using enum value directly as index
         trail_idx = trail_type.value
-        self._active_colors_np[trail_idx, pos] = [color.r, color.g, color.b]
-        self._active_times_np[trail_idx, pos] = [now, duration]
+        self._active_colors_np[trail_idx, layer, pos] = [color.r, color.g, color.b]
+        self._active_times_np[trail_idx, layer, pos] = [now, duration]
 
-    def set_target_trail_pixel(self, pos: int, color: Color, duration: float = -1) -> None:
+    def set_target_trail_pixel(self, pos: int, color: Color, duration: float, layer: int = 0) -> None:
         """Set pixel color at position in target ring with an optional duration.
         
         Args:
             pos: The logical position of the LED.
             color: The Pygame Color for the LED.
             duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
+            layer: The layer to set the pixel on.
         """
-        self._request_pixel_on_trail(pos, color, TrailType.TARGET, duration)
+        self._request_pixel_on_trail(pos, color, TrailType.TARGET, duration, layer)
     
     def set_hit_trail_pixel(self, pos: int, color: Color, duration: float = -1) -> None:
         """Set pixel color at position in hit trail ring with an optional duration.
@@ -189,32 +192,32 @@ class DisplayManager:
             now: Current time in seconds
             
         Returns:
-            Array of faded colors with shape (2, led_count, 3)
+            Array of faded colors with shape (2, led_count, 3) after averaging layers
         """
         # Get set_times and durations for all pixels
-        set_times = self._active_times_np[:, :, 0]  # Shape: (2, led_count)
-        durations = self._active_times_np[:, :, 1]  # Shape: (2, led_count)
-        elapsed = now - set_times  # Shape: (2, led_count)
+        set_times = self._active_times_np[:, :, :, 0]  # Shape: (2, 2, led_count)
+        durations = self._active_times_np[:, :, :, 1]  # Shape: (2, 2, led_count)
+        elapsed = now - set_times  # Shape: (2, 2, led_count)
         
         # Create masks for different pixel states
-        # Shape: (2, led_count, 1) for broadcasting with colors
+        # Shape: (2, 2, led_count, 1) for broadcasting with colors
         is_fading = (durations > 0)[..., None]  # Pixels that should fade
         is_expired = (is_fading & (elapsed >= durations)[..., None])  # Fading pixels that have expired
         is_permanent = (durations == -1)[..., None]  # Permanent pixels
         
         # Calculate fade ratios for fading pixels (1.0 to 0.0)
-        # Shape: (2, led_count, 1)
+        # Shape: (2, 2, led_count, 1)
         fade_ratios = np.where(
             is_fading,
             1.0 - np.clip(elapsed / durations, 0, 1)[..., None],
             1.0
         )
         
-        # Calculate final colors:
+        # Calculate colors for each layer:
         # - Expired pixels become black (0)
         # - Fading pixels are multiplied by fade ratio
         # - Permanent pixels keep original color
-        return np.where(
+        layer_colors = np.where(
             is_expired,
             0,  # Expired pixels become black
             np.where(
@@ -222,13 +225,19 @@ class DisplayManager:
                 self._active_colors_np,  # Permanent pixels keep original color
                 (self._active_colors_np * fade_ratios).astype(np.uint8)  # Fading pixels
             )
-        )
+        )  # Shape: (2, 2, led_count, 3)
+        
+        # Average the two layers using integer arithmetic
+        # Add layers and right shift by 1 (divide by 2)
+        averaged = ((layer_colors[:, 0].astype(np.uint16) + layer_colors[:, 1].astype(np.uint16)) >> 1).astype(np.uint8)
+        
+        return averaged  # Shape: (2, led_count, 3)
 
     def _update_display(self, faded_colors: np.ndarray) -> None:
         """Update the display with faded colors.
         
         Args:
-            faded_colors: Array of faded colors with shape (2, led_count, 3)
+            faded_colors: Array of faded colors with shape (2, led_count, 3) after averaging
         """
         # Update display using numpy implementation
         for trail_type in TrailType:
