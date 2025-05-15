@@ -90,7 +90,6 @@ class GameState:
     """Manages game state and timing."""
     
     def __init__(self) -> None:
-        self.start_ticks_ms: int = pygame.time.get_ticks()
         self.next_loop: int = 1
         self.loop_count: int = 0
         self.button_handler = ButtonHandler(
@@ -99,8 +98,6 @@ class GameState:
             auto_score=args.auto_score
         )
         self.beat_start_time_ms: int = 0
-        self.total_beats: int = 0  # Track total beats in song
-        self.last_beat: int = -1  # Track last beat for increment
         
         # Create a single session for all HTTP requests with better DNS settings
         connector = aiohttp.TCPConnector(use_dns_cache=True, ttl_dns_cache=300)
@@ -110,6 +107,7 @@ class GameState:
         # Component managers
         self.score_manager = ScoreManager()
         self.audio_manager = AudioManager("music/Rise Up 4.mp3")
+        self.start_ticks_ms: int = pygame.time.get_ticks()
         self.wled_manager = WLEDManager(not args.disable_wled, WLED_IP, self.http_session, WLED_SETTINGS, number_of_leds)
         
         # Trail state manager (replaces individual trail state variables)
@@ -119,50 +117,32 @@ class GameState:
         # Track miss timestamps for fade effect
         self.miss_timestamps: Dict[Tuple[int, TargetType], Tuple[float, float]] = {}  # (position, target_type) -> (timestamp, initial_intensity)
 
-    async def update_timing(self) -> Tuple[int, float]:
+    async def update_timing(self, current_time_ms: int) -> Tuple[int, float]:
         """Calculate current timing values."""
-        current_time_ms: int = pygame.time.get_ticks()
         beat_in_phrase, beat_float = self.audio_manager.calculate_beat_timing(
             current_time_ms, self.start_ticks_ms
         )
-
-        # Update total beats when we cross a beat boundary
-        if int(beat_float) > self.last_beat:
-            self.total_beats += 1
-            self.last_beat = int(beat_float)
-            # print(f"Total beats in song: {self.total_beats}")            
             
         if beat_in_phrase == 0:
-            self.beat_start_time_ms = pygame.time.get_ticks()
+            self.beat_start_time_ms = current_time_ms
         
         return beat_in_phrase, beat_float
     
-    def handle_music_loop(self, stable_score: float) -> None:
+    def handle_music_loop(self, stable_score: int, current_time_ms: int) -> None:
         """Handle music looping and position updates."""
-            
-        self.beat_start_time_ms = pygame.time.get_ticks()
-        current_time_ms: int = pygame.time.get_ticks()
-            
-        # Calculate target music time
         print(f"beat_start_time_ms: {self.beat_start_time_ms}, current_time_ms: {current_time_ms}, score: {self.score_manager.score}")
         target_time_s: float = self.audio_manager.get_target_music_time(
             stable_score,
             self.beat_start_time_ms,
             current_time_ms
         )
-        
-        # Get current music position for logging
         current_music_pos_s: float = self.audio_manager.get_current_music_position()
-
+        print(f"target_time_s: {target_time_s}, current_music_pos_s: {current_music_pos_s}")
         if self.audio_manager.should_sync_music(current_music_pos_s, target_time_s, 0.2):
             print(f"SYNCING difference {abs(current_music_pos_s - target_time_s)}")
-            
-            # Update total beats based on new target time
-            target_beats: int = self.audio_manager.calculate_target_beats(target_time_s)
-            self.total_beats = target_beats
-            self.last_beat = target_beats - 1
-            
             self.audio_manager.play_music(start_pos_s=target_time_s)
+
+        self.start_ticks_ms = current_time_ms - target_time_s * MS_PER_SEC
 
     def handle_misses(self, misses: List[TargetType], max_distance: int, display: DisplayManager) -> None:
         """Handle visualization of missed targets with fade out effect.
@@ -272,8 +252,8 @@ def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
     CENTER_X = SCREEN_WIDTH // 2
     eased_percent_complete = FIFTH_LINE_EASE(min(percent_complete, 1.0))
     position_x = int(CENTER_X * eased_percent_complete)
-    print(f"draw_fifth_line percent_complete: {percent_complete}, eased_percent_complete: {eased_percent_complete}, position_x: {position_x}")
-    if percent_complete > 0.9:
+    # print(f"draw_fifth_line percent_complete: {percent_complete}, eased_percent_complete: {eased_percent_complete}, position_x: {position_x}")
+    if percent_complete > 0.95:
         fifth_color = Color(255, 0, 0)
     if percent_complete > 1.0:
         # Fade from 100% to 0% between 1.0 and 1.5
@@ -284,41 +264,49 @@ def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
         if brightness == 0:
             return False
     pygame.draw.circle(display.pygame_surface, fifth_color, (position_x, 96), 4, 1)
-    return True
 
-target_fifth_line_beat_float: float = 0
-def draw_fifth_lines(display: DisplayManager, measure: float, beat_float: float) -> None:
-    """Draw the fifth line animation based on the current measure.
+# Stack of target beat floats for fifth line animations
+target_fifth_line_beat_floats: List[float] = []
+
+def maybe_start_fifth_line(measure: float) -> None:
+    """Check if we should start a new fifth line animation based on the current measure.
+    
+    Args:
+        measure: The current measure number in the song.
+    """
+    global target_fifth_line_beat_floats
+    print(f"maybe_start_fifth_line measure: {measure}")
+    for target_measure in FIFTH_LINE_TARGET_MEASURES:
+        starting_measure = target_measure - FIFTH_LINE_TARGET_BUFFER_MEASURE
+        if measure == starting_measure:
+            new_target = target_measure*BEATS_PER_MEASURE
+            # Only add if this exact target doesn't already exist
+            if new_target not in target_fifth_line_beat_floats:
+                target_fifth_line_beat_floats.append(new_target)
+                print(f"maybe_start_fifth_line MATCHED measure: {measure}, new_target: {new_target}, target_measure: {target_measure}, starting_measure: {starting_measure}")
+            break
+
+def update_fifth_line(display: DisplayManager, beat_float: float) -> None:
+    """Update and draw the fifth line animation if one is active.
     
     Args:
         display: The display manager instance to draw on.
-        measure: The current measure number in the song.
+        beat_float: The current beat position as float.
     """
-    global fifth_line_measure
-    global target_fifth_line_beat_float
-    TARGET_MEASURES = [20, 36, 40, 44]
-    TARGET_BUFFER_MEASURE = 1
+    global target_fifth_line_beat_floats
     
-    if target_fifth_line_beat_float == 0:
-        for target_measure in TARGET_MEASURES:
-            starting_measure = target_measure - TARGET_BUFFER_MEASURE
-            ending_measure = target_measure + TARGET_BUFFER_MEASURE/2
-            if measure > starting_measure and measure <= ending_measure:
-                target_fifth_line_beat_float = beat_float + TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE
-                print(f"draw_fifth_lines MATCHED measure: {measure}, target_fifth_line_beat_float: {target_fifth_line_beat_float}, target_measure: {target_measure}, starting_measure: {starting_measure}, ending_measure: {ending_measure}")
-                break
-        else:
-            target_fifth_line_beat_float = 0
-
-    if target_fifth_line_beat_float:
-        percent_remaining = (target_fifth_line_beat_float - beat_float) / (TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
+    for target_beat in target_fifth_line_beat_floats[:]:  # Copy list to allow modification during iteration
+        # print(f"update_fifth_line target_beat: {target_beat}, beat_float: {beat_float}")
+        percent_remaining = (target_beat - beat_float) / (FIFTH_LINE_TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
         percent_complete = 1.0 - percent_remaining
-        if percent_complete > 1.5:
-            target_fifth_line_beat_float = 0
         
-        # print(f"draw_fifth_lines measure: {measure}, beat_float: {beat_float}, target_fifth_line_beat_float: {target_fifth_line_beat_float}, percent_complete: {percent_complete}")
-        draw_fifth_line(display, percent_complete)
-    
+        if percent_complete >= 1.5:
+            # Remove completed animation
+            target_fifth_line_beat_floats.remove(target_beat)
+        else:
+            # Draw this animation
+            draw_fifth_line(display, percent_complete)
+
 def get_effective_window_size(phrase: int) -> int:
     """Calculate the effective window size based on the current phrase.
     
@@ -390,12 +378,14 @@ async def run_game() -> None:
         last_beat = -1
         ending_phrase = 1 if args.one_loop else 18
         stable_score = 0
+        current_phrase = 0
         while True:
             display.clear()
-
+            current_time_ms: int = pygame.time.get_ticks()
+    
             beat_in_phrase: int
             beat_float: float
-            beat_in_phrase, beat_float = await game_state.update_timing()
+            beat_in_phrase, beat_float = await game_state.update_timing(current_time_ms)
             fractional_beat: float = beat_float % 1
             # print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}, fractional_beat: {fractional_beat}")
             if last_beat != int(beat_float):
@@ -409,17 +399,26 @@ async def run_game() -> None:
                 if stable_score >= ending_phrase:
                     await game_state.exit_game()
                     return
+
+                score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) # + beat_float/BEATS_PER_MEASURE
+                # print(f"score_measure: {int(1+stable_score)*8}, {beat_float}")
     
+                # Sync music on phrase boundaries
                 if beat_in_phrase == 0:
-                    game_state.handle_music_loop(stable_score)
+                    current_phrase = int(stable_score)
+                    print(f"current_phrase: {current_phrase}")
+                    game_state.handle_music_loop(int(stable_score), current_time_ms)
  
+                # Start fifth line animation on measure boundaries
+                if beat_in_phrase == 0 or beat_in_phrase == 4:
+                    maybe_start_fifth_line(current_phrase*2 + 
+                                        (1 if beat_in_phrase == 4 else 0))
             # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}")
             score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + beat_float/BEATS_PER_MEASURE
             # print(f"score_based_measure: {score_based_measure}, beat_float: {beat_float}")
             if not IS_RASPBERRY_PI:
-                draw_fifth_lines(display, score_based_measure, beat_float)
+                update_fifth_line(display, beat_float)
     
-            current_time_ms: int = pygame.time.get_ticks()
             
             led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
             

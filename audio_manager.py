@@ -84,7 +84,7 @@ class AudioManager:
         """
         return int(target_time_s * (1000 * BEAT_PER_MS))
     
-    def get_target_music_time(self, score: float, beat_start_time_ms: int, 
+    def get_target_music_time(self, score: int, beat_start_time_ms: int, 
                              current_time_ms: int) -> float:
         """Calculate target music time based on score and timing.
         
@@ -97,7 +97,7 @@ class AudioManager:
             Target music time in seconds
         """
         measure_offset_s: float = (current_time_ms - beat_start_time_ms) / MS_PER_SEC
-        return int(score) * SECONDS_PER_MEASURE_S + measure_offset_s
+        return score * SECONDS_PER_PHRASE + measure_offset_s
     
     def _sync_music(self, target_pos_s: float) -> None:
         """Synchronize music to the target position.

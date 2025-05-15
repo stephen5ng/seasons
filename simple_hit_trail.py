@@ -42,7 +42,7 @@ class SimpleHitTrail:
         if target_type not in self.hits_by_type:
             self.hits_by_type[target_type] = []
         self.hits_by_type[target_type].append(new_position)
-        print(f"total_hits: {self.total_hits}")
+        # print(f"total_hits: {self.total_hits}")
 
     def remove_hit(self, target_type: TargetType) -> None:
         """Remove a hit of the specified target type from the hit trail.

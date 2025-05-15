@@ -11,6 +11,9 @@ NUMBER_OF_VICTORY_LEDS: int = 150
 # Target constants - will be calculated at runtime based on actual LED count
 TARGET_WINDOW_PERCENT = 0.05
 
+FIFTH_LINE_TARGET_MEASURES = [8, 16, 18, 20, 22, 24, 44]
+FIFTH_LINE_TARGET_BUFFER_MEASURE = 2
+
 # Target positions as fixed percentages (clock positions)
 RED_TARGET_PERCENT = 0.0    # 12 o'clock (0%)
 GREEN_TARGET_PERCENT = 0.25 # 3 o'clock (25%)
@@ -37,7 +40,7 @@ TARGET_TRAIL_RADIUS = CIRCLE_RADIUS + 4  # Radius for target trail (outer circle
 BEATS_PER_MEASURE = 4
 BEATS_PER_PHRASE = 8
 BEAT_PER_MS = 13.0 / 6000.0
-SECONDS_PER_MEASURE_S = 3.7
+SECONDS_PER_PHRASE = 3.7
 
 # Trail settings
 TRAIL_FADE_DURATION_S = 0.8  # Time for trail to fade out
