@@ -48,7 +48,7 @@ class DisplayManager:
         self.screen_height = screen_height
         self.scaling_factor = scaling_factor
         self.led_count = led_count
-        # New dict to track active pixels: (pos, trail_type) -> (color, set_time, duration, setter)
+        # New dict to track active pixels: (pos, trail_type) -> (color, set_time, duration)
         self._active_pixels = {}
         
         # Create setter functions once at initialization
@@ -67,8 +67,8 @@ class DisplayManager:
                 self._set_pixel_on_trail(pos, color, rpi_calc, radius)
             return setter
             
-        self._target_setter = create_trail_setter(True)
-        self._hit_setter = create_trail_setter(False)
+        # Store setters in a list for fast indexing (0=target, 1=hit)
+        self._setters = [create_trail_setter(True), create_trail_setter(False)]
         
         if IS_RASPBERRY_PI:
             self.strip: PixelStrip = PixelStrip(
@@ -131,8 +131,12 @@ class DisplayManager:
             duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
         """
         now = pygame.time.get_ticks() / 1000.0
-        setter = self._target_setter if trail_type == 'target' else self._hit_setter
-        self._active_pixels[pos, trail_type] = (color, now, duration, setter)
+        # Store only color, time, and duration - setter can be derived from trail_type
+        self._active_pixels[pos, trail_type] = (color, now, duration)
+        
+
+
+
 
     def set_target_trail_pixel(self, pos: int, color: Color, duration: float = -1) -> None:
         """Set pixel color at position in target ring with an optional duration.
@@ -160,8 +164,11 @@ class DisplayManager:
         to_remove = []
         
         # First pass: update all pixels and collect ones to remove
-        for (pos, trail_type), (color, set_time, duration, setter) in self._active_pixels.items():
+        for (pos, trail_type), (color, set_time, duration) in self._active_pixels.items():
             elapsed = now - set_time
+            trail_idx = 0 if trail_type == 'target' else 1
+            setter = self._setters[trail_idx]
+            
             if duration != -1 and elapsed >= duration:
                 # Fade out: set the pixel to black
                 faded_color = Color(0, 0, 0)
