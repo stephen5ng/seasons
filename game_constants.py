@@ -40,7 +40,7 @@ TARGET_TRAIL_RADIUS = CIRCLE_RADIUS + 4  # Radius for target trail (outer circle
 BEATS_PER_MEASURE = 4
 BEATS_PER_PHRASE = 8
 BEAT_PER_MS = 13.0 / 6000.0
-SECONDS_PER_PHRASE = 3.7
+SECONDS_PER_PHRASE = 3.692166666
 
 # Trail settings
 TRAIL_FADE_DURATION_S = 0.8  # Time for trail to fade out
