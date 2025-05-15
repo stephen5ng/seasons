@@ -411,8 +411,7 @@ async def run_game() -> None:
             # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}")
             score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + beat_float/BEATS_PER_MEASURE
             # print(f"score_based_measure: {score_based_measure}, beat_float: {beat_float}")
-            if not IS_RASPBERRY_PI:
-                update_fifth_line(display, beat_float)
+            update_fifth_line(display, beat_float)
     
             
             led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)

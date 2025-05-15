@@ -94,11 +94,13 @@ class DisplayManager:
         
         if IS_RASPBERRY_PI:
             # Create separate strips for target/hit rings and fifth line
+            # Use PWM channel 0 (GPIO 18) for main strip, PWM channel 1 (GPIO 13) for fifth line
+            # Use DMA 10 for main strip, DMA 5 for fifth line to avoid conflicts
             self.strip: PixelStrip = PixelStrip(
-                led_count*2, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
+                led_count*2, led_pin, led_freq_hz, 10, led_invert, led_brightness, 0  # GPIO 18, PWM0, DMA 10
             )
             self.fifth_line_strip: PixelStrip = PixelStrip(
-                300, 21, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
+                300, 13, led_freq_hz, 5, led_invert, led_brightness, 1  # GPIO 13, PWM1, DMA 5
             )
             self.strip.begin()
             self.fifth_line_strip.begin()
@@ -144,7 +146,7 @@ class DisplayManager:
             pygame_radius: The radius of the trail ring for Pygame display.
         """
         if IS_RASPBERRY_PI:
-            actual_led_pos = rpi_pos_calculator(pos, self.led_count)
+            actual_led_pos = int(rpi_pos_calculator(pos, self.led_count))
             self.strip.setPixelColor(actual_led_pos, self._convert_to_led_color(color))
         else:
             x, y = self._get_ring_position(pos, self.screen_width // 2, self.screen_height // 2, pygame_radius, self.led_count)
