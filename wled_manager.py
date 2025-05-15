@@ -5,7 +5,44 @@ from typing import Optional, Dict
 
 from wled_controller import WLEDController
 from game_constants import NUMBER_OF_VICTORY_LEDS
-
+WLED_BASE = {"on":True,
+ "bri":255,
+ "on": True,
+ "seg":[
+     {"id":0,
+      "grp":1,
+      "on":True,
+      "bri":255,
+      "set":0,
+      "n":"my_name_fun0",
+      "ix":128,
+      "sel":True,
+      "si":0
+      },
+     {
+         "id":1,
+         "grp":1,
+         "on":True,
+         "bri":255,
+         "set":0,
+         "ix":128,
+         "sel":True,
+         "o3":False,
+         "si":0
+     },
+     {
+         "id":2,
+         "grp":1,
+         "on":True,
+         "bri":255,
+         "set":0,
+         "ix":128,
+         "sel":True,
+         "o3":False,
+         "si":0
+     }
+ ]
+}
 class WLEDManager:
     """Manages WLED communication and state tracking.
     
@@ -41,6 +78,7 @@ class WLEDManager:
         seg_list = [{**base_seg,
                      "start": i * NUMBER_OF_VICTORY_LEDS,
                      "stop": i*NUMBER_OF_VICTORY_LEDS + min(NUMBER_OF_VICTORY_LEDS, current_phrase*8),
+                     "n": f"my_name_{i}",
                      "id": i
                      } for i in range(n)]
 
@@ -65,11 +103,8 @@ class WLEDManager:
         wled_base_command = self.command_settings.get(current_phrase)
         if wled_base_command and wled_base_command != self.last_wled_base_command:
             self.last_wled_base_command = wled_base_command
-        
-        json_base = {
-                 "seg": [{
-                 }]
-                }
+            
+        json_base = WLED_BASE
         
         wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, json_base, 3, current_phrase)
         if wled_command != self.last_wled_command:
