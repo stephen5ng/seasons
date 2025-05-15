@@ -93,10 +93,15 @@ class DisplayManager:
         self._active_times_np = np.full((2, 2, led_count, 2), [-1.0, -1.0], dtype=np.float32)  # Initialize with -1 for both set_time and duration
         
         if IS_RASPBERRY_PI:
+            # Create separate strips for target/hit rings and fifth line
             self.strip: PixelStrip = PixelStrip(
                 led_count*2, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
             )
+            self.fifth_line_strip: PixelStrip = PixelStrip(
+                300, 21, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
+            )
             self.strip.begin()
+            self.fifth_line_strip.begin()
             self.pygame_surface: Optional[Surface] = None
             self.display_surface: Optional[Surface] = None
         else:
@@ -111,6 +116,8 @@ class DisplayManager:
         if IS_RASPBERRY_PI:
             for i in range(self.strip.numPixels()):
                 self.strip.setPixelColor(i, 0)
+            for i in range(self.fifth_line_strip.numPixels()):
+                self.fifth_line_strip.setPixelColor(i, 0)
         else:
             self.pygame_surface.fill((0, 0, 0))
     
@@ -188,6 +195,22 @@ class DisplayManager:
         """
         self._request_pixel_on_trail(pos, color, TrailType.HIT, duration)
 
+    def set_fifth_line_pixel(self, pos: int, color: Color) -> None:
+        """Set pixel color for the fifth line LED chain.
+        
+        Args:
+            pos: Position in the fifth line chain (0-300)
+            color: The Pygame Color for the LED
+        """
+        if IS_RASPBERRY_PI:
+            # Use separate strip for fifth line
+            self.fifth_line_strip.setPixelColor(pos, self._convert_to_led_color(color))
+            self.fifth_line_strip.show()  # Update immediately for smoother animation
+        else:
+            # Draw circle centered on screen for non-Pi mode
+            position_x = int((pos / 300.0) * (self.screen_width // 2))  # Scale 0-300 to 0-screen_center
+            pygame.draw.circle(self.pygame_surface, color, (position_x, 96), 4, 1)
+
     def _calculate_faded_colors(self, now: float) -> np.ndarray:
         """Calculate faded colors for all pixels based on their durations and elapsed time.
         
@@ -259,6 +282,7 @@ class DisplayManager:
         # Update the display
         if IS_RASPBERRY_PI:
             self.strip.show()
+            self.fifth_line_strip.show()
         else:
             pygame.transform.scale(
                 self.pygame_surface, 

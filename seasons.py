@@ -250,7 +250,7 @@ def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
     
     # Calculate position and color based on completion percentage
     eased = FIFTH_LINE_EASE(min(percent_complete, 1.0))
-    position_x = int(SCREEN_WIDTH // 2 * eased)
+    position = int(300 * eased)  # Scale to 0-300 range for LED chain
     
     # Color transitions: gray (0-95%) -> red (95-100%) -> fade out (100-150%)
     if percent_complete > 1.0:
@@ -262,7 +262,8 @@ def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
     else:
         color = Color(255, 0, 0) if percent_complete > 0.95 else Color(128, 128, 128)
     
-    pygame.draw.circle(display.pygame_surface, color, (position_x, 96), 4, 1)
+    # Use the new LED chain on Pi, fall back to circle drawing on non-Pi
+    display.set_fifth_line_pixel(position, color)
 
 # Stack of target beat floats for fifth line animations
 target_fifth_line_beat_floats: List[float] = []
