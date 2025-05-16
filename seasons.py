@@ -250,7 +250,8 @@ def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
     
     # Calculate position and color based on completion percentage
     eased = FIFTH_LINE_EASE(min(percent_complete, 1.0))
-    position = int(300 * eased)  # Scale to 0-300 range for LED chain
+    # Ensure position is strictly less than led_count
+    position = min(int(display.led_count * eased), display.led_count - 1)
     
     # Color transitions: gray (0-95%) -> red (95-100%) -> fade out (100-150%)
     if percent_complete > 1.0:

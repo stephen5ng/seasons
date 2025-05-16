@@ -23,10 +23,11 @@ LED_OFFSET = 10
 class TrailType(Enum):
     """Enum for trail types.
     
-    The auto() values will be 0 for TARGET and 1 for HIT, making them perfect for array indexing.
+    The auto() values will be 0 for TARGET, 1 for HIT, and 2 for FIFTH, making them perfect for array indexing.
     """
     TARGET = 0  # Explicitly set to 0 for array indexing
     HIT = 1     # Explicitly set to 1 for array indexing
+    FIFTH = 2   # Explicitly set to 2 for array indexing
 
 class DisplayManager:
     """Handles LED display output for both Pygame and WS281x."""
@@ -48,7 +49,7 @@ class DisplayManager:
             screen_width: Width of the screen in pixels
             screen_height: Height of the screen in pixels
             scaling_factor: Scaling factor for the display
-            led_count: Number of LEDs in the strip (Raspberry Pi mode)
+            led_count: Number of LEDs in each strip (Raspberry Pi mode)
             led_pin: GPIO pin connected to the pixels (Raspberry Pi mode)
             led_freq_hz: LED signal frequency in Hz (Raspberry Pi mode)
             led_dma: DMA channel to use (Raspberry Pi mode)
@@ -80,27 +81,31 @@ class DisplayManager:
                     lambda p, lc: (p + LED_OFFSET) % lc + lc,
                     game_constants.HIT_TRAIL_RADIUS
                 )
+            },
+            TrailType.FIFTH: {
+                'rpi_calc': lambda p, lc: p % lc,  # Use same LED count as other trails
+                'radius': 0,  # Not used for fifth line
+                'setter': lambda pos, color: self._set_pixel_on_fifth_line(pos, color)
             }
         }
         
         # Numpy arrays to track active pixels in parallel
-        # Shape: (2, 1, led_count, 3) for colors, (2, 1, led_count, 2) for timing
-        # First dimension: trail_type (0 for target, 1 for hit)
+        # Shape: (num_trails, 2, led_count, 3) for colors, (num_trails, 2, led_count, 2) for timing
+        # First dimension: trail_type (0 for target, 1 for hit, 2 for fifth)
         # Second dimension: layer
         # Third dimension: pos (0 to led_count-1)
         # Fourth dimension: [r,g,b] for colors, [set_time, duration] for timing
-        self._active_colors_np = np.zeros((2, 2, led_count, 3), dtype=np.uint8)
-        self._active_times_np = np.full((2, 2, led_count, 2), [-1.0, -1.0], dtype=np.float32)  # Initialize with -1 for both set_time and duration
+        num_trails = len(TrailType)
+        self._active_colors_np = np.zeros((num_trails, 2, led_count, 3), dtype=np.uint8)
+        self._active_times_np = np.full((num_trails, 2, led_count, 2), [-1.0, -1.0], dtype=np.float32)
         
         if IS_RASPBERRY_PI:
             # Create separate strips for target/hit rings and fifth line
-            # Use PWM channel 0 (GPIO 18) for main strip, PWM channel 1 (GPIO 13) for fifth line
-            # Use DMA 10 for main strip, DMA 5 for fifth line to avoid conflicts
             self.strip: PixelStrip = PixelStrip(
                 led_count*2, led_pin, led_freq_hz, 10, led_invert, led_brightness, 0  # GPIO 18, PWM0, DMA 10
             )
             self.fifth_line_strip: PixelStrip = PixelStrip(
-                300, 13, led_freq_hz, 5, led_invert, led_brightness, 1  # GPIO 13, PWM1, DMA 5
+                led_count, 13, led_freq_hz, 5, led_invert, led_brightness, 1  # GPIO 13, PWM1, DMA 5
             )
             self.strip.begin()
             self.fifth_line_strip.begin()
@@ -152,13 +157,26 @@ class DisplayManager:
             x, y = self._get_ring_position(pos, self.screen_width // 2, self.screen_height // 2, pygame_radius, self.led_count)
             self.pygame_surface.set_at((x, y), color)
 
+    def _set_pixel_on_fifth_line(self, pos: int, color: Color) -> None:
+        """Set a pixel on the fifth line strip.
+        
+        Args:
+            pos: Position in the fifth line chain (0 to led_count-1)
+            color: The Pygame Color for the LED
+        """
+        if IS_RASPBERRY_PI:
+            self.fifth_line_strip.setPixelColor(pos, self._convert_to_led_color(color))
+        else:
+            position_x = int((pos / (self.led_count - 1)) * (self.screen_width // 2))
+            pygame.draw.circle(self.pygame_surface, color, (position_x, 96), 4, 1)
+
     def _request_pixel_on_trail(self, pos: int, color: Color, trail_type: TrailType, duration: float, layer: int = 0) -> None:
         """Request a pixel to be displayed on a trail with fade management.
         
         Args:
             pos: The logical position of the LED.
             color: The Pygame Color for the LED.
-            trail_type: The type of trail (TARGET or HIT).
+            trail_type: The type of trail (TARGET, HIT, or FIFTH).
             duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
                     Must be either -1 (permanent) or > 0 (fading).
             layer: The layer to set the pixel on.
@@ -197,21 +215,18 @@ class DisplayManager:
         """
         self._request_pixel_on_trail(pos, color, TrailType.HIT, duration)
 
-    def set_fifth_line_pixel(self, pos: int, color: Color) -> None:
-        """Set pixel color for the fifth line LED chain.
+    def set_fifth_line_pixel(self, pos: int, color: Color, duration: float = 0.2, layer: int = 0) -> None:
+        """Set pixel color for the fifth line LED chain with optional duration.
         
         Args:
-            pos: Position in the fifth line chain (0-300)
+            pos: Position in the fifth line chain (0 to led_count-1)
             color: The Pygame Color for the LED
+            duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
+            layer: The layer to set the pixel on.
         """
-        if IS_RASPBERRY_PI:
-            # Use separate strip for fifth line
-            self.fifth_line_strip.setPixelColor(pos, self._convert_to_led_color(color))
-            self.fifth_line_strip.show()  # Update immediately for smoother animation
-        else:
-            # Draw circle centered on screen for non-Pi mode
-            position_x = int((pos / 300.0) * (self.screen_width // 2))  # Scale 0-300 to 0-screen_center
-            pygame.draw.circle(self.pygame_surface, color, (position_x, 96), 4, 1)
+        if pos < 0 or pos >= self.led_count:
+            raise ValueError(f"Position must be between 0 and {self.led_count-1}")
+        self._request_pixel_on_trail(pos, color, TrailType.FIFTH, duration, layer)
 
     def _calculate_faded_colors(self, now: float) -> np.ndarray:
         """Calculate faded colors for all pixels based on their durations and elapsed time.
@@ -220,21 +235,21 @@ class DisplayManager:
             now: Current time in seconds
             
         Returns:
-            Array of faded colors with shape (2, led_count, 3) after averaging layers
+            Array of faded colors with shape (num_trails, led_count, 3) after averaging layers
         """
         # Get set_times and durations for all pixels
-        set_times = self._active_times_np[:, :, :, 0]  # Shape: (2, 2, led_count)
-        durations = self._active_times_np[:, :, :, 1]  # Shape: (2, 2, led_count)
-        elapsed = now - set_times  # Shape: (2, 2, led_count)
+        set_times = self._active_times_np[:, :, :, 0]  # Shape: (num_trails, 2, led_count)
+        durations = self._active_times_np[:, :, :, 1]  # Shape: (num_trails, 2, led_count)
+        elapsed = now - set_times  # Shape: (num_trails, 2, led_count)
         
         # Create masks for different pixel states
-        # Shape: (2, 2, led_count, 1) for broadcasting with colors
+        # Shape: (num_trails, 2, led_count, 1) for broadcasting with colors
         is_fading = (durations > 0)[..., None]  # Pixels that should fade
         is_expired = (is_fading & (elapsed >= durations)[..., None])  # Fading pixels that have expired
         is_permanent = (durations == -1)[..., None]  # Permanent pixels
         
         # Calculate fade ratios for fading pixels (1.0 to 0.0)
-        # Shape: (2, 2, led_count, 1)
+        # Shape: (num_trails, 2, led_count, 1)
         fade_ratios = np.where(
             is_fading,
             1.0 - np.clip(elapsed / durations, 0, 1)[..., None],
@@ -253,19 +268,19 @@ class DisplayManager:
                 self._active_colors_np,  # Permanent pixels keep original color
                 (self._active_colors_np * fade_ratios).astype(np.uint8)  # Fading pixels
             )
-        )  # Shape: (2, 2, led_count, 3)
+        )  # Shape: (num_trails, 2, led_count, 3)
         
         # Average the two layers using integer arithmetic
         # Add layers and right shift by 1 (divide by 2)
         averaged = ((layer_colors[:, 0].astype(np.uint16) + layer_colors[:, 1].astype(np.uint16)) >> 1).astype(np.uint8)
         
-        return averaged  # Shape: (2, led_count, 3)
+        return averaged  # Shape: (num_trails, led_count, 3)
 
     def _update_display(self, faded_colors: np.ndarray) -> None:
         """Update the display with faded colors.
         
         Args:
-            faded_colors: Array of faded colors with shape (2, led_count, 3) after averaging
+            faded_colors: Array of faded colors with shape (num_trails, led_count, 3) after averaging
         """
         # Update display using numpy implementation
         for trail_type in TrailType:
