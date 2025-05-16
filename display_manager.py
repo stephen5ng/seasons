@@ -3,10 +3,11 @@ import pygame
 import math
 import numpy as np
 from enum import Enum
-from typing import Tuple, Protocol
+from typing import Tuple, Protocol, Optional
 from pygame import Color
 from game_constants import *
 import game_constants
+import logging
 
 # For Raspberry Pi mode
 try:
@@ -17,8 +18,14 @@ except ImportError:
     PixelStrip = None
     LEDColor = None
 
+# For sACN mode
+from sacn_display import SacnDisplay
+HAS_SACN = True
+
 LED_OFFSET = 10
 USE_SEPARATE_FIFTH_LINE_STRIP = False
+
+logger = logging.getLogger(__name__)
 
 class TrailType(Enum):
     """Enum for trail types.
@@ -70,12 +77,12 @@ class RaspberryPiDisplay:
         actual_led_pos = int((pos + LED_OFFSET) % self.led_count + trail_start_offset)
         self.strip.setPixelColor(actual_led_pos, self._convert_to_led_color(color))
 
-    def set_fifth_line_pixel(self, pos: int, color: Color) -> None:
+    def set_fifth_line_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the fifth line strip."""
         if USE_SEPARATE_FIFTH_LINE_STRIP:
             self.fifth_line_strip.setPixelColor(pos, self._convert_to_led_color(color))
         else:
-            self.set_pixel(pos, color, self.led_count * 2)
+            self.set_pixel(pos, color, trail_start_offset)
 
     def draw_score_lines(self, score: float) -> None:
         """Draw score lines on the display."""
@@ -112,7 +119,7 @@ class PygameDisplay:
                                      game_constants.TARGET_TRAIL_RADIUS, self.led_count)
         self.pygame_surface.set_at((x, y), color)
 
-    def set_fifth_line_pixel(self, pos: int, color: Color) -> None:
+    def set_fifth_line_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the fifth line."""
         position_x = int((pos / (self.led_count - 1)) * (self.screen_width // 2))
         pygame.draw.circle(self.pygame_surface, color, (position_x, 96), 4, 1)
@@ -147,7 +154,7 @@ class PygameDisplay:
         return (center_x + x, center_y + y)
 
 class DisplayManager:
-    """Handles LED display output for both Pygame and WS281x."""
+    """Handles LED display output for Pygame, WS281x, and sACN."""
     
     def __init__(self, 
                  screen_width: int, 
@@ -160,11 +167,26 @@ class DisplayManager:
                  led_invert: bool,
                  led_brightness: int,
                  led_channel: int) -> None:
-        """Initialize the display manager."""
+        """Initialize the display manager.
+        
+        Args:
+            screen_width: Width of pygame display
+            screen_height: Height of pygame display
+            scaling_factor: Scaling factor for pygame display
+            led_count: Number of LEDs in strip
+            led_pin: GPIO pin for WS281x
+            led_freq_hz: WS281x frequency
+            led_dma: WS281x DMA channel
+            led_invert: WS281x invert signal
+            led_brightness: WS281x brightness
+            led_channel: WS281x PWM channel
+        """
         self.led_count = led_count
         
-        if IS_RASPBERRY_PI:
-            self.display: Display = RaspberryPiDisplay(
+        if HAS_SACN:
+            self.display: Display = SacnDisplay(led_count*3)
+        elif IS_RASPBERRY_PI:
+            self.display = RaspberryPiDisplay(
                 led_count, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
             )
         else:
@@ -217,7 +239,7 @@ class DisplayManager:
 
     def _set_pixel_on_fifth_line(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the fifth line strip."""
-        self.display.set_fifth_line_pixel(pos, color)
+        self.display.set_fifth_line_pixel(pos, color, trail_start_offset)
 
     def update(self) -> None:
         """Update the display and fade out pixels if their duration has expired."""
@@ -280,6 +302,7 @@ class DisplayManager:
         Args:
             faded_colors: Array of faded colors with shape (num_trails, led_count, 3) after averaging
         """
+        # logger.debug("Updating display with faded colors")
         # Update display using numpy implementation
         for trail_type in TrailType:
             trail_idx = trail_type.value
@@ -293,9 +316,9 @@ class DisplayManager:
             for pos in non_zero_positions:
                 color = Color(*faded_colors[trail_idx, pos])
                 setter(pos, color)
+                # logger.debug(f"Set pixel {pos} to RGB({color.r}, {color.g}, {color.b})")
         
-        # Update the display
-        self.display.show()
+        # Note: show() is called by update() after this method returns
 
     def draw_score_lines(self, score: float) -> None:
         """Draw horizontal lines representing the score with top-to-bottom animation."""
