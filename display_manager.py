@@ -208,10 +208,8 @@ class DisplayManager:
         self._active_times_np = np.full((num_trails, 2, led_count, 2), [-1.0, -1.0], dtype=np.float32)
 
     def clear(self) -> None:
-        """Clear all pixels using slice assignment."""
-        self.strip[:] = 0
-        if USE_SEPARATE_FIFTH_LINE_STRIP:
-            self.fifth_line_strip[:] = 0
+        """Clear the display by delegating to the display implementation."""
+        self.display.clear()
 
     def _set_pixel_on_trail(self, pos: int, color: Color, trail_start_offset: int, pygame_radius: int) -> None:
         """Activate a pixel on the display at a specific position."""
