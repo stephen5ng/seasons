@@ -318,7 +318,8 @@ class DisplayManager:
         # Update the display
         if IS_RASPBERRY_PI:
             self.strip.show()
-            self.fifth_line_strip.show()
+            if USE_SEPARATE_FIFTH_LINE_STRIP:
+                self.fifth_line_strip.show()
         else:
             pygame.transform.scale(
                 self.pygame_surface, 
