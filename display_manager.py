@@ -19,7 +19,7 @@ except ImportError:
     LEDColor = None
 
 LED_OFFSET = 10
-
+USE_SEPARATE_FIFTH_LINE_STRIP = False
 class TrailType(Enum):
     """Enum for trail types.
     
@@ -65,27 +65,28 @@ class DisplayManager:
         # Map trail types to their properties
         self._trail_properties: Dict[TrailType, Dict[str, Any]] = {
             TrailType.TARGET: {
-                'rpi_calc': lambda p, lc: (p + LED_OFFSET) % lc,
                 'radius': game_constants.TARGET_TRAIL_RADIUS,
                 'setter': lambda pos, color: self._set_pixel_on_trail(
                     pos, color,
-                    lambda p, lc: (p + LED_OFFSET) % lc,
+                    0,
                     game_constants.TARGET_TRAIL_RADIUS
                 )
             },
             TrailType.HIT: {
-                'rpi_calc': lambda p, lc: (p + LED_OFFSET) % lc + lc,
                 'radius': game_constants.HIT_TRAIL_RADIUS,
                 'setter': lambda pos, color: self._set_pixel_on_trail(
                     pos, color,
-                    lambda p, lc: (p + LED_OFFSET) % lc + lc,
+                    self.led_count,
                     game_constants.HIT_TRAIL_RADIUS
                 )
             },
             TrailType.FIFTH: {
-                'rpi_calc': lambda p, lc: p % lc,  # Use same LED count as other trails
                 'radius': 0,  # Not used for fifth line
-                'setter': lambda pos, color: self._set_pixel_on_fifth_line(pos, color)
+                'setter': lambda pos, color: self._set_pixel_on_fifth_line(
+                    pos, 
+                    color, 
+                    0 if USE_SEPARATE_FIFTH_LINE_STRIP else self.led_count * 2
+                )
             }
         }
         
@@ -102,13 +103,16 @@ class DisplayManager:
         if IS_RASPBERRY_PI:
             # Create separate strips for target/hit rings and fifth line
             self.strip: PixelStrip = PixelStrip(
-                led_count*2, led_pin, led_freq_hz, 10, led_invert, led_brightness, 0  # GPIO 18, PWM0, DMA 10
+                led_count*2 if USE_SEPARATE_FIFTH_LINE_STRIP else led_count*3,
+                led_pin, led_freq_hz, led_dma, led_invert, led_brightness, 0
             )
-            self.fifth_line_strip: PixelStrip = PixelStrip(
-                led_count, 13, led_freq_hz, 5, led_invert, led_brightness, 1  # GPIO 13, PWM1, DMA 5
-            )
+            if USE_SEPARATE_FIFTH_LINE_STRIP:
+                self.fifth_line_strip: PixelStrip = PixelStrip(
+                    led_count, 13, led_freq_hz, 5, led_invert, led_brightness, 1
+                )
             self.strip.begin()
-            self.fifth_line_strip.begin()
+            if USE_SEPARATE_FIFTH_LINE_STRIP:
+                self.fifth_line_strip.begin()
             self.pygame_surface: Optional[Surface] = None
             self.display_surface: Optional[Surface] = None
         else:
@@ -123,8 +127,9 @@ class DisplayManager:
         if IS_RASPBERRY_PI:
             for i in range(self.strip.numPixels()):
                 self.strip.setPixelColor(i, 0)
-            for i in range(self.fifth_line_strip.numPixels()):
-                self.fifth_line_strip.setPixelColor(i, 0)
+            if USE_SEPARATE_FIFTH_LINE_STRIP:
+                for i in range(self.fifth_line_strip.numPixels()):
+                    self.fifth_line_strip.setPixelColor(i, 0)
         else:
             self.pygame_surface.fill((0, 0, 0))
     
@@ -139,7 +144,18 @@ class DisplayManager:
         """
         return LEDColor(color.r, color.g, color.b) if LEDColor else None
 
-    def _set_pixel_on_trail(self, pos: int, color: Color, rpi_pos_calculator: Callable[[int, int], int], pygame_radius: int) -> None:
+    def _set_raspberry_pi_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
+        """Set a pixel on the Raspberry Pi LED strip.
+        
+        Args:
+            pos: The logical position of the LED.
+            color: The Pygame Color for the LED.
+            trail_start_offset: Offset to add to the position for this trail.
+        """
+        actual_led_pos = int((pos + LED_OFFSET) % self.led_count + trail_start_offset)
+        self.strip.setPixelColor(actual_led_pos, self._convert_to_led_color(color))
+
+    def _set_pixel_on_trail(self, pos: int, color: Color, trail_start_offset: int, pygame_radius: int) -> None:
         """Activate a pixel on the display at a specific position.
         
         This method only handles the immediate display update.
@@ -147,25 +163,28 @@ class DisplayManager:
         Args:
             pos: The logical position of the LED.
             color: The Pygame Color for the LED.
-            rpi_pos_calculator: A function to calculate the actual LED index for Raspberry Pi.
+            trail_start_offset: Offset to add to the position for this trail (e.g. 0 for target, led_count for hit)
             pygame_radius: The radius of the trail ring for Pygame display.
         """
         if IS_RASPBERRY_PI:
-            actual_led_pos = int(rpi_pos_calculator(pos, self.led_count))
-            self.strip.setPixelColor(actual_led_pos, self._convert_to_led_color(color))
+            self._set_raspberry_pi_pixel(pos, color, trail_start_offset)
         else:
             x, y = self._get_ring_position(pos, self.screen_width // 2, self.screen_height // 2, pygame_radius, self.led_count)
             self.pygame_surface.set_at((x, y), color)
 
-    def _set_pixel_on_fifth_line(self, pos: int, color: Color) -> None:
+    def _set_pixel_on_fifth_line(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the fifth line strip.
         
         Args:
             pos: Position in the fifth line chain (0 to led_count-1)
             color: The Pygame Color for the LED
+            trail_start_offset: Offset to add to the position for this trail
         """
         if IS_RASPBERRY_PI:
-            self.fifth_line_strip.setPixelColor(pos, self._convert_to_led_color(color))
+            if USE_SEPARATE_FIFTH_LINE_STRIP:
+                self.fifth_line_strip.setPixelColor(pos, self._convert_to_led_color(color))
+            else:
+                self._set_raspberry_pi_pixel(pos, color, trail_start_offset)
         else:
             position_x = int((pos / (self.led_count - 1)) * (self.screen_width // 2))
             pygame.draw.circle(self.pygame_surface, color, (position_x, 96), 4, 1)
