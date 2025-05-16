@@ -339,14 +339,11 @@ async def run_game() -> None:
     )
     
     game_state: GameState = GameState()
-    hit_trail_visualizer = TrailVisualizer.create_visualizer(
-        led_count=number_of_leds,
-        auto_mode=args.auto_score,
-        speed=1
+    hit_trail_visualizer = TrailVisualizer(
+        display,
+        number_of_leds
     )
     
-    hit_trail_visualizer.display = display
-
     if args.score > 0:
         logger.info(f"Setting initial score to {args.score}")
         game_state.score_manager.score = args.score
@@ -444,7 +441,7 @@ async def run_game() -> None:
             if not game_state.button_handler.is_in_valid_window(led_position):
                 stable_score = game_state.score_manager.score
                         
-            hit_trail_visualizer.sync_with_game_state(game_state, led_position)
+            hit_trail_visualizer.draw_trail(led_position)
             
             if not IS_RASPBERRY_PI:
                 display.draw_score_lines(game_state.score_manager.score)
