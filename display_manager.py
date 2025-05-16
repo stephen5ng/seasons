@@ -1,12 +1,14 @@
-"""Display management utilities."""
+"""Display manager for the rhythm game."""
 import pygame
 import math
 import numpy as np
-from enum import Enum
-from typing import Tuple, Protocol, Optional
+from enum import Enum, auto
+from typing import Tuple, Protocol, Optional, Dict, List
 from pygame import Color
-from game_constants import *
+from game_constants import DISPLAY_LED_OFFSET, USE_SEPARATE_FIFTH_LINE_STRIP, USE_SACN
 import game_constants
+from sacn_display import SacnDisplay
+
 import logging
 
 # For Raspberry Pi mode
@@ -19,22 +21,20 @@ except ImportError:
     LEDColor = None
 
 # For sACN mode
-from sacn_display import SacnDisplay
-HAS_SACN = True
+try:
+    import sacn
+except ImportError:
+    sacn = None
 
-LED_OFFSET = 10
-USE_SEPARATE_FIFTH_LINE_STRIP = False
-
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class TrailType(Enum):
-    """Enum for trail types.
-    
-    The auto() values will be 0 for TARGET, 1 for HIT, and 2 for FIFTH, making them perfect for array indexing.
-    """
-    TARGET = 0  # Explicitly set to 0 for array indexing
-    HIT = 1     # Explicitly set to 1 for array indexing
-    FIFTH = 2   # Explicitly set to 2 for array indexing
+    """Types of trails that can be drawn."""
+    TARGET = 0
+    HIT = 1
+    FIFTH_LINE = 2
 
 class Display(Protocol):
     """Protocol for display implementations."""
@@ -74,7 +74,7 @@ class RaspberryPiDisplay:
 
     def set_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the LED strip."""
-        actual_led_pos = int((pos + LED_OFFSET) % self.led_count + trail_start_offset)
+        actual_led_pos = int((pos + DISPLAY_LED_OFFSET) % self.led_count + trail_start_offset)
         self.strip.setPixelColor(actual_led_pos, self._convert_to_led_color(color))
 
     def set_fifth_line_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
@@ -183,8 +183,8 @@ class DisplayManager:
         """
         self.led_count = led_count
         
-        if HAS_SACN:
-            self.display: Display = SacnDisplay(led_count*3)
+        if USE_SACN:
+            self.display: Display = SacnDisplay(led_count*3) # Target, hit, fifth line
         elif IS_RASPBERRY_PI:
             self.display = RaspberryPiDisplay(
                 led_count, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
@@ -209,7 +209,7 @@ class DisplayManager:
                     game_constants.HIT_TRAIL_RADIUS
                 )
             },
-            TrailType.FIFTH: {
+            TrailType.FIFTH_LINE: {
                 'radius': 0,  # Not used for fifth line
                 'setter': lambda pos, color: self._set_pixel_on_fifth_line(
                     pos, 
@@ -235,7 +235,8 @@ class DisplayManager:
 
     def _set_pixel_on_trail(self, pos: int, color: Color, trail_start_offset: int, pygame_radius: int) -> None:
         """Activate a pixel on the display at a specific position."""
-        self.display.set_pixel(pos, color, trail_start_offset)
+        actual_led_pos = int((pos + DISPLAY_LED_OFFSET) % self.led_count + trail_start_offset)
+        self.display.set_pixel(actual_led_pos, color, trail_start_offset)
 
     def _set_pixel_on_fifth_line(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the fifth line strip."""
@@ -330,7 +331,7 @@ class DisplayManager:
         Args:
             pos: The logical position of the LED.
             color: The Pygame Color for the LED.
-            trail_type: The type of trail (TARGET, HIT, or FIFTH).
+            trail_type: The type of trail (TARGET, HIT, or FIFTH_LINE).
             duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
                     Must be either -1 (permanent) or > 0 (fading).
             layer: The layer to set the pixel on.
@@ -380,4 +381,4 @@ class DisplayManager:
         """
         if pos < 0 or pos >= self.led_count:
             raise ValueError(f"Position must be between 0 and {self.led_count-1}")
-        self._request_pixel_on_trail(pos, color, TrailType.FIFTH, duration, layer)
+        self._request_pixel_on_trail(pos, color, TrailType.FIFTH_LINE, duration, layer)

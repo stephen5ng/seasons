@@ -2,6 +2,7 @@
 import logging
 from typing import List
 from pygame import Color
+from game_constants import DISPLAY_LED_OFFSET
 
 # For sACN mode
 try:
@@ -31,6 +32,7 @@ class SacnDisplay:
             raise ImportError("sacn package is required for sACN support")
             
         self.led_count = led_count
+        self.leds_per_strip = led_count//3
         logger.info(f"Initializing sACN display with {led_count} LEDs")
         
         # Calculate number of universes needed (170 LEDs per universe)
@@ -59,17 +61,11 @@ class SacnDisplay:
             color: RGB color
             trail_start_offset: Offset for trail position (unused in sACN)
         """
+        pos = (pos + DISPLAY_LED_OFFSET) % self.leds_per_strip
         pos += trail_start_offset
-        if pos < 0 or pos >= self.led_count:
-            logger.debug(f"Invalid pixel position {pos} (led_count: {self.led_count})")
-            return
 
         # Calculate DMX address (3 channels per LED)
         addr = pos * 3
-        if addr + 2 >= len(self.dmx_data):  # Check against total buffer size
-            logger.debug(f"DMX address {addr} exceeds buffer size {len(self.dmx_data)} for position {pos}")
-            sys.exit(1)
-            return
 
         pos += 3*trail_start_offset
         # Set RGB values in DMX data
@@ -97,6 +93,7 @@ class SacnDisplay:
         """Clear all pixels by setting to black."""
         total_channels = self.led_count * 3  # 3 channels per LED
         self.dmx_data = [0] * total_channels     
+        # print(f"len(self.dmx_data): {len(self.dmx_data)}")
            
     def show(self) -> None:
         """Send the current DMX data to all active universes."""
