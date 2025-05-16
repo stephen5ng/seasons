@@ -83,12 +83,10 @@ class RaspberryPiDisplay:
         pass
 
     def clear(self) -> None:
-        """Clear all pixels."""
-        for i in range(self.strip.numPixels()):
-            self.strip.setPixelColor(i, 0)
+        """Clear all pixels using slice assignment."""
+        self.strip[:] = 0
         if USE_SEPARATE_FIFTH_LINE_STRIP:
-            for i in range(self.fifth_line_strip.numPixels()):
-                self.fifth_line_strip.setPixelColor(i, 0)
+            self.fifth_line_strip[:] = 0
 
     def show(self) -> None:
         """Update the display."""
@@ -210,8 +208,10 @@ class DisplayManager:
         self._active_times_np = np.full((num_trails, 2, led_count, 2), [-1.0, -1.0], dtype=np.float32)
 
     def clear(self) -> None:
-        """Clear the display."""
-        self.display.clear()
+        """Clear all pixels using slice assignment."""
+        self.strip[:] = 0
+        if USE_SEPARATE_FIFTH_LINE_STRIP:
+            self.fifth_line_strip[:] = 0
 
     def _set_pixel_on_trail(self, pos: int, color: Color, trail_start_offset: int, pygame_radius: int) -> None:
         """Activate a pixel on the display at a specific position."""
