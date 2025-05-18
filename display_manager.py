@@ -167,6 +167,67 @@ class PygameDisplay:
         y = int(-radius * math.cos(angle))
         return (center_x + x, center_y + y)
 
+class PygameAndSacnDisplay:
+    """Display implementation that combines both Pygame and sACN displays.
+    
+    This class delegates all display operations to both a Pygame display and an sACN display,
+    allowing for simultaneous visualization on screen and LED strips.
+    """
+    
+    def __init__(self, screen_width: int, screen_height: int, scaling_factor: int, led_count: int) -> None:
+        """Initialize the combined display.
+        
+        Args:
+            screen_width: Width of pygame display
+            screen_height: Height of pygame display
+            scaling_factor: Scaling factor for pygame display
+            led_count: Number of LEDs in strip
+        """
+        self.pygame_display = PygameDisplay(screen_width, screen_height, scaling_factor, led_count)
+        self.sacn_display = SacnDisplay(led_count * 3)  # Target, hit, fifth line
+        
+    def set_pixel(self, pos: int, color: Color, trail_start_offset: int, pygame_radius: int) -> None:
+        """Set a pixel on both displays.
+        
+        Args:
+            pos: Position of the pixel
+            color: Color to set
+            trail_start_offset: Offset for the trail
+            pygame_radius: Radius to use for pygame display
+        """
+        self.pygame_display.set_pixel(pos, color, trail_start_offset, pygame_radius)
+        self.sacn_display.set_pixel(pos, color, trail_start_offset, pygame_radius)
+        
+    def set_fifth_line_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
+        """Set a pixel on the fifth line for both displays.
+        
+        Args:
+            pos: Position of the pixel
+            color: Color to set
+            trail_start_offset: Offset for the trail
+        """
+        self.pygame_display.set_fifth_line_pixel(pos, color, trail_start_offset)
+        self.sacn_display.set_fifth_line_pixel(pos, color, trail_start_offset)
+        
+    def draw_score_lines(self, score: float) -> None:
+        """Draw score lines on the pygame display.
+        
+        Args:
+            score: Score value to display
+        """
+        self.pygame_display.draw_score_lines(score)
+        # sACN display doesn't support score lines
+        
+    def clear(self) -> None:
+        """Clear both displays."""
+        self.pygame_display.clear()
+        self.sacn_display.clear()
+        
+    def show(self) -> None:
+        """Update both displays."""
+        self.pygame_display.show()
+        self.sacn_display.show()
+
 class DisplayManager:
     """Handles LED display output for Pygame, WS281x, and sACN."""
     
@@ -197,8 +258,11 @@ class DisplayManager:
         """
         self.led_count = led_count
         
-        if USE_SACN:
-            self.display: Display = SacnDisplay(led_count*3) # Target, hit, fifth line
+        if USE_SACN and not IS_RASPBERRY_PI:
+            # Use combined display when sACN is enabled and not on Raspberry Pi
+            self.display: Display = PygameAndSacnDisplay(screen_width, screen_height, scaling_factor, led_count)
+        elif USE_SACN:
+            self.display = SacnDisplay(led_count*3) # Target, hit, fifth line
         elif IS_RASPBERRY_PI:
             self.display = RaspberryPiDisplay(
                 led_count, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
