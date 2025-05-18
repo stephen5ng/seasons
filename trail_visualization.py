@@ -32,12 +32,20 @@ class TrailVisualizer:
         self.simple_hit_trail = SimpleHitTrail()
     
     def get_score(self) -> float:
-        """Get the current score from the hit trail.
+        """Calculate current score based on total hits.
         
         Returns:
-            Current score value
+            Current score value (total_hits / 4.0)
         """
         return self.simple_hit_trail.get_score()
+    
+    def clear_all_hits(self) -> None:
+        """Clear all hits from the hit trail and display."""
+        while self.simple_hit_trail.total_hits > 0:
+            for target_type in game_constants.TargetType:
+                if target_type in self.simple_hit_trail.hits_by_type and self.simple_hit_trail.hits_by_type[target_type]:
+                    self.remove_hit(target_type)
+                    break
     
     def draw_trail(self, led_position: int) -> None:
         """Draw the hit trail at the given LED position.

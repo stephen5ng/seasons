@@ -78,9 +78,7 @@ MS_PER_SEC = 1000.0  # Convert seconds to milliseconds
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
 
-# Global state
 quit_app = False
-
 
 class GameState:
     """Manages game state and timing."""
@@ -111,6 +109,10 @@ class GameState:
         
         # Track miss timestamps for fade effect
         self.miss_timestamps: Dict[Tuple[int, TargetType], Tuple[float, float]] = {}  # (position, target_type) -> (timestamp, initial_intensity)
+        
+        # Fifth line state
+        self.fifth_line_in_valid_window: bool = False  # Whether fifth line is in the valid hit window
+        self.fifth_line_hit_target_beats: set[float] = set()  # Set of target beats that were hit
 
     async def update_timing(self, current_time_ms: int) -> Tuple[int, float]:
         """Calculate current timing values."""
@@ -226,74 +228,125 @@ def get_rainbow_color(time_ms: int, line_index: int) -> Color:
     else:  # Magenta to Red
         return Color(255, 0, int(255 * (6 - hue * 6)))
 
-def get_score_line_color(base_color: Color, flash_intensity: float, flash_type: str) -> Color:
-    """Get the color for score lines during flash effect."""
-    return ScoreManager.get_score_line_color(base_color, flash_intensity, flash_type)
+def get_fifth_line_color(percent_complete: float, in_valid_window: bool, was_hit: bool) -> Color:
+    """Get the color for the fifth line based on its state and animation progress.
+    
+    Args:
+        percent_complete: Animation completion percentage (0.0 to 1.5)
+        in_valid_window: Whether the fifth line is in the valid hit window
+        was_hit: Whether the fifth line was successfully hit
+        
+    Returns:
+        Color for the fifth line with appropriate brightness
+    """
+    # Base color selection
+    if was_hit:
+        base_color = Color(0, 255, 0)  # Green when hit
+    elif in_valid_window:
+        base_color = Color(255, 0, 0)  # Red in valid window
+    else:
+        base_color = Color(128, 128, 128)  # Gray otherwise
+    
+    # Apply fade-out for animation completion
+    if percent_complete >= 1.0:
+        brightness = 1 - min(1.0, (percent_complete - 1.0) * 2)
+        if brightness <= 0:
+            return Color(0, 0, 0)  # Fully transparent
+        return Color(
+            int(base_color.r * brightness),
+            int(base_color.g * brightness),
+            int(base_color.b * brightness)
+        )
+    
+    return base_color
 
-def draw_fifth_line(display: DisplayManager, percent_complete: float) -> None:
+def draw_fifth_line(display: DisplayManager, percent_complete: float, game_state: GameState) -> None:
     """Draw the fifth line with easing animation and color transitions.
     
     Args:
         display: The display manager instance to draw on.
         percent_complete: The completion percentage of the animation (0.0 to 1.5).
+        game_state: The game state instance to update fifth line state.
     """
     FIFTH_LINE_EASE = easing_functions.QuadEaseInOut(start=0.0, end=1.0, duration=1.0)
     
-    # Calculate position and color based on completion percentage
-    eased = FIFTH_LINE_EASE(min(percent_complete, 1.0))
-    # Ensure position is strictly less than led_count
-    position = min(int(display.led_count * eased), display.led_count - 1)
+    # Calculate position with easing, capped at 1.0 for the animation
+    eased = FIFTH_LINE_EASE.ease(min(percent_complete, 1.0))
+    position = int(eased * (display.led_count - 1))
     
-    # Color transitions: gray (0-95%) -> red (95-100%) -> fade out (100-150%)
-    if percent_complete > 1.0:
-        # Fade out from red to black
-        brightness = 1 - min(1.0, (percent_complete - 1.0) * 2)
-        if brightness <= 0:
-            return
-        color = Color(int(255 * brightness), 0, 0)
-    else:
-        color = Color(255, 0, 0) if percent_complete > 0.95 else Color(128, 128, 128)
+    in_valid_window = percent_complete > 0.90
+    if in_valid_window and not game_state.fifth_line_in_valid_window:
+        # Just entered valid window
+        print(f"Entering valid window at percent_complete: {percent_complete}")
+        game_state.fifth_line_in_valid_window = True
+    elif not in_valid_window and game_state.fifth_line_in_valid_window:
+        # Just left valid window
+        print(f"Leaving valid window at percent_complete: {percent_complete}")
+        game_state.fifth_line_in_valid_window = False
     
-    # Use the new LED chain on Pi, fall back to circle drawing on non-Pi
-    display.set_fifth_line_pixel(position, color)
+    # A fifth line can only be considered "hit" if it was hit while in the valid window
+    was_hit = in_valid_window and target_fifth_line_beat_floats and target_fifth_line_beat_floats[0] in game_state.fifth_line_hit_target_beats
+    color = get_fifth_line_color(percent_complete, in_valid_window, was_hit)
+    if color == Color(0, 0, 0):  # Fully transparent
+        return
+
+    start = max(0, position - 20)
+    for i in range(start, position + 1):
+        display.set_fifth_line_pixel(i, color)
 
 # Stack of target beat floats for fifth line animations
 target_fifth_line_beat_floats: List[float] = []
 
-def maybe_start_fifth_line(measure: int) -> None:
+def maybe_start_fifth_line(measure: int, game_state: GameState) -> None:
     """Check if we should start a new fifth line animation based on the current measure.
     
     Args:
         measure: The current measure number in the song.
+        game_state: The game state instance to update.
     """
     global target_fifth_line_beat_floats
     # Calculate target measure for animation start
     target_measure = measure + FIFTH_LINE_TARGET_BUFFER_MEASURE
-    # print(f"maybe_start_fifth_line measure: {measure}, target_measure: {target_measure}")
     if target_measure in FIFTH_LINE_TARGET_MEASURES:
-        # print(f"maybe_start_fifth_line target_measure in FIFTH_LINE_TARGET_MEASURES")
         target_beat = target_measure * BEATS_PER_MEASURE
         if target_beat not in target_fifth_line_beat_floats:
             target_fifth_line_beat_floats.append(target_beat)
             print(f"Starting fifth line animation at measure {target_measure}")
+            # Don't reset was_hit here - wait until old fifth line is gone
 
-def update_fifth_line(display: DisplayManager, beat_float: float) -> None:
+def update_fifth_line(display: DisplayManager, beat_float: float, game_state: GameState) -> Tuple[bool, Optional[float]]:
     """Update and draw the fifth line animation if one is active.
     
     Args:
         display: The display manager instance to draw on.
         beat_float: The current beat position as float.
+        game_state: The game state instance to update fifth line state.
+        
+    Returns:
+        Tuple of (should_apply_penalty, target_beat) where should_apply_penalty is True if
+        a fifth line completed without being hit, and target_beat is the beat that completed.
     """
     global target_fifth_line_beat_floats
     
+    should_apply_penalty = False
+    completed_target_beat = None
+    
     for target_beat in target_fifth_line_beat_floats[:]:  # Copy list to allow modification during iteration
-        # print(f"update_fifth_line target_beat: {target_beat}, beat_float: {beat_float}")
         progress = 1.0 - (target_beat - beat_float) / (FIFTH_LINE_TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
-        # print(f"update_fifth_line progress: {progress}")
         if progress >= 1.5:  # Animation complete
+            print(f"-------------Animation complete for target_beat: {target_beat}")
+            # Check hit state before removing the target beat
+            if target_beat not in game_state.fifth_line_hit_target_beats:
+                should_apply_penalty = True
+                completed_target_beat = target_beat
+            # Remove this beat from hit set when animation completes
+            game_state.fifth_line_hit_target_beats.discard(target_beat)
             target_fifth_line_beat_floats.remove(target_beat)
+            game_state.fifth_line_in_valid_window = False  # Ensure state is updated when animation completes
         elif progress >= 0:  # Animation active
-            draw_fifth_line(display, progress)
+            draw_fifth_line(display, progress, game_state)
+            
+    return should_apply_penalty, completed_target_beat
 
 def get_effective_window_size(phrase: int) -> int:
     """Calculate the effective window size based on the current phrase.
@@ -340,22 +393,25 @@ async def run_game() -> None:
     
     try:
         game_state.audio_manager.play_music(start_pos_s=0.0)
-
+        
         # Variables for tracking if we've completed one full loop in debug mode
         previous_led_position = -1
+        was_in_valid_window = False  # Track previous fifth line valid window state
 
         # Handle key press mapping
         key_mapping = {
             "r": TargetType.RED,
             "g": TargetType.GREEN,
             "b": TargetType.BLUE,
-            "y": TargetType.YELLOW
+            "y": TargetType.YELLOW,
+            " ": None  # Space bar for fifth line
         }
 
         last_beat = -1
         ending_phrase = 1 if args.one_loop else 18
         stable_score = 0
         current_phrase = 0
+        debug_state = None
         while True:
             display.clear()
             current_time_ms: int = pygame.time.get_ticks()
@@ -365,6 +421,41 @@ async def run_game() -> None:
             beat_in_phrase, beat_float = await game_state.update_timing(current_time_ms)
             fractional_beat: float = beat_float % 1
             
+            # Check if space bar was pressed when fifth line was in valid window
+            for key, keydown in get_key():
+                if key == " " and keydown and game_state.fifth_line_in_valid_window:
+                    # Store which fifth line was hit
+                    if target_fifth_line_beat_floats:
+                        game_state.fifth_line_hit_target_beats.add(target_fifth_line_beat_floats[0])
+                        print(f"Hit registered for target beat: {target_fifth_line_beat_floats[0]}")
+                elif key == "quit":
+                    return
+
+            # Check if we just left valid window (transition from True to False)
+            if was_in_valid_window and not game_state.fifth_line_in_valid_window:
+                print(f"Valid window transition detected. Current target beat: {target_fifth_line_beat_floats[0] if target_fifth_line_beat_floats else None}")
+                # Only apply penalty if we didn't hit this specific fifth line while it was in the valid window
+                if target_fifth_line_beat_floats and target_fifth_line_beat_floats[0] not in game_state.fifth_line_hit_target_beats:
+                    print("Applying penalty - fifth line was not hit in valid window")
+                    hit_trail_visualizer.clear_all_hits()
+                    print("Score reset: Missed space bar press while fifth line was in valid window")
+            
+            # Update previous state for next frame
+            was_in_valid_window = game_state.fifth_line_in_valid_window
+
+            # Update fifth line and check for missed hits
+            should_apply_penalty, completed_target_beat = update_fifth_line(display, beat_float, game_state)
+            if should_apply_penalty:
+                print(f"Applying penalty - fifth line {completed_target_beat} completed without being hit")
+                hit_trail_visualizer.clear_all_hits()
+                print("Score reset: Fifth line animation completed without being hit")
+
+            debug_str = f" fifth line was in valid window: {was_in_valid_window}, is in valid window: {game_state.fifth_line_in_valid_window}, hit beats: {game_state.fifth_line_hit_target_beats}, current target: {target_fifth_line_beat_floats[0] if target_fifth_line_beat_floats else None}"
+            
+            if debug_state != debug_str:
+                debug_state = debug_str
+                print(debug_state)
+
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
                 print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}")
@@ -387,11 +478,11 @@ async def run_game() -> None:
  
                 # Start fifth line animation on measure boundaries
                 if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
-                    maybe_start_fifth_line(current_phrase * 2 + (1 if beat_in_phrase == 4 else 0))
+                    maybe_start_fifth_line(current_phrase * 2 + (1 if beat_in_phrase == 4 else 0), game_state)
 
             score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + beat_float/BEATS_PER_MEASURE
-            update_fifth_line(display, beat_float)
-    
+            # print(f"score_based_measure: {score_based_measure}, beat_float: {beat_float}")
+            
             led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
             
             if not game_state.button_handler.is_in_valid_window(led_position):

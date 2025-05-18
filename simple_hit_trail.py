@@ -87,6 +87,7 @@ class SimpleHitTrail:
         positions_to_remove = []
         
         for pos, (target_type, start_time) in self.active_hits.items():
+            # print(f"simple_hit_trail.py: pos: {pos}, target_type: {target_type}, start_time: {start_time}")
             elapsed_ms = current_time - start_time
             
             if elapsed_ms > self.easing.duration:
@@ -105,6 +106,7 @@ class SimpleHitTrail:
             
             self.rotate += self.rotate_speed
             r = int(self.rotate) % 300
+            r = 0
             display_func(pos + r, faded_color)
         
         # Remove expired positions
