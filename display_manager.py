@@ -5,7 +5,7 @@ import numpy as np
 from enum import Enum, auto
 from typing import Tuple, Protocol, Optional, Dict, List
 from pygame import Color
-from game_constants import DISPLAY_LED_OFFSET, USE_SEPARATE_FIFTH_LINE_STRIP, USE_SACN
+from game_constants import *
 import game_constants
 from sacn_display import SacnDisplay
 
@@ -38,7 +38,7 @@ class TrailType(Enum):
 
 class Display(Protocol):
     """Protocol for display implementations."""
-    def set_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None: ...
+    def set_pixel(self, pos: int, color: Color, trail_start_offset: int, pygame_radius: int) -> None: ...
     def set_fifth_line_pixel(self, pos: int, color: Color) -> None: ...
     def draw_score_lines(self, score: float) -> None: ...
     def clear(self) -> None: ...
@@ -72,8 +72,15 @@ class RaspberryPiDisplay:
         """
         return LEDColor(color.r, color.g, color.b)
 
-    def set_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
-        """Set a pixel on the LED strip."""
+    def set_pixel(self, pos: int, color: Color, trail_start_offset: int, _: int) -> None:
+        """Set a pixel on the LED strip.
+        
+        Args:
+            pos: The logical position of the LED
+            color: The color to set
+            trail_start_offset: Offset for LED position calculation
+            _: Unused parameter (pygame_radius)
+        """
         actual_led_pos = int((pos + DISPLAY_LED_OFFSET) % self.led_count + trail_start_offset)
         self.strip.setPixelColor(actual_led_pos, self._convert_to_led_color(color))
 
@@ -113,10 +120,17 @@ class PygameDisplay:
         )
         self.pygame_surface = pygame.Surface((screen_width, screen_height))
 
-    def set_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
-        """Set a pixel on the pygame surface."""
+    def set_pixel(self, pos: int, color: Color, _: int, pygame_radius: int) -> None:
+        """Set a pixel on the pygame surface.
+        
+        Args:
+            pos: The logical position of the LED
+            color: The color to set
+            _: Unused parameter (trail_start_offset)
+            pygame_radius: Radius to use for pygame display
+        """
         x, y = self._get_ring_position(pos, self.screen_width // 2, self.screen_height // 2, 
-                                     game_constants.TARGET_TRAIL_RADIUS, self.led_count)
+                                     pygame_radius, self.led_count)
         self.pygame_surface.set_at((x, y), color)
 
     def set_fifth_line_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
@@ -194,7 +208,6 @@ class DisplayManager:
 
         self._trail_properties: Dict[TrailType, Dict[str, Any]] = {
             TrailType.TARGET: {
-                'radius': game_constants.TARGET_TRAIL_RADIUS,
                 'setter': lambda pos, color: self._set_pixel_on_trail(
                     pos, color,
                     0,
@@ -202,7 +215,6 @@ class DisplayManager:
                 )
             },
             TrailType.HIT: {
-                'radius': game_constants.HIT_TRAIL_RADIUS,
                 'setter': lambda pos, color: self._set_pixel_on_trail(
                     pos, color,
                     self.led_count,
@@ -210,7 +222,6 @@ class DisplayManager:
                 )
             },
             TrailType.FIFTH_LINE: {
-                'radius': 0,  # Not used for fifth line
                 'setter': lambda pos, color: self._set_pixel_on_fifth_line(
                     pos, 
                     color, 
@@ -236,7 +247,7 @@ class DisplayManager:
     def _set_pixel_on_trail(self, pos: int, color: Color, trail_start_offset: int, pygame_radius: int) -> None:
         """Activate a pixel on the display at a specific position."""
         actual_led_pos = int((pos + DISPLAY_LED_OFFSET) % self.led_count + trail_start_offset)
-        self.display.set_pixel(actual_led_pos, color, trail_start_offset)
+        self.display.set_pixel(actual_led_pos, color, trail_start_offset, pygame_radius)
 
     def _set_pixel_on_fifth_line(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the fifth line strip."""

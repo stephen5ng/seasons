@@ -53,13 +53,14 @@ class SacnDisplay:
         # Initialize DMX data buffer
         self.clear()
         
-    def set_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
+    def set_pixel(self, pos: int, color: Color, trail_start_offset: int, _: int) -> None:
         """Set a pixel color in the DMX data buffer.
         
         Args:
             pos: LED position (0 to led_count-1)
             color: RGB color
-            trail_start_offset: Offset for trail position (unused in sACN)
+            trail_start_offset: Offset for trail position
+            _: Unused parameter (pygame_radius)
         """
         pos = (pos + DISPLAY_LED_OFFSET) % self.leds_per_strip
         pos += trail_start_offset
@@ -82,7 +83,7 @@ class SacnDisplay:
             pos: LED position (0 to led_count-1)
             color: RGB color
         """
-        self.set_pixel(pos, color, trail_start_offset)
+        self.set_pixel(pos, color, trail_start_offset, 0)
         
     def draw_score_lines(self, score: float) -> None:
         """Draw score lines (not supported in sACN)."""
