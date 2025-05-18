@@ -11,6 +11,7 @@ import aiohttp
 import pygame
 from pygame import Color
 from pygameasync import Clock
+from gpiozero import Button  # type: ignore
 
 from get_key import get_key
 from button_handler import ButtonHandler
@@ -113,6 +114,11 @@ class GameState:
         # Fifth line state
         self.fifth_line_in_valid_window: bool = False  # Whether fifth line is in the valid hit window
         self.fifth_line_hit_target_beats: set[float] = set()  # Set of target beats that were hit
+
+        # Initialize GPIO button if on Raspberry Pi
+        self.fifth_line_button: Optional[Button] = None
+        if IS_RASPBERRY_PI:
+            self.fifth_line_button = Button(22)  # GPIO 22 for fifth line hit
 
     async def update_timing(self, current_time_ms: int) -> Tuple[int, float]:
         """Calculate current timing values."""
@@ -421,15 +427,23 @@ async def run_game() -> None:
             beat_in_phrase, beat_float = await game_state.update_timing(current_time_ms)
             fractional_beat: float = beat_float % 1
             
-            # Check if space bar was pressed when fifth line was in valid window
+            # Check if space bar or GPIO button was pressed when fifth line was in valid window
+            fifth_line_pressed = False
             for key, keydown in get_key():
-                if key == " " and keydown and game_state.fifth_line_in_valid_window:
-                    # Store which fifth line was hit
-                    if target_fifth_line_beat_floats:
-                        game_state.fifth_line_hit_target_beats.add(target_fifth_line_beat_floats[0])
-                        print(f"Hit registered for target beat: {target_fifth_line_beat_floats[0]}")
+                if key == " " and keydown:
+                    fifth_line_pressed = True
                 elif key == "quit":
                     return
+            
+            # Check GPIO button if on Raspberry Pi
+            if game_state.fifth_line_button and game_state.fifth_line_button.is_pressed:
+                fifth_line_pressed = True
+                
+            if fifth_line_pressed and game_state.fifth_line_in_valid_window:
+                # Store which fifth line was hit
+                if target_fifth_line_beat_floats:
+                    game_state.fifth_line_hit_target_beats.add(target_fifth_line_beat_floats[0])
+                    print(f"Hit registered for target beat: {target_fifth_line_beat_floats[0]}")
 
             # Check if we just left valid window (transition from True to False)
             if was_in_valid_window and not game_state.fifth_line_in_valid_window:
