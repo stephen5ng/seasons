@@ -27,6 +27,14 @@ class SimpleHitTrail:
         self.hits_by_type: Dict[TargetType, List[int]] = {}
         self.total_hits: int = 0
 
+    def get_score(self) -> float:
+        """Calculate current score based on total hits.
+        
+        Returns:
+            Current score value (total_hits / 4.0)
+        """
+        return self.total_hits / 4.0
+
     def add_hit(self, position: int, target_type: TargetType) -> None:
         """Add a hit to the trail.
         

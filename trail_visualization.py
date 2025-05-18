@@ -31,6 +31,14 @@ class TrailVisualizer:
         self.display = display
         self.simple_hit_trail = SimpleHitTrail()
     
+    def get_score(self) -> float:
+        """Get the current score from the hit trail.
+        
+        Returns:
+            Current score value
+        """
+        return self.simple_hit_trail.get_score()
+    
     def draw_trail(self, led_position: int) -> None:
         """Draw the hit trail at the given LED position.
         

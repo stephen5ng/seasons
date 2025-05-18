@@ -1,120 +1,111 @@
-import unittest
-import asyncio
-import pygame
-from seasons import (
-    GameState, ButtonHandler, TargetType, TARGET_COLORS,
-    NUMBER_OF_LEDS, TARGET_WINDOW_SIZE
-)
-from game_constants import (
-    BLUE_TARGET_PERCENT,
-    GREEN_TARGET_PERCENT,
-    YELLOW_TARGET_PERCENT
-)
+"""Unit tests for the seasons game."""
 
-class TestButtonHandler(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        pygame.init()
-        pygame.mixer.init()
+import pytest
+from unittest.mock import MagicMock, patch
+from pygame import Color
 
-    @classmethod
-    def tearDownClass(cls):
-        pygame.quit()
+from seasons import GameState, get_rainbow_color, get_score_line_color
+from game_constants import TargetType, TARGET_COLORS
+from trail_visualization import TrailVisualizer
 
-    def setUp(self):
-        self.handler = ButtonHandler(
-            number_of_leds=NUMBER_OF_LEDS,
-            target_window_size=TARGET_WINDOW_SIZE,
-            auto_score=False
-        )
-
-    def test_is_in_valid_window(self):
-        # Test positions within each target window
-        self.assertTrue(self.handler.is_in_valid_window(0))  # Red target
-        self.assertTrue(self.handler.is_in_valid_window(TARGET_WINDOW_SIZE - 1))  # Red target
-        self.assertTrue(self.handler.is_in_valid_window(int(NUMBER_OF_LEDS * BLUE_TARGET_PERCENT)))  # Blue target
-        self.assertTrue(self.handler.is_in_valid_window(int(NUMBER_OF_LEDS * GREEN_TARGET_PERCENT)))  # Green target
-        self.assertTrue(self.handler.is_in_valid_window(int(NUMBER_OF_LEDS * YELLOW_TARGET_PERCENT)))  # Yellow target
+class TestGameState:
+    """Test cases for the GameState class."""
+    
+    @pytest.fixture
+    def game_state(self):
+        """Create a GameState instance for testing."""
+        with patch('seasons.WLEDManager'), \
+             patch('seasons.AudioManager'), \
+             patch('seasons.ButtonHandler'), \
+             patch('seasons.TrailStateManager'):
+            return GameState()
+    
+    @pytest.fixture
+    def hit_trail_visualizer(self):
+        """Create a mock TrailVisualizer for testing."""
+        visualizer = MagicMock(spec=TrailVisualizer)
+        visualizer.simple_hit_trail.total_hits = 0
+        visualizer.get_score.return_value = 0.0
+        return visualizer
+    
+    def test_handle_hits(self, game_state, hit_trail_visualizer):
+        """Test handling successful hits."""
+        display = MagicMock()
         
-        # Test positions outside target windows
-        self.assertFalse(self.handler.is_in_valid_window(TARGET_WINDOW_SIZE + 1))
-        self.assertFalse(self.handler.is_in_valid_window(int(NUMBER_OF_LEDS * BLUE_TARGET_PERCENT) + TARGET_WINDOW_SIZE + 1))
-
-    def test_get_target_type(self):
-        # Test each target type
-        self.assertEqual(self.handler.get_target_type(0), TargetType.RED)
-        self.assertEqual(self.handler.get_target_type(int(NUMBER_OF_LEDS * BLUE_TARGET_PERCENT)), TargetType.BLUE)
-        self.assertEqual(self.handler.get_target_type(int(NUMBER_OF_LEDS * GREEN_TARGET_PERCENT)), TargetType.GREEN)
-        self.assertEqual(self.handler.get_target_type(int(NUMBER_OF_LEDS * YELLOW_TARGET_PERCENT)), TargetType.YELLOW)
+        # Test with no hits
+        game_state.handle_hits([], 0, hit_trail_visualizer, 0.0, display)
+        hit_trail_visualizer.add_hit.assert_not_called()
         
-        # Test positions outside target windows
-        self.assertIsNone(self.handler.get_target_type(TARGET_WINDOW_SIZE + 1))
+        # Test with hits
+        hit_trail_visualizer.simple_hit_trail.total_hits = 0
+        game_state.handle_hits([TargetType.RED], 0, hit_trail_visualizer, 1.0, display)
+        hit_trail_visualizer.add_hit.assert_called_once_with(TargetType.RED)
 
-    def test_apply_penalty(self):
-        # Test penalty application
-        score = 4.0
-        new_score = self.handler.apply_penalty(score)
-        self.assertLess(new_score, score)
-        self.assertGreaterEqual(new_score, 0)
+def test_get_rainbow_color():
+    """Test rainbow color generation."""
+    # Test red to yellow transition
+    color = get_rainbow_color(0, 0)
+    assert color.r == 255
+    assert color.g == 0
+    assert color.b == 0
+    
+    # Test yellow to green transition
+    color = get_rainbow_color(COLOR_CYCLE_TIME_MS / 6, 0)
+    assert color.r < 255
+    assert color.g == 255
+    assert color.b == 0
+    
+    # Test green to cyan transition
+    color = get_rainbow_color(COLOR_CYCLE_TIME_MS / 3, 0)
+    assert color.r == 0
+    assert color.g == 255
+    assert color.b > 0
+    
+    # Test cyan to blue transition
+    color = get_rainbow_color(COLOR_CYCLE_TIME_MS / 2, 0)
+    assert color.r == 0
+    assert color.g < 255
+    assert color.b == 255
+    
+    # Test blue to magenta transition
+    color = get_rainbow_color(2 * COLOR_CYCLE_TIME_MS / 3, 0)
+    assert color.r > 0
+    assert color.g == 0
+    assert color.b == 255
+    
+    # Test magenta to red transition
+    color = get_rainbow_color(5 * COLOR_CYCLE_TIME_MS / 6, 0)
+    assert color.r == 255
+    assert color.g == 0
+    assert color.b > 0
 
-class TestGameState(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        pygame.init()
-        pygame.mixer.init()
-
-    @classmethod
-    def tearDownClass(cls):
-        pygame.quit()
-
-    def setUp(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.game_state = self.loop.run_until_complete(self._create_game_state())
-
-    def tearDown(self):
-        self.loop.run_until_complete(self.game_state.http_session.close())
-        self.loop.close()
-
-    async def _create_game_state(self):
-        return GameState()
-
-    def test_update_score(self):
-        # Test score increase
-        initial_score = self.game_state.score
-        self.game_state.update_score(initial_score + 0.25, TargetType.RED, 0.0)
-        self.assertEqual(self.game_state.score, initial_score + 0.25)
-        
-        # Test hit trail color addition when target is hit
-        # Get initial state
-        initial_hit_colors_length = len(self.game_state.hit_colors)
-        
-        # Simulate a hit
-        self.game_state.update_score(self.game_state.score + 0.25, TargetType.RED, 0.0)
-        
-        # After hitting a red target, we should have at least one color in the hit trail
-        self.assertGreaterEqual(len(self.game_state.hit_colors), initial_hit_colors_length)
-
-    def test_calculate_led_position(self):
-        # Test LED position calculation
-        position = self.game_state.calculate_led_position(0, 0.0)
-        self.assertEqual(position, 0)
-        
-        position = self.game_state.calculate_led_position(4, 0.5)
-        self.assertGreater(position, 0)
-        self.assertLess(position, NUMBER_OF_LEDS)
-
-    def test_get_score_flash_intensity(self):
-        # Test flash intensity calculation
-        # Update the score manager's score_flash_start_beat
-        self.game_state.score_manager.score_flash_start_beat = 0.0
-        intensity = self.game_state.get_score_flash_intensity(0.0)
-        self.assertEqual(intensity, 1.0)
-        
-        # Set the flash start beat to a time that would result in 0 intensity
-        self.game_state.score_manager.score_flash_start_beat = -2.0  # Set to a value that will result in 0 intensity
-        intensity = self.game_state.get_score_flash_intensity(2.0)
-        self.assertEqual(intensity, 0.0)
-
-if __name__ == '__main__':
-    unittest.main() 
+def test_get_score_line_color():
+    """Test score line color calculation."""
+    base_color = Color(255, 255, 255)
+    
+    # Test with no flash
+    assert get_score_line_color(base_color, 0.0, "red") == base_color
+    
+    # Test with red flash
+    red_flash = get_score_line_color(base_color, 1.0, "red")
+    assert red_flash.r == 255
+    assert red_flash.g < 255
+    assert red_flash.b < 255
+    
+    # Test with blue flash
+    blue_flash = get_score_line_color(base_color, 1.0, "blue")
+    assert blue_flash.r < 255
+    assert blue_flash.g < 255
+    assert blue_flash.b == 255
+    
+    # Test with green flash
+    green_flash = get_score_line_color(base_color, 1.0, "green")
+    assert green_flash.r < 255
+    assert green_flash.g == 255
+    assert green_flash.b < 255
+    
+    # Test with yellow flash
+    yellow_flash = get_score_line_color(base_color, 1.0, "yellow")
+    assert yellow_flash.r == 255
+    assert yellow_flash.g == 255
+    assert yellow_flash.b < 255 

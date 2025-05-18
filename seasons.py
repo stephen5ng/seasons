@@ -17,7 +17,6 @@ from button_handler import ButtonHandler
 from led_position import LEDPosition
 from wled_manager import WLEDManager
 from display_manager import DisplayManager
-from score_manager import ScoreManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
 from trail_visualization import (
@@ -39,8 +38,6 @@ def parse_args():
 
     # Debug options
     debug_group = parser.add_argument_group('Debug options')
-    debug_group.add_argument('--score', type=float, default=0.0,
-                      help='Set initial score value for debug modes')
     debug_group.add_argument('--one-loop', action='store_true',
                       help='Run for one loop and exit')
     debug_group.add_argument('--disable-wled', action='store_true',
@@ -56,7 +53,6 @@ def parse_args():
 default_args = argparse.Namespace(
     leds=80,
     hit_trail_strategy='normal',
-    score=0.0,
     one_loop=False,
     disable_wled=False,
     auto_score=False,
@@ -105,7 +101,6 @@ class GameState:
         self.http_session = aiohttp.ClientSession(connector=connector, timeout=timeout)
         
         # Component managers
-        self.score_manager = ScoreManager()
         self.audio_manager = AudioManager("music/Rise Up 4.mp3")
         self.start_ticks_ms: int = pygame.time.get_ticks()
         self.wled_manager = WLEDManager(not args.disable_wled, WLED_IP, self.http_session, WLED_SETTINGS, number_of_leds)
@@ -130,7 +125,7 @@ class GameState:
     
     def handle_music_loop(self, stable_score: int, current_time_ms: int) -> None:
         """Handle music looping and position updates."""
-        print(f"beat_start_time_ms: {self.beat_start_time_ms}, current_time_ms: {current_time_ms}, score: {self.score_manager.score}")
+        print(f"beat_start_time_ms: {self.beat_start_time_ms}, current_time_ms: {current_time_ms}")
         target_time_s: float = self.audio_manager.get_target_music_time(
             stable_score,
             self.beat_start_time_ms,
@@ -151,8 +146,6 @@ class GameState:
             misses: List of target types that were missed
             display: Display manager instance to draw on
         """
-        # if misses:
-        #     print(f"misses: {misses}, handle_misses max_distance: {max_distance}")
         current_time = pygame.time.get_ticks() / 1000.0  # Convert to seconds
         
         # Add new misses
@@ -170,7 +163,6 @@ class GameState:
                     int(TARGET_COLORS[target_miss].b * initial_intensity)
                 )
                 display.set_target_trail_pixel(pos, faded_color, 1.0)
-        
 
     def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail_visualizer: 'TrailVisualizer', beat_float: float, display: DisplayManager) -> None:
         """Handle successful hits and update score.
@@ -198,7 +190,6 @@ class GameState:
                 display.set_target_trail_pixel(i % self.button_handler.number_of_leds, target_color, 1.0, 1)
     
             hit_trail_visualizer.add_hit(target_hit)
-        self.score_manager.update_score(hit_trail_visualizer.simple_hit_trail.total_hits/4, beat_float)
 
     async def exit_game(self) -> None:
         """Exit the game gracefully.
@@ -344,15 +335,7 @@ async def run_game() -> None:
         number_of_leds
     )
     
-    if args.score > 0:
-        logger.info(f"Setting initial score to {args.score}")
-        game_state.score_manager.score = args.score
-        hit_trail_visualizer.score = args.score  # Let each visualizer handle the score
-    
     logger.info("Showing main trail")
-        
-    # Set up hit colors based on score (simulate multiple hits)
-    hit_trail_visualizer.score = game_state.score_manager.score  # Let the visualizer handle color mapping
     logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
     
     try:
@@ -381,10 +364,10 @@ async def run_game() -> None:
             beat_float: float
             beat_in_phrase, beat_float = await game_state.update_timing(current_time_ms)
             fractional_beat: float = beat_float % 1
-            # print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}, fractional_beat: {fractional_beat}")
+            
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
-                print(f"stable_score: {stable_score}, beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}")
+                print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}")
                 
                 await game_state.wled_manager.update_wled(stable_score)
 
@@ -394,8 +377,7 @@ async def run_game() -> None:
                     await game_state.exit_game()
                     return
 
-                score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) # + beat_float/BEATS_PER_MEASURE
-                # print(f"score_measure: {int(1+stable_score)*8}, {beat_float}")
+                score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE)
     
                 # Sync music on phrase boundaries
                 if beat_in_phrase == 0:
@@ -406,12 +388,10 @@ async def run_game() -> None:
                 # Start fifth line animation on measure boundaries
                 if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
                     maybe_start_fifth_line(current_phrase * 2 + (1 if beat_in_phrase == 4 else 0))
-            # print(f"score: {game_state.score_manager.score}, score*2: {game_state.score_manager.score*2}")
+
             score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + beat_float/BEATS_PER_MEASURE
-            # print(f"score_based_measure: {score_based_measure}, beat_float: {beat_float}")
             update_fifth_line(display, beat_float)
     
-            
             led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
             
             if not game_state.button_handler.is_in_valid_window(led_position):
@@ -426,11 +406,15 @@ async def run_game() -> None:
             game_state.handle_hits(hits, led_position, hit_trail_visualizer, beat_float, display)
             game_state.handle_misses(misses, 8, display)
             
+            # Update stable_score only when outside a scoring window
+            if not game_state.button_handler.is_in_valid_window(led_position):
+                stable_score = int(hit_trail_visualizer.get_score())
+            
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
-                game_state.trail_state_manager.update_position(led_position, current_time_ms / MS_PER_SEC)            
-                        
+                game_state.trail_state_manager.update_position(led_position, current_time_ms / MS_PER_SEC)
+            
             # Draw LEDs at the start and end of each target window
             for target_type, target_pos in game_state.button_handler.target_positions.items():
                 window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos)
@@ -438,13 +422,11 @@ async def run_game() -> None:
                 display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], -1)
             
             display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8)
-            if not game_state.button_handler.is_in_valid_window(led_position):
-                stable_score = game_state.score_manager.score
-                        
+            
             hit_trail_visualizer.draw_trail(led_position)
             
             if not IS_RASPBERRY_PI:
-                display.draw_score_lines(game_state.score_manager.score)
+                display.draw_score_lines(hit_trail_visualizer.get_score())
 
                 for key, keydown in get_key():
                     if key == "quit":
