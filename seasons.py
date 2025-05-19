@@ -481,8 +481,6 @@ async def run_game() -> None:
                 if stable_score >= ending_phrase:
                     await game_state.exit_game()
                     return
-
-                score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE)
     
                 # Sync music on phrase boundaries
                 if beat_in_phrase == 0:
@@ -494,9 +492,6 @@ async def run_game() -> None:
                 if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
                     maybe_start_fifth_line(current_phrase * 2 + (1 if beat_in_phrase == 4 else 0), game_state)
 
-            score_based_measure = 1 + stable_score*(BEATS_PER_PHRASE/BEATS_PER_MEASURE) + beat_float/BEATS_PER_MEASURE
-            # print(f"score_based_measure: {score_based_measure}, beat_float: {beat_float}")
-            
             led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
             
             if not game_state.button_handler.is_in_valid_window(led_position):
