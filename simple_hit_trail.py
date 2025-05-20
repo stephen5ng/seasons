@@ -10,6 +10,7 @@ from game_constants import TargetType, TARGET_COLORS
 from easing_functions import QuadEaseOut  # type: ignore
 from display_manager import DisplayManager
 
+LEDS_PER_HIT = 4
 class SimpleHitTrail:
     """A simple hit trail implementation that lights up a single LED position."""
     
@@ -43,7 +44,7 @@ class SimpleHitTrail:
         Returns:
             Current score value (total_hits / 4.0)
         """
-        return self.total_hits / 4.0
+        return self.total_hits / (LEDS_PER_HIT * 4.0)
 
     def clear_all_hits(self) -> None:
         """Clear all hits from the hit trail and display."""
@@ -70,7 +71,8 @@ class SimpleHitTrail:
             target_pos = int(self.led_count * 0.75)  # 9 o'clock
             
         # Add the hit at the target position
-        self._add_hit_at_position(target_pos, target_type)
+        for n in range(LEDS_PER_HIT):
+            self._add_hit_at_position(target_pos + n, target_type)
 
     def _add_hit_at_position(self, position: int, target_type: TargetType) -> None:
         """Internal method to add a hit at a specific position.
