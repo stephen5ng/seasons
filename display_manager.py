@@ -314,8 +314,7 @@ class DisplayManager:
 
     def _set_pixel_on_trail(self, pos: int, color: Color, trail_start_offset: int, pygame_radius: int) -> None:
         """Activate a pixel on the display at a specific position."""
-        actual_led_pos = int((pos + DISPLAY_LED_OFFSET) % self.led_count + trail_start_offset)
-        self.display.set_pixel(actual_led_pos, color, trail_start_offset, pygame_radius)
+        self.display.set_pixel(pos, color, trail_start_offset, pygame_radius)
 
     def _set_pixel_on_fifth_line(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the fifth line strip."""
