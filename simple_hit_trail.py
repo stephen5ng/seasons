@@ -89,6 +89,8 @@ class SimpleHitTrail:
         new_position = position + self.number_of_hits_by_type[target_type]*LEDS_PER_HIT
         self.number_of_hits_by_type[target_type] += 1
         self.active_hits[new_position] = target_type
+        for x in range(LEDS_PER_HIT):
+            self.display.set_hit_trail_pixel(new_position + x, TARGET_COLORS[target_type], -1)         
         self.hits_by_type[target_type].append(new_position)
 
     def remove_hit(self, target_type: TargetType) -> None:
@@ -108,24 +110,3 @@ class SimpleHitTrail:
             self.total_hits = max(0, self.total_hits - 1)
             del self.active_hits[position]
 
-    def draw_trail(self, led_position: int) -> None:
-        """Draw the hit trail at the given LED position.
-        
-        Args:
-            led_position: Current LED position to draw at
-        """
-        for pos, target_type in self.active_hits.items():                
-            for x in range(LEDS_PER_HIT):
-                self.display.set_hit_trail_pixel(pos + x, TARGET_COLORS[target_type], -1)
-
-    @property
-    def hit_colors(self) -> List[Color]:
-        """Get the current hit colors.
-        
-        Returns:
-            List of colors in the hit trail
-        """
-        if self.hit_position:
-            _, color, _ = self.hit_position
-            return [color]
-        return [] 

@@ -275,7 +275,7 @@ async def run_game() -> None:
     )
     
     logger.info("Showing main trail")
-    logger.info(f"Created hit trail with {len(hit_trail.hit_colors)} colors")
+    logger.info(f"Created hit trail with {hit_trail.total_hits} total hits")
     
     try:
         game_state.audio_manager.play_music(start_pos_s=0.0)
@@ -382,9 +382,7 @@ async def run_game() -> None:
                 display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], -1)
             
             display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8)
-            
-            hit_trail.draw_trail(led_position)
-            
+                        
             if not IS_RASPBERRY_PI:
                 display.draw_score_lines(hit_trail.get_score())
 
