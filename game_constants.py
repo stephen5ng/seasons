@@ -104,10 +104,28 @@ LED_CHANNEL = 0  # PWM channel
 
 # Target type enum
 class TargetType(Enum):
+    """Enum representing different target types in the game.
+    
+    The order of declaration determines the cycling order when using next().
+    RED -> BLUE -> GREEN -> YELLOW -> RED
+    """
     RED = auto()
-    BLUE = auto()
     GREEN = auto()
+    BLUE = auto()
     YELLOW = auto()
+    
+    def next(self) -> 'TargetType':
+        """Get the next target type in the cycle.
+        
+        Returns:
+            The next TargetType in the cycle, wrapping back to RED after YELLOW
+        """
+        # Get list of all target types in order
+        types = list(TargetType)
+        # Find current index
+        current_idx = types.index(self)
+        # Return next type, wrapping around to start
+        return types[(current_idx + 1) % len(types)]
 
 # Target colors
 TARGET_COLORS = {

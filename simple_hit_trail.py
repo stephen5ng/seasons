@@ -23,11 +23,9 @@ class SimpleHitTrail:
         """
         self.display = display
         self.led_count = led_count
-        self.active_hits: Dict[int, TargetType] = {}  # position -> target_type
-        self.rotate = 0.0
-        self.rotate_speed = 0.0
-        self.hit_position: Optional[Tuple[int, TargetType]] = None  # (position, target_type)        
-        # Initialize dictionaries with default values for all target types
+        self.max_hits = led_count // LEDS_PER_HIT
+        self.max_hits_per_target = self.max_hits // 4
+
         self.number_of_hits_by_type: Dict[TargetType, int] = {
             target_type: 0 for target_type in TargetType
         }
@@ -58,41 +56,19 @@ class SimpleHitTrail:
                     self.remove_hit(target_type)
                     hits_cleared += 1
                     if hits_cleared >= hits_to_clear:
-                        break
+                        return
 
     def add_hit(self, target_type: TargetType) -> None:
-        """Add a hit of the specified target type to the hit trail.
-        
-        Args:
-            target_type: Type of target to add
-        """
-        # Calculate target position based on target type
-        if target_type == TargetType.RED:
-            target_pos = 0  # 12 o'clock
-        elif target_type == TargetType.GREEN:
-            target_pos = int(self.led_count * 0.25)  # 3 o'clock
-        elif target_type == TargetType.BLUE:
-            target_pos = int(self.led_count * 0.5)  # 6 o'clock
-        else:  # YELLOW
-            target_pos = int(self.led_count * 0.75)  # 9 o'clock
-            
-        self._add_hit_at_position(target_pos, target_type)
-
-    def _add_hit_at_position(self, position: int, target_type: TargetType) -> None:
-        """Internal method to add a hit at a specific position.
-        
-        Args:
-            position: The LED position to light up
-            target_type: The type of target that was hit
-        """
+        print(f"adding hit for target_type: {target_type}")
         self.total_hits += 1
-        new_position = position + self.number_of_hits_by_type[target_type]*LEDS_PER_HIT
-        self.number_of_hits_by_type[target_type] += 1
-        self.active_hits[new_position] = target_type
-        for x in range(LEDS_PER_HIT):
-            self.display.set_hit_trail_pixel(new_position + x, TARGET_COLORS[target_type], -1)         
-        self.hits_by_type[target_type].append(new_position)
+        while self.number_of_hits_by_type[target_type] >= self.max_hits_per_target:
+            target_type = target_type.next()
 
+        target_position = (target_type.value-1) * self.max_hits_per_target + self.number_of_hits_by_type[target_type]
+        self.number_of_hits_by_type[target_type] += 1
+        self._set_leds(target_position, TARGET_COLORS[target_type])
+        self.hits_by_type[target_type].append(target_position)
+    
     def remove_hit(self, target_type: TargetType) -> None:
         """Remove a hit of the specified target type from the hit trail.
         
@@ -100,13 +76,14 @@ class SimpleHitTrail:
             target_type: Type of target to remove
         """
         if self.hits_by_type[target_type]:
-            position = self.hits_by_type[target_type].pop()
+            target_position = self.hits_by_type[target_type].pop()
             
-            # Clear all LEDs in the trail
-            for x in range(LEDS_PER_HIT):
-                self.display.set_hit_trail_pixel(position + x, Color(0, 0, 0), -1)
+            self._set_leds(target_position, Color(0, 0, 0))
             
             self.number_of_hits_by_type[target_type] -= 1
             self.total_hits = max(0, self.total_hits - 1)
-            del self.active_hits[position]
 
+    def _set_leds(self, target_position: int, color: Color) -> None:
+        for x in range(LEDS_PER_HIT):
+            self.display.set_hit_trail_pixel(
+                target_position*LEDS_PER_HIT + x, color, -1)

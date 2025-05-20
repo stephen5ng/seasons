@@ -307,7 +307,7 @@ async def run_game() -> None:
             fractional_beat: float = beat_float % 1
             
             # Check if space bar or GPIO button was pressed when fifth line was in valid window
-            fifth_line_pressed = args.auto_score
+            fifth_line_pressed = True or args.auto_score
             for key, keydown in get_key():
                 if key == " " and keydown:
                     fifth_line_pressed = True
