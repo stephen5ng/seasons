@@ -10,20 +10,20 @@ from game_constants import TargetType, TARGET_COLORS
 from display_manager import DisplayManager
 
 LEDS_PER_HIT = 4
+
 class SimpleHitTrail:
     """A simple hit trail implementation that lights up a single LED position."""
     
-    def __init__(self, display: DisplayManager, led_count: int, fade_duration_ms: int = 90000000000) -> None:
+    def __init__(self, display: DisplayManager, led_count: int) -> None:
         """Initialize the simple hit trail.
         
         Args:
             display: DisplayManager instance for controlling the LED display
             led_count: Number of LEDs in the strip
-            fade_duration_ms: Duration in milliseconds for the fade-out effect
         """
         self.display = display
         self.led_count = led_count
-        self.active_hits: Dict[int, Tuple[TargetType, int]] = {}  # position -> (target_type, start_time)
+        self.active_hits: Dict[int, TargetType] = {}  # position -> target_type
         self.rotate = 0.0
         self.rotate_speed = 0.0
         self.hit_position: Optional[Tuple[int, TargetType]] = None  # (position, target_type)        
@@ -46,11 +46,11 @@ class SimpleHitTrail:
 
     def clear_all_hits(self) -> None:
         """Clear all hits from the hit trail and display."""
-        while self.total_hits > 0:
-            for target_type in TargetType:
-                if self.hits_by_type[target_type]:
-                    self.remove_hit(target_type)
-                    break
+        print(f"clearing all hits, total_hits: {self.total_hits}")
+        for target_type in TargetType:
+            while self.hits_by_type[target_type]:
+                self.remove_hit(target_type)
+
 
     def add_hit(self, target_type: TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
@@ -82,7 +82,7 @@ class SimpleHitTrail:
         self.total_hits += 1
         new_position = position + self.number_of_hits_by_type[target_type]
         self.number_of_hits_by_type[target_type] += 1
-        self.active_hits[new_position] = (target_type, pygame.time.get_ticks())
+        self.active_hits[new_position] = target_type
         self.hits_by_type[target_type].append(new_position)
 
     def remove_hit(self, target_type: TargetType) -> None:
@@ -106,8 +106,9 @@ class SimpleHitTrail:
             
             if position in self.active_hits:
                 self.total_hits = max(0, self.total_hits - 1)
-                print(f"total_hits: {self.total_hits}")
+                print(f"removing hit, total_hits: {self.total_hits}")
                 del self.active_hits[position]
+                print(f"removed hit from active_hits")
 
     def draw_trail(self, led_position: int) -> None:
         """Draw the hit trail at the given LED position.
@@ -115,9 +116,9 @@ class SimpleHitTrail:
         Args:
             led_position: Current LED position to draw at
         """
-        for pos, (target_type, _) in self.active_hits.items():                
+        for pos, target_type in self.active_hits.items():                
             self.display.set_hit_trail_pixel(pos, TARGET_COLORS[target_type], -1)
-        
+
     @property
     def hit_colors(self) -> List[Color]:
         """Get the current hit colors.
