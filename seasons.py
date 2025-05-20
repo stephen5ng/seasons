@@ -35,6 +35,8 @@ def parse_args():
     
     # Display mode options
     display_group = parser.add_argument_group('Display options')    
+    display_group.add_argument('--disable-sacn', action='store_true',
+                      help='Disable sACN for LED control')
 
     # Debug options
     debug_group = parser.add_argument_group('Debug options')
@@ -56,7 +58,8 @@ default_args = argparse.Namespace(
     one_loop=False,
     disable_wled=False,
     auto_score=False,
-    trails=0
+    trails=0,
+    use_sacn=True
 )
 
 # Only parse arguments when the script is run directly
@@ -263,7 +266,8 @@ async def run_game() -> None:
         led_dma=LED_DMA,
         led_invert=LED_INVERT,
         led_brightness=LED_BRIGHTNESS,
-        led_channel=LED_CHANNEL
+        led_channel=LED_CHANNEL,
+        use_sacn=not args.no_sacn
     )
     
     game_state: GameState = GameState()

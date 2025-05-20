@@ -245,7 +245,8 @@ class DisplayManager:
                  led_dma: int,
                  led_invert: bool,
                  led_brightness: int,
-                 led_channel: int) -> None:
+                 led_channel: int,
+                 use_sacn: bool = False) -> None:
         """Initialize the display manager.
         
         Args:
@@ -259,20 +260,22 @@ class DisplayManager:
             led_invert: WS281x invert signal
             led_brightness: WS281x brightness
             led_channel: WS281x PWM channel
+            use_sacn: Whether to use sACN for LED control
         """
         self.led_count = led_count
         
-        if USE_SACN and not IS_RASPBERRY_PI:
-            # Use combined display when sACN is enabled and not on Raspberry Pi
-            self.display: Display = PygameAndSacnDisplay(screen_width, screen_height, scaling_factor, led_count)
-        elif USE_SACN:
-            self.display = SacnDisplay(led_count*3) # Target, hit, fifth line
-        elif IS_RASPBERRY_PI:
-            self.display = RaspberryPiDisplay(
-                led_count, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
-            )
+        if IS_RASPBERRY_PI:
+            if use_sacn:
+                self.display = SacnDisplay(led_count*3) # Target, hit, fifth line
+            else:
+                self.display = RaspberryPiDisplay(
+                    led_count, led_pin, led_freq_hz, led_dma, led_invert, led_brightness, led_channel
+                )
         else:
-            self.display = PygameDisplay(screen_width, screen_height, scaling_factor, led_count)
+            if use_sacn:
+                self.display: Display = PygameAndSacnDisplay(screen_width, screen_height, scaling_factor, led_count)
+            else:
+                self.display = PygameDisplay(screen_width, screen_height, scaling_factor, led_count)
 
         self._trail_properties: Dict[TrailType, Dict[str, Any]] = {
             TrailType.TARGET: {
