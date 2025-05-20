@@ -43,7 +43,7 @@ class TrailVisualizer:
         """Clear all hits from the hit trail and display."""
         while self.simple_hit_trail.total_hits > 0:
             for target_type in game_constants.TargetType:
-                if target_type in self.simple_hit_trail.hits_by_type and self.simple_hit_trail.hits_by_type[target_type]:
+                if self.simple_hit_trail.hits_by_type[target_type]:
                     self.remove_hit(target_type)
                     break
     
@@ -77,7 +77,7 @@ class TrailVisualizer:
             target_type: Type of target to remove
         """
         # Get the position before removing the hit
-        if target_type in self.simple_hit_trail.hits_by_type and self.simple_hit_trail.hits_by_type[target_type]:
+        if self.simple_hit_trail.hits_by_type[target_type]:
             position = self.simple_hit_trail.hits_by_type[target_type][-1]
             # Clear the LED by drawing black permanently
             self.display.set_hit_trail_pixel(position, Color(0, 0, 0), -1)

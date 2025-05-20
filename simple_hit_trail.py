@@ -23,8 +23,13 @@ class SimpleHitTrail:
         self.rotate = 0.0
         self.rotate_speed = 0.0
         self.hit_position: Optional[Tuple[int, TargetType]] = None  # (position, target_type)        
-        self.number_of_hits_by_type: Dict[TargetType, int] = {}
-        self.hits_by_type: Dict[TargetType, List[int]] = {}
+        # Initialize dictionaries with default values for all target types
+        self.number_of_hits_by_type: Dict[TargetType, int] = {
+            target_type: 0 for target_type in TargetType
+        }
+        self.hits_by_type: Dict[TargetType, List[int]] = {
+            target_type: [] for target_type in TargetType
+        }
         self.total_hits: int = 0
 
     def get_score(self) -> float:
@@ -43,12 +48,9 @@ class SimpleHitTrail:
             target_type: The type of target that was hit
         """
         self.total_hits += 1
-        new_position = position + self.number_of_hits_by_type.get(target_type, 0)
-        self.number_of_hits_by_type[target_type] = self.number_of_hits_by_type.get(target_type, 0) + 1
+        new_position = position + self.number_of_hits_by_type[target_type]
+        self.number_of_hits_by_type[target_type] += 1
         self.active_hits[new_position] = (target_type, pygame.time.get_ticks())
-        
-        if target_type not in self.hits_by_type:
-            self.hits_by_type[target_type] = []
         self.hits_by_type[target_type].append(new_position)
         # print(f"total_hits: {self.total_hits}")
 
@@ -58,9 +60,8 @@ class SimpleHitTrail:
         Args:
             target_type: Type of the hit to remove
         """
-        if target_type in self.number_of_hits_by_type:
-            self.number_of_hits_by_type[target_type] -= 1
-        if target_type in self.hits_by_type and self.hits_by_type[target_type]:
+        self.number_of_hits_by_type[target_type] -= 1
+        if self.hits_by_type[target_type]:
             position = self.hits_by_type[target_type].pop()
             
             if position in self.active_hits:
