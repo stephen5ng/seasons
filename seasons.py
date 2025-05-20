@@ -267,7 +267,7 @@ async def run_game() -> None:
         led_invert=LED_INVERT,
         led_brightness=LED_BRIGHTNESS,
         led_channel=LED_CHANNEL,
-        use_sacn=not args.no_sacn
+        use_sacn=not args.disable_sacn
     )
     
     game_state: GameState = GameState()
