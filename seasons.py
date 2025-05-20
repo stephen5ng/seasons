@@ -154,9 +154,7 @@ class GameState:
         Args:
             misses: List of target types that were missed
             display: Display manager instance to draw on
-        """
-        current_time = pygame.time.get_ticks() / 1000.0  # Convert to seconds
-        
+        """        
         # Add new misses
         for target_miss in misses:
             error_pos = self.button_handler.target_positions[target_miss]

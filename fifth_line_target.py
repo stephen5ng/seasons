@@ -65,7 +65,7 @@ class FifthLineTarget:
         
         if self._target_beat is None:
             self.state = TargetState.NO_TARGET
-        elif percent_complete < 0.90:
+        elif percent_complete < 0.80:
             self.state = TargetState.PRE_WINDOW
         elif percent_complete < 1.0:
             self.state = TargetState.IN_WINDOW
