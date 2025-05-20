@@ -40,17 +40,25 @@ class SimpleHitTrail:
         """Calculate current score based on total hits.
         
         Returns:
-            Current score value (total_hits / 4.0)
+            Current score value
         """
-        return self.total_hits / (LEDS_PER_HIT * 4.0)
+        return self.total_hits / 4.0
 
-    def clear_all_hits(self) -> None:
-        """Clear all hits from the hit trail and display."""
-        print(f"clearing all hits, total_hits: {self.total_hits}")
-        for target_type in TargetType:
-            while self.hits_by_type[target_type]:
-                self.remove_hit(target_type)
-
+    def clear_some_hits(self) -> None:
+        """Clear half of the hits from the hit trail, cycling through target types."""
+        print(f"clearing half of hits, total_hits: {self.total_hits}")
+        
+        # Calculate how many hits to clear
+        hits_to_clear = self.total_hits // 2
+        hits_cleared = 0
+        
+        while hits_cleared < hits_to_clear:
+            for target_type in TargetType:
+                if self.hits_by_type[target_type]:
+                    self.remove_hit(target_type)
+                    hits_cleared += 1
+                    if hits_cleared >= hits_to_clear:
+                        break
 
     def add_hit(self, target_type: TargetType) -> None:
         """Add a hit of the specified target type to the hit trail.
@@ -68,9 +76,7 @@ class SimpleHitTrail:
         else:  # YELLOW
             target_pos = int(self.led_count * 0.75)  # 9 o'clock
             
-        # Add the hit at the target position
-        for n in range(LEDS_PER_HIT):
-            self._add_hit_at_position(target_pos + n, target_type)
+        self._add_hit_at_position(target_pos, target_type)
 
     def _add_hit_at_position(self, position: int, target_type: TargetType) -> None:
         """Internal method to add a hit at a specific position.
@@ -80,7 +86,7 @@ class SimpleHitTrail:
             target_type: The type of target that was hit
         """
         self.total_hits += 1
-        new_position = position + self.number_of_hits_by_type[target_type]
+        new_position = position + self.number_of_hits_by_type[target_type]*LEDS_PER_HIT
         self.number_of_hits_by_type[target_type] += 1
         self.active_hits[new_position] = target_type
         self.hits_by_type[target_type].append(new_position)
@@ -88,27 +94,19 @@ class SimpleHitTrail:
     def remove_hit(self, target_type: TargetType) -> None:
         """Remove a hit of the specified target type from the hit trail.
         
-        This method removes the hit from the trail and clears the LED by drawing black
-        at that position.
-        
         Args:
             target_type: Type of target to remove
         """
-        # Get the position before removing the hit
         if self.hits_by_type[target_type]:
-            position = self.hits_by_type[target_type][-1]
-            # Clear the LED by drawing black permanently
-            self.display.set_hit_trail_pixel(position, Color(0, 0, 0), -1)
+            position = self.hits_by_type[target_type].pop()
             
-            # Remove from tracking dictionaries
+            # Clear all LEDs in the trail
+            for x in range(LEDS_PER_HIT):
+                self.display.set_hit_trail_pixel(position + x, Color(0, 0, 0), -1)
+            
             self.number_of_hits_by_type[target_type] -= 1
-            self.hits_by_type[target_type].pop()
-            
-            if position in self.active_hits:
-                self.total_hits = max(0, self.total_hits - 1)
-                print(f"removing hit, total_hits: {self.total_hits}")
-                del self.active_hits[position]
-                print(f"removed hit from active_hits")
+            self.total_hits = max(0, self.total_hits - 1)
+            del self.active_hits[position]
 
     def draw_trail(self, led_position: int) -> None:
         """Draw the hit trail at the given LED position.
@@ -117,7 +115,8 @@ class SimpleHitTrail:
             led_position: Current LED position to draw at
         """
         for pos, target_type in self.active_hits.items():                
-            self.display.set_hit_trail_pixel(pos, TARGET_COLORS[target_type], -1)
+            for x in range(LEDS_PER_HIT):
+                self.display.set_hit_trail_pixel(pos + x, TARGET_COLORS[target_type], -1)
 
     @property
     def hit_colors(self) -> List[Color]:

@@ -329,7 +329,7 @@ async def run_game() -> None:
             game_state.fifth_line_target.get_debug_str()  # Use the new debug method
             if game_state.fifth_line_target.check_penalties():
                 print("Applying penalty - missed fifth line hit")
-                hit_trail.clear_all_hits()
+                hit_trail.clear_some_hits()
 
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
