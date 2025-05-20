@@ -7,7 +7,6 @@ import pygame
 from typing import Dict, Tuple, Optional, List, Callable
 from pygame import Color
 from game_constants import TargetType, TARGET_COLORS
-from easing_functions import QuadEaseOut  # type: ignore
 from display_manager import DisplayManager
 
 LEDS_PER_HIT = 4
@@ -24,7 +23,6 @@ class SimpleHitTrail:
         """
         self.display = display
         self.led_count = led_count
-        self.easing = QuadEaseOut(start=1.0, end=0.0, duration=fade_duration_ms)
         self.active_hits: Dict[int, Tuple[TargetType, int]] = {}  # position -> (target_type, start_time)
         self.rotate = 0.0
         self.rotate_speed = 0.0
@@ -117,44 +115,9 @@ class SimpleHitTrail:
         Args:
             led_position: Current LED position to draw at
         """
-        if self.total_hits > 60:
-            self.rotate_speed = -0.002
-        elif self.total_hits > 50:
-            self.rotate_speed = 0.002
-        elif self.total_hits > 33:
-            self.rotate_speed = 0.001
-        else:
-            self.rotate_speed = 0.0
-
-        current_time = pygame.time.get_ticks()
-        positions_to_remove = []
+        for pos, (target_type, _) in self.active_hits.items():                
+            self.display.set_hit_trail_pixel(pos, TARGET_COLORS[target_type], -1)
         
-        for pos, (target_type, start_time) in self.active_hits.items():
-            elapsed_ms = current_time - start_time
-            
-            if elapsed_ms > self.easing.duration:
-                positions_to_remove.append(pos)
-                continue
-                
-            brightness = self.easing(elapsed_ms)
-            
-            hit_color = TARGET_COLORS[target_type]
-            faded_color = Color(
-                int(hit_color.r * brightness),
-                int(hit_color.g * brightness),
-                int(hit_color.b * brightness),
-                255  # Always full alpha
-            )
-            
-            self.rotate += self.rotate_speed
-            r = int(self.rotate) % 300
-            r = 0
-            self.display.set_hit_trail_pixel(pos + r, faded_color, -1)
-        
-        # Remove expired positions
-        for pos in positions_to_remove:
-            del self.active_hits[pos]
-
     @property
     def hit_colors(self) -> List[Color]:
         """Get the current hit colors.
