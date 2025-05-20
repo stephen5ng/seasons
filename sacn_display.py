@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 LEDS_PER_UNIVERSE = 170  # Maximum LEDs per DMX universe (512 channels / 3 channels per LED)
 WLED_LEDS_PER_STRIP = 300  # WLED is configured for 300 LEDs per strip
-SACN_IP_ADDRESS = "wled-f4afec.local"  # Hardcoded IP address for sACN receiver
+SACN_IP_ADDRESS = "seasons-uno.local"  # Hardcoded IP address for sACN receiver
 
 class SacnDisplay:
     """sACN (E1.31) display implementation for DMX over Ethernet."""

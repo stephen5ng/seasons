@@ -56,7 +56,7 @@ SCORE_FLASH_DURATION_MS = 1000  # How long the score flash lasts
 SCORE_LINE_ANIMATION_TIME_MS = 500  # How long the score line animation lasts
 
 # WLED settings
-WLED_IP = "wled-e56890.local"
+QUAD_IP = "seasons-quad.local"
 
 WLED_SETTINGS = {
     0: {"on": False, 

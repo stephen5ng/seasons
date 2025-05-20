@@ -101,7 +101,7 @@ class GameState:
         # Component managers
         self.audio_manager = AudioManager("music/Rise Up 4.mp3")
         self.start_ticks_ms: int = pygame.time.get_ticks()
-        self.wled_manager = WLEDManager(not args.disable_wled, WLED_IP, self.http_session, WLED_SETTINGS, number_of_leds)
+        self.wled_manager = WLEDManager(not args.disable_wled, QUAD_IP, self.http_session, WLED_SETTINGS, number_of_leds)
         
         # Trail state manager (replaces individual trail state variables)
         self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
