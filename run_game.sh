@@ -5,6 +5,8 @@ curl -X POST http://wled-e56890.local/json/settings -H "Content-Type: applicatio
 curl -X POST http://wled-f4afec.local/json/settings -H "Content-Type: application/json" -d '{"live":true}'
 
 amixer sset 'Speaker' 90%
+
+cd /home/dietpi/seasons/seasons
 . ./env/bin/activate
 
 while true; do
