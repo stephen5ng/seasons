@@ -20,7 +20,7 @@ from wled_manager import WLEDManager
 from display_manager import DisplayManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
-from trail_visualization import TrailVisualizer
+from simple_hit_trail import SimpleHitTrail
 from fifth_line_target import FifthLineTarget
 
 from game_constants import *
@@ -173,13 +173,13 @@ class GameState:
                 )
                 display.set_target_trail_pixel(pos, faded_color, 1.0)
 
-    def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail_visualizer: 'TrailVisualizer', beat_float: float, display: DisplayManager) -> None:
+    def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail: 'SimpleHitTrail', beat_float: float, display: DisplayManager) -> None:
         """Handle successful hits and update score.
         
         Args:
             hits: List of target types that were hit
             led_position: Current LED position
-            hit_trail_visualizer: Visualizer for hit trails
+            hit_trail: Hit trail instance
             beat_float: Current beat position as float
             display: Display manager instance to draw on
         """
@@ -198,7 +198,7 @@ class GameState:
             for i in range(window_start, window_end + 1):
                 display.set_target_trail_pixel(i % self.button_handler.number_of_leds, target_color, 1.0, 1)
     
-            hit_trail_visualizer.add_hit(target_hit)
+            hit_trail.add_hit(target_hit)
 
     async def exit_game(self) -> None:
         """Exit the game gracefully.
@@ -271,13 +271,13 @@ async def run_game() -> None:
     )
     
     game_state: GameState = GameState()
-    hit_trail_visualizer = TrailVisualizer(
+    hit_trail = SimpleHitTrail(
         display,
         number_of_leds
     )
     
     logger.info("Showing main trail")
-    logger.info(f"Created hit trail with {len(hit_trail_visualizer.hit_colors)} colors")
+    logger.info(f"Created hit trail with {len(hit_trail.hit_colors)} colors")
     
     try:
         game_state.audio_manager.play_music(start_pos_s=0.0)
@@ -329,7 +329,7 @@ async def run_game() -> None:
             game_state.fifth_line_target.get_debug_str()  # Use the new debug method
             if game_state.fifth_line_target.check_penalties():
                 print("Applying penalty - missed fifth line hit")
-                hit_trail_visualizer.clear_all_hits()
+                hit_trail.clear_all_hits()
 
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
@@ -359,18 +359,18 @@ async def run_game() -> None:
             if not game_state.button_handler.is_in_valid_window(led_position):
                 missed_target = game_state.button_handler.missed_target()
                 if missed_target:
-                    hit_trail_visualizer.remove_hit(missed_target)
+                    hit_trail.remove_hit(missed_target)
             
             game_state.button_handler.reset_flags(led_position)
             
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
-            game_state.handle_hits(hits, led_position, hit_trail_visualizer, beat_float, display)
+            game_state.handle_hits(hits, led_position, hit_trail, beat_float, display)
             game_state.handle_misses(misses, 8, display)
             
             # Update stable_score only when outside a scoring window
             if not game_state.button_handler.is_in_valid_window(led_position):
-                stable_score = int(hit_trail_visualizer.get_score())
+                stable_score = int(hit_trail.get_score())
             
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
@@ -385,10 +385,10 @@ async def run_game() -> None:
             
             display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8)
             
-            hit_trail_visualizer.draw_trail(led_position)
+            hit_trail.draw_trail(led_position)
             
             if not IS_RASPBERRY_PI:
-                display.draw_score_lines(hit_trail_visualizer.get_score())
+                display.draw_score_lines(hit_trail.get_score())
 
                 for key, keydown in get_key():
                     if key == "quit":
