@@ -114,8 +114,6 @@ class SacnDisplay:
             self.sender[universe].dmx_data = tuple(universe_data)
             # logger.debug(f"Sent universe {universe} data: {len(universe_data)} bytes (LEDs {start_idx//3}-{end_idx//3})")
         
-    def __del__(self) -> None:
-        """Cleanup sACN sender on deletion."""
-        if hasattr(self, 'sender'):
-            logger.info("Stopping sACN sender")
-            self.sender.stop() 
+    def cleanup(self) -> None:
+        """Clean up sACN resources by stopping the sender."""
+        self.sender.stop()

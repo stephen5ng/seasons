@@ -228,6 +228,10 @@ class PygameAndSacnDisplay:
         self.pygame_display.show()
         self.sacn_display.show()
 
+    def cleanup(self) -> None:
+        """Clean up display resources."""
+        self.sacn_display.cleanup()
+
 class DisplayManager:
     """Handles LED display output for Pygame, WS281x, and sACN."""
     
@@ -457,3 +461,8 @@ class DisplayManager:
         if pos < 0 or pos >= self.led_count:
             raise ValueError(f"Position must be between 0 and {self.led_count-1}")
         self._request_pixel_on_trail(pos, color, TrailType.FIFTH_LINE, duration, layer)
+
+    def cleanup(self) -> None:
+        """Clean up display resources."""
+        if hasattr(self.display, 'cleanup'):
+            self.display.cleanup()

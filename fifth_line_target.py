@@ -189,7 +189,6 @@ class FifthLineTarget:
         """Register a hit for the current fifth line target if in valid window."""
         if self.state == TargetState.IN_WINDOW:
             self.target_hit_registered = True
-            print(f"Hit registered for target beat: {self._target_beat}")
 
     def get_debug_str(self) -> str:
         """Get the debug string for the current state.
