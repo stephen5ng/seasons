@@ -109,10 +109,10 @@ class TargetType(Enum):
     The order of declaration determines the cycling order when using next().
     RED -> BLUE -> GREEN -> YELLOW -> RED
     """
-    RED = auto()
-    GREEN = auto()
-    BLUE = auto()
-    YELLOW = auto()
+    RED = 0
+    GREEN = 1
+    BLUE = 2
+    YELLOW = 3
     
     def next(self) -> 'TargetType':
         """Get the next target type in the cycle.

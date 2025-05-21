@@ -64,7 +64,7 @@ class SimpleHitTrail:
         while self.number_of_hits_by_type[target_type] >= self.max_hits_per_target:
             target_type = target_type.next()
 
-        target_position = (target_type.value-1) * self.max_hits_per_target + self.number_of_hits_by_type[target_type]
+        target_position = target_type.value * self.max_hits_per_target + self.number_of_hits_by_type[target_type]
         self.number_of_hits_by_type[target_type] += 1
         self._set_leds(target_position, TARGET_COLORS[target_type])
         self.hits_by_type[target_type].append(target_position)
