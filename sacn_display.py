@@ -1,6 +1,7 @@
 """sACN (E1.31) display implementation for DMX over Ethernet."""
 import logging
 import time
+import socket
 from typing import List, Dict
 from pygame import Color
 from game_constants import DISPLAY_LED_OFFSET
@@ -18,9 +19,31 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 LEDS_PER_UNIVERSE = 170  # Maximum LEDs per DMX universe (512 channels / 3 channels per LED)
-SACN_IP_ADDRESS = "seasons-uno.local"  # Hardcoded IP address for sACN receiver
+SACN_DNS_HOSTNAME = "seasons-uno.local"  # LED controller hostname
 REFRESH_RATE = 22  # Hz - how often to send updates
 MIN_TIME_BETWEEN_UPDATES = 1.0 / REFRESH_RATE  # seconds
+
+def resolve_mdns_hostname(hostname: str) -> str:
+    """Resolve an mDNS hostname to an IP address.
+    
+    Args:
+        hostname: The mDNS hostname to resolve
+        
+    Returns:
+        The resolved IP address
+        
+    Raises:
+        socket.gaierror: If hostname resolution fails
+    """
+    try:
+        # Try to resolve the hostname
+        logger.info(f"Resolving hostname {hostname}...")
+        ip_address = socket.gethostbyname(hostname)
+        logger.info(f"Resolved {hostname} to {ip_address}")
+        return ip_address
+    except socket.gaierror as e:
+        logger.error(f"Failed to resolve {hostname}: {e}")
+        raise
 
 class SacnDisplay:
     """sACN (E1.31) display implementation for DMX over Ethernet."""
@@ -39,6 +62,9 @@ class SacnDisplay:
         self.universes = list(range(1, self.num_universes + 1))  # Universes 1 to N
         print(f"Using {self.num_universes} universes: {self.universes}")
         
+        # Resolve the LED controller's IP address once at startup
+        self.sacn_ip_address = resolve_mdns_hostname(SACN_DNS_HOSTNAME)
+        
         # Initialize sACN sender with manual refresh rate
         self.sender = sacn.sACNsender(fps=REFRESH_RATE, sync_universe=self.universes[-1] + 1)
         self.sender.start()
@@ -50,11 +76,11 @@ class SacnDisplay:
         # Activate all needed universes
         for universe in self.universes:
             self.sender.activate_output(universe)
-            self.sender[universe].destination = SACN_IP_ADDRESS
+            self.sender[universe].destination = self.sacn_ip_address
             self.sender[universe].multicast = False  # Set to True if multiple receivers
             # Manually control refresh rate
             self.sender[universe].manual_flush = True
-            logger.info(f"Activated universe {universe} -> {SACN_IP_ADDRESS}")
+            logger.info(f"Activated universe {universe} -> {self.sacn_ip_address}")
         
         # Initialize DMX data buffer
         self.clear()
