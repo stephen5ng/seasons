@@ -1,10 +1,16 @@
 """WLED management for the rhythm game."""
 import asyncio
 import aiohttp
+import socket
+import logging
 from typing import Optional, Dict
 
 from wled_controller import WLEDController
 from game_constants import NUMBER_OF_VICTORY_LEDS
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
 WLED_BASE = {"on":True,
  "bri":255,
  "on": True,
@@ -43,6 +49,29 @@ WLED_BASE = {"on":True,
      }
  ]
 }
+
+def resolve_mdns_hostname(hostname: str) -> str:
+    """Resolve an mDNS hostname to an IP address.
+    
+    Args:
+        hostname: The mDNS hostname to resolve
+        
+    Returns:
+        The resolved IP address
+        
+    Raises:
+        socket.gaierror: If hostname resolution fails
+    """
+    try:
+        # Try to resolve the hostname
+        logger.info(f"Resolving WLED hostname {hostname}...")
+        ip_address = socket.gethostbyname(hostname)
+        logger.info(f"Resolved WLED {hostname} to {ip_address}")
+        return ip_address
+    except socket.gaierror as e:
+        logger.error(f"Failed to resolve WLED {hostname}: {e}")
+        raise
+
 class WLEDManager:
     """Manages WLED communication and state tracking.
     
@@ -50,17 +79,28 @@ class WLEDManager:
     sent measure and score, and determining when to send new commands.
     """
     
-    def __init__(self, enabled: bool, ip_address: str, http_session: aiohttp.ClientSession, command_settings: Dict[int, str], number_of_leds: int) -> None:
+    def __init__(self, enabled: bool, hostname: str, http_session: aiohttp.ClientSession, command_settings: Dict[int, str], number_of_leds: int) -> None:
         """Initialize the WLED manager.
         
         Args:
             enabled: Whether WLED is enabled
-            ip_address: IP address of the WLED device
+            hostname: Hostname or IP address of the WLED device
             http_session: Shared HTTP session for making requests
             command_settings: Dictionary mapping measures to WLED commands
             number_of_leds: Number of LEDs in the strip
         """
         self.enabled = enabled
+        
+        # Resolve hostname if it looks like a DNS name
+        if not hostname.replace(".", "").isdigit():  # Simple check for IP vs hostname
+            try:
+                ip_address = resolve_mdns_hostname(hostname)
+            except socket.gaierror:
+                logger.error(f"Could not resolve {hostname}, falling back to hostname")
+                ip_address = hostname
+        else:
+            ip_address = hostname
+            
         self.wled_controller = WLEDController(ip_address, http_session)
         self.command_settings = command_settings
         self.last_wled_base_command: str = ""
@@ -95,7 +135,7 @@ class WLEDManager:
         sending a new command to the WLED device.
         
         Args:
-            current_measure: Current measure number
+            current_phrase: Current phrase number
         """
         if not self.enabled:
             return
@@ -108,6 +148,6 @@ class WLEDManager:
         
         wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, json_base, 3, current_phrase)
         if wled_command != self.last_wled_command:
-            print(f"wled_command: {wled_command}")
+            logger.debug(f"Sending WLED command: {wled_command}")
             self.last_wled_command = wled_command
             await self.wled_controller.send_json(wled_command)
