@@ -430,7 +430,7 @@ class DisplayManager:
         self._active_colors_np[trail_idx, layer, pos] = [color.r, color.g, color.b]
         self._active_times_np[trail_idx, layer, pos] = [now, duration]
 
-    def set_target_trail_pixel(self, pos: int, color: Color, duration: float, layer: int = 0) -> None:
+    def set_target_trail_pixel(self, pos: int, color: Color, duration: float, layer: int) -> None:
         """Set pixel color at position in target ring with an optional duration.
         
         Args:

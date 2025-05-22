@@ -21,7 +21,7 @@ from display_manager import DisplayManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
 from simple_hit_trail import SimpleHitTrail
-from fifth_line_target import FifthLineTarget
+from fifth_line_target import FifthLineTarget, TargetState
 
 from game_constants import *
 
@@ -155,7 +155,6 @@ class GameState:
             misses: List of target types that were missed
             display: Display manager instance to draw on
         """        
-        # Add new misses
         for target_miss in misses:
             error_pos = self.button_handler.target_positions[target_miss]
             for offset in range(-max_distance, max_distance + 1):
@@ -169,7 +168,7 @@ class GameState:
                     int(TARGET_COLORS[target_miss].g * initial_intensity),
                     int(TARGET_COLORS[target_miss].b * initial_intensity)
                 )
-                display.set_target_trail_pixel(pos, faded_color, 1.0)
+                display.set_target_trail_pixel(pos, faded_color, 1.0, 0)
 
     def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail: 'SimpleHitTrail', beat_float: float, display: DisplayManager) -> None:
         """Handle successful hits and update score.
@@ -290,7 +289,7 @@ async def run_game() -> None:
             fractional_beat: float = beat_float % 1
             
             # Check if space bar or GPIO button was pressed when fifth line was in valid window
-            fifth_line_pressed = args.auto_score
+            fifth_line_pressed = game_state.fifth_line_target.state == TargetState.IN_WINDOW and args.auto_score
             for key, keydown in get_key():
                 if key == " " and keydown:
                     fifth_line_pressed = True
@@ -303,7 +302,8 @@ async def run_game() -> None:
                 fifth_line_pressed = True
                 
             if fifth_line_pressed:
-                game_state.fifth_line_target.register_hit()
+                if not game_state.fifth_line_target.register_hit():
+                    game_state.fifth_line_target.handle_fifth_line_miss(display)
 
             # Update fifth line and check for penalties
             game_state.fifth_line_target.update(display, beat_float)
@@ -362,10 +362,10 @@ async def run_game() -> None:
             # Draw LEDs at the start and end of each target window
             for target_type, target_pos in game_state.button_handler.target_positions.items():
                 window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos)
-                display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], -1)
-                display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], -1)
+                display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], -1, 0)
+                display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], -1, 0)
             
-            display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8)
+            display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8, 0)
                         
             if not IS_RASPBERRY_PI:
                 display.draw_score_lines(hit_trail.get_score())

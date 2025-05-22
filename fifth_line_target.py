@@ -123,7 +123,7 @@ class FifthLineTarget:
         if was_hit:
             base_color = Color(0, 255, 0)  # Green when hit
         elif self.state == TargetState.IN_WINDOW:
-            base_color = Color(255, 0, 0)  # Red in valid window
+            base_color = Color(255, 165, 0)  # Orange in valid window
         else:
             base_color = Color(128, 128, 128)  # Gray otherwise
         
@@ -162,8 +162,15 @@ class FifthLineTarget:
             return
 
         start = max(0, position - 20)
+        if was_hit:
+            start = 0
         for i in range(start, position + 1):
-            display.set_fifth_line_pixel(i, color)
+            duration = 0.2
+            display.set_fifth_line_pixel(i, color, duration=duration)
+
+    def handle_fifth_line_miss(self, display: DisplayManager) -> None:
+        """Handle fifth line miss."""
+        display.set_fifth_line_pixel(display.led_count - 1, Color(255, 165, 0), 1.0)
     
     def update(self, display: DisplayManager, beat_float: float) -> None:
         """Update and draw the fifth line animation if one is active.
@@ -189,6 +196,8 @@ class FifthLineTarget:
         """Register a hit for the current fifth line target if in valid window."""
         if self.state == TargetState.IN_WINDOW:
             self.target_hit_registered = True
+            return True
+        return False
 
     def get_debug_str(self) -> str:
         """Get the debug string for the current state.
