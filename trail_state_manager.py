@@ -17,18 +17,11 @@ class TrailStateManager:
     - Trail rendering with easing effects
     """
     
-    def __init__(self, get_rainbow_color_func: Callable[[int, int], Color]) -> None:
-        """Initialize the trail state manager.
-        
-        Args:
-            get_rainbow_color_func: Function to generate rainbow colors
-        """
+    def __init__(self) -> None:
+        """Initialize the trail state manager."""
         # Main trail state
         self.lit_positions: Dict[int, float] = {}  # Maps LED position to timestamp when it was lit
         self.lit_colors: Dict[int, Color] = {}     # Maps LED position to base color when it was lit
-        
-        # Required functions
-        self.get_rainbow_color_func = get_rainbow_color_func
         
     def update_position(self, position: int, timestamp_s: float, base_color: Color = Color(255, 255, 255)) -> None:
         """Update the trail when a new LED position is reached.

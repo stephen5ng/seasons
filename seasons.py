@@ -107,7 +107,7 @@ class GameState:
         self.wled_manager = WLEDManager(not args.disable_wled, QUAD_HOSTNAME, self.http_session, WLED_SETTINGS, number_of_leds)
         
         # Trail state manager (replaces individual trail state variables)
-        self.trail_state_manager = TrailStateManager(get_rainbow_color_func=get_rainbow_color)
+        self.trail_state_manager = TrailStateManager()
         self.current_led_position: Optional[int] = None  # Track current LED position
         
         # Track miss timestamps for fade effect
@@ -215,23 +215,6 @@ def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
 def get_hit_trail_position(i: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in the hit trail ring, starting at 12 o'clock."""
     return get_target_ring_position(i, HIT_TRAIL_RADIUS)
-
-def get_rainbow_color(time_ms: int, line_index: int) -> Color:
-    """Generate a rainbow color based on time and line position."""
-    hue: float = (time_ms / COLOR_CYCLE_TIME_MS + line_index * 0.1) % 1.0
-    
-    if hue < 1/6:  # Red to Yellow
-        return Color(255, int(255 * (hue * 6)), 0)
-    elif hue < 2/6:  # Yellow to Green
-        return Color(int(255 * (2 - hue * 6)), 255, 0)
-    elif hue < 3/6:  # Green to Cyan
-        return Color(0, 255, int(255 * (hue * 6 - 2)))
-    elif hue < 4/6:  # Cyan to Blue
-        return Color(0, int(255 * (4 - hue * 6)), 255)
-    elif hue < 5/6:  # Blue to Magenta
-        return Color(int(255 * (hue * 6 - 4)), 0, 255)
-    else:  # Magenta to Red
-        return Color(255, 0, int(255 * (6 - hue * 6)))
 
 def get_effective_window_size(phrase: int) -> int:
     """Calculate the effective window size based on the current phrase.

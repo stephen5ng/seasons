@@ -9,5 +9,5 @@ cd /home/dietpi/seasons/seasons
 
 while true; do
     ./seasons.py --led 300
-    echo "Game ended. Restarting in 3 seconds..."
+    sleep 60
 done
