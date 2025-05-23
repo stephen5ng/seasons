@@ -104,7 +104,7 @@ class GameState:
         # Component managers
         self.audio_manager = AudioManager("music/Rise Up 4.mp3")
         self.start_ticks_ms: int = pygame.time.get_ticks()
-        self.wled_manager = WLEDManager(not args.disable_wled, QUAD_HOSTNAME, self.http_session, WLED_SETTINGS, number_of_leds)
+        self.wled_manager = WLEDManager(not args.disable_wled, QUAD_HOSTNAME, self.http_session, number_of_leds=number_of_leds//2)
         
         # Trail state manager (replaces individual trail state variables)
         self.trail_state_manager = TrailStateManager()
@@ -316,7 +316,8 @@ async def run_game() -> None:
                 last_beat = int(beat_float)
                 print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}")
                 
-                await game_state.wled_manager.update_wled(stable_score)
+                print(f"Updating WLED {stable_score}, hit_trail.get_score(): {hit_trail.get_score()}")
+                await game_state.wled_manager.update_wled(int(stable_score*2))
 
                 game_state.button_handler.set_window_size(get_effective_window_size(stable_score))
 
@@ -352,7 +353,7 @@ async def run_game() -> None:
             
             # Update stable_score only when outside a scoring window
             if not game_state.button_handler.is_in_valid_window(led_position):
-                stable_score = int(hit_trail.get_score())
+                stable_score = hit_trail.get_score()
             
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position

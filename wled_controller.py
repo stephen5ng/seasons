@@ -42,7 +42,6 @@ class WLEDController:
         """
         try:
             json_str = json.dumps(json_data)
-            print(f"Sending JSON command to WLED: {json_str}")
             
             async with self.http_session.post(url, data=json_str, headers={'Content-Type': 'application/json'}) as response:
                 if response.status != 200:
