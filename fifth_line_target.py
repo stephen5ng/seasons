@@ -65,9 +65,9 @@ class FifthLineTarget:
         
         if self._target_beat is None:
             self.state = TargetState.NO_TARGET
-        elif percent_complete < 0.80:
+        elif percent_complete < 0.90:
             self.state = TargetState.PRE_WINDOW
-        elif percent_complete < 1.0:
+        elif percent_complete < 1.1:
             self.state = TargetState.IN_WINDOW
         else:
             self.state = TargetState.POST_WINDOW
@@ -107,7 +107,7 @@ class FifthLineTarget:
         if target_measure in FIFTH_LINE_TARGET_MEASURES:
             self._target_beat = target_measure * BEATS_PER_MEASURE
             self.state = TargetState.PRE_WINDOW
-            print(f"Starting fifth line animation at measure {target_measure}")
+            print(f"Starting fifth line animation for measure {target_measure}")
     
     def get_fifth_line_color(self, percent_complete: float, was_hit: bool) -> Color:
         """Get the color for the fifth line based on its state and animation progress.
