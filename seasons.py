@@ -291,16 +291,14 @@ async def run_game() -> None:
             
             # Check if space bar or GPIO button was pressed when fifth line was in valid window
             fifth_line_pressed = game_state.fifth_line_target.state == TargetState.IN_WINDOW and args.auto_score
+            if game_state.fifth_line_button and game_state.fifth_line_button.is_pressed:
+                fifth_line_pressed = True
             for key, keydown in get_key():
                 if key == " " and keydown:
                     fifth_line_pressed = True
                 elif key == "quit":
                     display.cleanup()  # Clean up display before exiting
                     return
-            
-            # Check GPIO button if on Raspberry Pi
-            if game_state.fifth_line_button and game_state.fifth_line_button.is_pressed:
-                fifth_line_pressed = True
                 
             if fifth_line_pressed:
                 if not game_state.fifth_line_target.register_hit():
@@ -365,14 +363,14 @@ async def run_game() -> None:
             # Draw LEDs at the start and end of each target window
             for target_type, target_pos in game_state.button_handler.target_positions.items():
                 window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos)
-                display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], -1, 0)
-                display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], -1, 0)
-            
+                display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], 0.5, 0)
+                display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], 0.5, 0)
+
             display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8, 0)
             display.draw_score_lines(hit_trail.get_score())
                         
             display.update()
-            await clock.tick(60)
+            await clock.tick(30)
     finally:
         # Clean up the HTTP session
         await game_state.http_session.close()
