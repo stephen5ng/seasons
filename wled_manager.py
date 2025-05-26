@@ -98,7 +98,7 @@ class WLEDManager:
         self.wled_config = self._load_wled_config()
         
         # Resolve hostname if it looks like a DNS name
-        if not hostname.replace(".", "").isdigit():  # Simple check for IP vs hostname
+        if self.enabled and not hostname.replace(".", "").isdigit():  # Simple check for IP vs hostname
             try:
                 ip_address = resolve_mdns_hostname(hostname)
             except socket.gaierror:
