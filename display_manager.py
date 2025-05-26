@@ -406,7 +406,7 @@ class DisplayManager:
         """Draw horizontal lines representing the score with top-to-bottom animation."""
         self.display.draw_score_lines(score)
 
-    def _request_pixel_on_trail(self, pos: int, color: Color, trail_type: TrailType, duration: float, layer: int = 0) -> None:
+    def _request_pixel_on_trail(self, pos: int, color: Color, trail_type: TrailType, duration: float, layer: int) -> None:
         """Request a pixel to be displayed on a trail with fade management.
         
         Args:
@@ -441,17 +441,17 @@ class DisplayManager:
         """
         self._request_pixel_on_trail(pos, color, TrailType.TARGET, duration, layer)
     
-    def set_hit_trail_pixel(self, pos: int, color: Color, duration: float = -1) -> None:
-        """Set pixel color at position in hit trail ring with an optional duration.
+    def set_hit_trail_pixel(self, pos: int, color: Color, duration: float) -> None:
+        """Set pixel color at position in hit trail ring with specified duration.
         
         Args:
             pos: The logical position of the LED.
             color: The Pygame Color for the LED.
             duration: Duration (in seconds) for the pixel to remain on. If -1, the pixel remains until overridden.
         """
-        self._request_pixel_on_trail(pos, color, TrailType.HIT, duration)
+        self._request_pixel_on_trail(pos, color, TrailType.HIT, duration, 0)
 
-    def set_fifth_line_pixel(self, pos: int, color: Color, duration: float = 0.2, layer: int = 0) -> None:
+    def set_fifth_line_pixel(self, pos: int, color: Color, duration: float, layer: int) -> None:
         """Set pixel color for the fifth line LED chain with optional duration.
         
         Args:

@@ -166,11 +166,11 @@ class FifthLineTarget:
             start = 0
         for i in range(start, position + 1):
             duration = 0.2
-            display.set_fifth_line_pixel(i, color, duration=duration)
+            display.set_fifth_line_pixel(i, color, duration, 0)
 
     def handle_fifth_line_miss(self, display: DisplayManager) -> None:
         """Handle fifth line miss."""
-        display.set_fifth_line_pixel(display.led_count - 1, Color(255, 165, 0), 1.0)
+        display.set_fifth_line_pixel(display.led_count - 1, Color(255, 165, 0), 1.0, 0)
     
     def update(self, display: DisplayManager, beat_float: float) -> None:
         """Update and draw the fifth line animation if one is active.
