@@ -19,6 +19,8 @@ from game_constants import (
     TargetType
 )
 from display_manager import DisplayManager
+WINDOW_SIZE_PERCENT = 0.20
+WINDOW_SIZE_LEDS = int(150*WINDOW_SIZE_PERCENT)
 
 class TargetState(Enum):
     """States for the fifth line target.
@@ -65,13 +67,15 @@ class FifthLineTarget:
         
         if self._target_beat is None:
             self.state = TargetState.NO_TARGET
-        elif percent_complete < 0.90:
+        elif percent_complete < 1.0 - WINDOW_SIZE_PERCENT:
             self.state = TargetState.PRE_WINDOW
-        elif percent_complete < 1.1:
+        elif percent_complete < 1.0 + WINDOW_SIZE_PERCENT:
             self.state = TargetState.IN_WINDOW
-        else:
+        elif percent_complete < 1.5:
             self.state = TargetState.POST_WINDOW
-            
+        else:
+            self.state = TargetState.NO_TARGET
+
         if old_state != self.state:
             print(f"State transition: {old_state.name} -> {self.state.name}")
     
@@ -153,8 +157,6 @@ class FifthLineTarget:
         eased = FIFTH_LINE_EASE.ease(min(percent_complete, 1.0))
         position = int(eased * (display.led_count - 1))
         
-        self._update_state(percent_complete)
-        
         # A fifth line can only be considered "hit" if it was hit while in the valid window
         was_hit = self.state == TargetState.IN_WINDOW and self.target_hit_registered
         color = self.get_fifth_line_color(percent_complete, was_hit)
@@ -162,11 +164,16 @@ class FifthLineTarget:
             return
 
         start = max(0, position - 20)
+        
+        # Redraw the entire fifth line if it was hit
         if was_hit:
             start = 0
         for i in range(start, position + 1):
             duration = 0.2
             display.set_fifth_line_pixel(i, color, duration, 0)
+        
+        display.set_fifth_line_pixel(display.led_count - 1, Color(255, 165, 0), 1.0, 0)
+        display.set_fifth_line_pixel(display.led_count - WINDOW_SIZE_LEDS, Color(255, 165, 0), 1.0, 0)
 
     def handle_fifth_line_miss(self, display: DisplayManager) -> None:
         """Handle fifth line miss."""
@@ -180,15 +187,14 @@ class FifthLineTarget:
             beat_float: The current beat position as float.
         """
         if self._target_beat is None:
-            return
+            return        
             
         progress = 1.0 - (self._target_beat - beat_float) / (FIFTH_LINE_TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
-        if progress >= 1.5:  # Animation complete
+        self._update_state(progress)
+        if self.state == TargetState.NO_TARGET:  # Animation complete
             print(f"-------------Animation complete for target_beat: {self._target_beat}")
-            # Clear the target beat
             self._target_beat = None
             self.target_hit_registered = False
-            self.state = TargetState.NO_TARGET
         elif progress >= 0:  # Animation active
             self.draw_fifth_line(display, progress)
     

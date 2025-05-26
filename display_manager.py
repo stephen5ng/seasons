@@ -136,7 +136,7 @@ class PygameDisplay:
     def set_fifth_line_pixel(self, pos: int, color: Color, trail_start_offset: int) -> None:
         """Set a pixel on the fifth line."""
         position_x = int((pos / (self.led_count - 1)) * (self.screen_width // 2))
-        pygame.draw.circle(self.pygame_surface, color, (position_x, 96), 4, 1)
+        pygame.draw.circle(self.pygame_surface, color, (position_x, 96), 1, 1)
 
     def draw_score_lines(self, score: float) -> None:
         """Draw horizontal lines representing the score with top-to-bottom animation."""
