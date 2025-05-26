@@ -30,7 +30,7 @@ import logging
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='LED rhythm game')
-    parser.add_argument('--leds', type=int, default=80,
+    parser.add_argument('--leds', type=int, default=NUMBER_OF_LEDS,
                       help='Number of LEDs in the strip (default: 80)')
     
     # Display mode options
@@ -276,9 +276,10 @@ async def run_game() -> None:
         }
 
         last_beat = -1
-        ending_phrase = 1 if args.one_loop else 18
+        ending_phrase = 1 if args.one_loop else 19
         stable_score = 0
         current_phrase = 0
+        missed_targets = 0
         while True:
             display.clear()
             current_time_ms: int = pygame.time.get_ticks()
@@ -308,9 +309,9 @@ async def run_game() -> None:
             # Update fifth line and check for penalties
             game_state.fifth_line_target.update(display, beat_float)
             game_state.fifth_line_target.get_debug_str()  # Use the new debug method
-            if game_state.fifth_line_target.check_penalties():
-                print("Applying penalty - missed fifth line hit")
-                hit_trail.clear_some_hits()
+            # if game_state.fifth_line_target.check_penalties():
+            #     print("Applying penalty - missed fifth line hit")
+            #     hit_trail.clear_some_hits()
 
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
@@ -331,7 +332,8 @@ async def run_game() -> None:
                 if beat_in_phrase == 0:
                     current_phrase = int(stable_score)
                     print(f"current_phrase: {current_phrase}")
-                    game_state.handle_music_loop(int(stable_score), current_time_ms)
+                    if current_phrase < 17:
+                        game_state.handle_music_loop(int(stable_score), current_time_ms)
  
                 # Start fifth line animation on measure boundaries
                 if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
@@ -342,7 +344,7 @@ async def run_game() -> None:
             if not game_state.button_handler.is_in_valid_window(led_position):
                 missed_target = game_state.button_handler.missed_target()
                 if missed_target:
-                    hit_trail.remove_hit(missed_target)
+                    missed_targets += 1
             
             game_state.button_handler.reset_flags(led_position)
             
@@ -367,14 +369,8 @@ async def run_game() -> None:
                 display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], -1, 0)
             
             display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8, 0)
+            display.draw_score_lines(hit_trail.get_score())
                         
-            if not IS_RASPBERRY_PI:
-                display.draw_score_lines(hit_trail.get_score())
-
-                for key, keydown in get_key():
-                    if key == "quit":
-                        return
-                
             display.update()
             await clock.tick(60)
     finally:
