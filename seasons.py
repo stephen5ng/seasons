@@ -109,8 +109,8 @@ class GameState:
         # Track miss timestamps for fade effect
         self.miss_timestamps: Dict[Tuple[int, TargetType], Tuple[float, float]] = {}  # (position, target_type) -> (timestamp, initial_intensity)
         
-        # Fifth line target manager
-        self.fifth_line_target = FifthLineTarget()
+        # Fifth line target array
+        self.fifth_line_targets: List[FifthLineTarget] = []
 
         # Initialize GPIO button if on Raspberry Pi
         self.fifth_line_button: Optional[Button] = None
@@ -279,7 +279,7 @@ async def run_game() -> None:
             fractional_beat: float = beat_float % 1
             
             # Check if space bar or GPIO button was pressed when fifth line was in valid window
-            fifth_line_pressed = game_state.fifth_line_target.state == TargetState.IN_WINDOW and args.auto_score
+            fifth_line_pressed = args.auto_score and any(target.state == TargetState.IN_WINDOW for target in game_state.fifth_line_targets)
             if game_state.fifth_line_pressed:
                 fifth_line_pressed = True
                 game_state.fifth_line_pressed = False  # Reset the flag after handling
@@ -291,15 +291,21 @@ async def run_game() -> None:
                     return
                 
             if fifth_line_pressed:
-                if not game_state.fifth_line_target.register_hit():
-                    game_state.fifth_line_target.handle_fifth_line_miss(display)
+                # Try to register hit for any target in valid window
+                hit_registered = False
+                for target in game_state.fifth_line_targets:
+                    if target.register_hit():
+                        hit_registered = True
+                        break
+                if not hit_registered:
+                    # If no valid hit, show miss effect
+                    FifthLineTarget.handle_fifth_line_miss(display)
 
-            # Update fifth line and check for penalties
-            game_state.fifth_line_target.update(display, beat_float)
-            game_state.fifth_line_target.get_debug_str()  # Use the new debug method
-            # if game_state.fifth_line_target.check_penalties():
-            #     print("Applying penalty - missed fifth line hit")
-            #     hit_trail.clear_some_hits()
+            # Update all fifth line targets and remove completed ones
+            for target in game_state.fifth_line_targets[:]:  # Create copy of list for safe removal
+                target.update(display, beat_float)
+                if target.state == TargetState.NO_TARGET:
+                    game_state.fifth_line_targets.remove(target)
 
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
@@ -318,7 +324,9 @@ async def run_game() -> None:
  
                 # Start fifth line animation on measure boundaries
                 if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
-                    game_state.fifth_line_target.maybe_start_fifth_line(current_phrase * 2 + (1 if beat_in_phrase == 4 else 0))
+                    measure = current_phrase * 2 + (1 if beat_in_phrase == 4 else 0)
+                    if FifthLineTarget.should_start_fifth_line(measure):
+                        game_state.fifth_line_targets.append(FifthLineTarget(measure))
 
             led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, game_state.number_of_leds)
             

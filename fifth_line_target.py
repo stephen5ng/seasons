@@ -51,12 +51,31 @@ class FifthLineTarget:
         state: Current state of the target (NO_TARGET, PRE_WINDOW, IN_WINDOW, POST_WINDOW)
     """
     
-    def __init__(self) -> None:
-        """Initialize the fifth line target state."""
-        self._target_beat: Optional[float] = None
+    @staticmethod
+    def should_start_fifth_line(measure: int) -> bool:
+        """Check if a fifth line target should be started for the given measure.
+        
+        Args:
+            measure: The current measure number in the song.
+            
+        Returns:
+            bool: True if a fifth line target should be started at this measure.
+        """
+        target_measure = measure + FIFTH_LINE_TARGET_BUFFER_MEASURE
+        return target_measure in FIFTH_LINE_TARGET_MEASURES
+
+    def __init__(self, measure: int) -> None:
+        """Initialize the fifth line target state for a specific measure.
+                
+        Args:
+            measure: The current measure number in the song.
+        """
+        target_measure = measure + FIFTH_LINE_TARGET_BUFFER_MEASURE
+        self._target_beat = target_measure * BEATS_PER_MEASURE
         self.target_hit_registered: bool = False
-        self.state: TargetState = TargetState.NO_TARGET
+        self.state: TargetState = TargetState.PRE_WINDOW
         self._last_debug_str: str = ""  # Track last debug string
+        print(f"Starting fifth line animation for measure {target_measure}")
     
     def _update_state(self, percent_complete: float) -> None:
         """Update the target state based on animation progress.
@@ -97,23 +116,6 @@ class FifthLineTarget:
             return should_penalize
         return False
     
-    def maybe_start_fifth_line(self, measure: int) -> None:
-        """Check if we should start a new fifth line animation based on the current measure.
-        
-        Args:
-            measure: The current measure number in the song.
-        """
-        # Only start new animation if no current animation is active
-        if self._target_beat is not None:
-            return
-            
-        # Calculate target measure for animation start
-        target_measure = measure + FIFTH_LINE_TARGET_BUFFER_MEASURE
-        if target_measure in FIFTH_LINE_TARGET_MEASURES:
-            self._target_beat = target_measure * BEATS_PER_MEASURE
-            self.state = TargetState.PRE_WINDOW
-            print(f"Starting fifth line animation for measure {target_measure}")
-    
     def get_fifth_line_color(self, percent_complete: float, was_hit: bool) -> Color:
         """Get the color for the fifth line based on its state and animation progress.
         
@@ -126,11 +128,11 @@ class FifthLineTarget:
         """
         # Base color selection
         if was_hit:
-            base_color = Color(0, 255, 0)  # Green when hit
+            base_color = Color(255, 165, 0)  # Orange when hit
         elif self.state == TargetState.IN_WINDOW:
             base_color = Color(255, 165, 0)  # Orange in valid window
         else:
-            base_color = Color(128, 128, 128)  # Gray otherwise
+            base_color = Color(255, 255, 255)  # White otherwise
         
         # Apply fade-out for animation completion
         if percent_complete >= 1.0:
@@ -174,7 +176,7 @@ class FifthLineTarget:
         # Redraw the entire fifth line if it was hit
         if was_hit:
             start = 0
-        duration = 1.5
+        duration = 0.5
         
         for i in range(start, end):
             # duration *= 0.5
@@ -183,8 +185,16 @@ class FifthLineTarget:
         display.set_fifth_line_pixel(display.led_count - 1, Color(255, 165, 0), 1.0, 0)
         display.set_fifth_line_pixel(display.led_count - WINDOW_SIZE_LEDS_BEFORE, Color(255, 165, 0), 1.0, 0)
 
-    def handle_fifth_line_miss(self, display: DisplayManager) -> None:
-        """Handle fifth line miss by lighting up the last 12 lights."""
+    @staticmethod
+    def handle_fifth_line_miss(display: DisplayManager) -> None:
+        """Handle fifth line miss by lighting up the last 12 lights.
+        
+        This is a static method that can be called even when there are no active targets,
+        ensuring that misses are always visually indicated.
+        
+        Args:
+            display: The display manager instance to draw on.
+        """
         for i in range(12):
             display.set_fifth_line_pixel(display.led_count - 1 - i, Color(255, 165, 0), 0.2, 0)
     
@@ -208,8 +218,12 @@ class FifthLineTarget:
         elif progress >= 0:  # Animation active
             self.draw_fifth_line(display, progress)
     
-    def register_hit(self) -> None:
-        """Register a hit for the current fifth line target if in valid window."""
+    def register_hit(self) -> bool:
+        """Register a hit for the current fifth line target if in valid window.
+        
+        Returns:
+            bool: True if the hit was registered, False if not in valid window.
+        """
         if self.state == TargetState.IN_WINDOW:
             self.target_hit_registered = True
             return True

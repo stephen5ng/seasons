@@ -14,7 +14,7 @@ AUTOPILOT_PHRASE = 17
 # Target constants - will be calculated at runtime based on actual LED count
 TARGET_WINDOW_PERCENT = 0.10
 
-FIFTH_LINE_TARGET_MEASURES = [8, 16, 18, 20, 22, 24, 34]
+FIFTH_LINE_TARGET_MEASURES = [8, 10, 12, 14, 16, 18, 20, 22, 24, 34]
 FIFTH_LINE_TARGET_BUFFER_MEASURE = 2
 
 # Target positions as fixed percentages (clock positions)
