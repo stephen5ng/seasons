@@ -184,8 +184,9 @@ class FifthLineTarget:
         display.set_fifth_line_pixel(display.led_count - WINDOW_SIZE_LEDS_BEFORE, Color(255, 165, 0), 1.0, 0)
 
     def handle_fifth_line_miss(self, display: DisplayManager) -> None:
-        """Handle fifth line miss."""
-        display.set_fifth_line_pixel(display.led_count - 1, Color(255, 165, 0), 1.0, 0)
+        """Handle fifth line miss by lighting up the last 12 lights."""
+        for i in range(12):
+            display.set_fifth_line_pixel(display.led_count - 1 - i, Color(255, 165, 0), 0.2, 0)
     
     def update(self, display: DisplayManager, beat_float: float) -> None:
         """Update and draw the fifth line animation if one is active.
