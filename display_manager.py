@@ -352,9 +352,15 @@ class DisplayManager:
         
         # Calculate fade ratios for fading pixels (1.0 to 0.0)
         # Shape: (num_trails, 2, led_count, 1)
+        # Handle edge cases:
+        # 1. Avoid division by zero by masking where durations > 0
+        # 2. Ensure elapsed times are non-negative
+        # 3. Prevent overflow by clipping large values
+        safe_durations = np.where(durations > 0, durations, 1.0)  # Replace 0/negative with 1.0 to avoid div by zero
+        safe_elapsed = np.maximum(elapsed, 0)  # Ensure non-negative
         fade_ratios = np.where(
             is_fading,
-            1.0 - np.clip(elapsed / durations, 0, 1)[..., None],
+            1.0 - np.clip(safe_elapsed / safe_durations, 0, 1)[..., None],
             1.0
         )
         
