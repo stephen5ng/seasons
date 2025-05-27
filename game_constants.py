@@ -9,7 +9,7 @@ NUMBER_OF_LEDS: int = 300
 NUMBER_OF_VICTORY_LEDS: int = 150
 
 # Target constants - will be calculated at runtime based on actual LED count
-TARGET_WINDOW_PERCENT = 0.05
+TARGET_WINDOW_PERCENT = 0.10
 
 FIFTH_LINE_TARGET_MEASURES = [8, 16, 18, 20, 22, 24, 34]
 FIFTH_LINE_TARGET_BUFFER_MEASURE = 2

@@ -7,12 +7,12 @@ import platform
 import os
 
 # Import only the enum and colors, but not the position constants
-from game_constants import TARGET_COLORS, TargetType
+from game_constants import TargetType, TARGET_WINDOW_PERCENT
 from gpiozero import Button
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
-
+MIN_WINDOW_SIZE = 8
 class ButtonConfig(NamedTuple):
     """Configuration for a GPIO button.
     
@@ -52,13 +52,11 @@ class ButtonHandler:
         for config in BUTTON_CONFIGS.values()
     }
     
-    def __init__(self, number_of_leds: int, target_window_size: int,
-                auto_score: bool) -> None:
+    def __init__(self, number_of_leds: int, auto_score: bool) -> None:
         """Initialize the button handler.
         
         Args:
             number_of_leds: Number of LEDs in the strip
-            target_window_size: Size of target windows
             auto_score: When True, automatically scores on every round
         """
         self.button_states: Dict[TargetType, bool] = {
@@ -73,7 +71,7 @@ class ButtonHandler:
 
         # Store LED configuration
         self.number_of_leds = number_of_leds
-        self.target_window_size = target_window_size
+        self.target_window_size = int(self.number_of_leds * TARGET_WINDOW_PERCENT)
         
         # Calculate and store target positions
         self.target_positions = {
@@ -95,14 +93,6 @@ class ButtonHandler:
             for target_type, config in self.BUTTON_CONFIGS.items():
                 button = Button(config.pin)
                 self.gpio_buttons[config.key] = button
-    
-    def set_window_size(self, window_size: int) -> None:
-        """Update the window size for scoring.
-        
-        Args:
-            window_size: New window size to use
-        """
-        self.target_window_size = window_size
 
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
@@ -241,15 +231,24 @@ class ButtonHandler:
     def mod_distance(a, b, mod):
         return min((a - b) % mod, (b - a) % mod)
 
-    def get_window_boundaries(self, target_pos: int) -> Tuple[int, int]:
+    def get_window_boundaries(self, target_pos: int, hits_by_type: Dict[TargetType, List[int]], target_type: TargetType) -> Tuple[int, int]:
         """Calculate the start and end positions of a target window.
         
         Args:
             target_pos: The center position of the target window
+            hits_by_type: Dictionary mapping target types to their hit positions
+            target_type: The target type to get window boundaries for
             
         Returns:
             Tuple of (window_start, window_end) positions, properly wrapped around the LED strip
         """
-        window_start = (target_pos - self.target_window_size) % self.number_of_leds
-        window_end = (target_pos + self.target_window_size) % self.number_of_leds
+        # Base window size is target_window_size
+        window_size = self.target_window_size
+        
+        # Reduce window size by 1 LED for each hit, with a minimum size of 2
+        num_hits = len(hits_by_type[target_type])
+        if num_hits > 0:
+            window_size = max(MIN_WINDOW_SIZE, window_size - num_hits)
+        window_start = (target_pos - window_size) % self.number_of_leds
+        window_end = (target_pos + window_size) % self.number_of_leds
         return window_start, window_end

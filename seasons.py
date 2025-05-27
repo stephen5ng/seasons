@@ -69,12 +69,6 @@ else:
     # Use default values when the script is imported
     args = default_args
 
-# Set number_of_leds from command line arguments
-number_of_leds = args.leds
-
-# Calculate target_window_size based on the number of LEDs
-target_window_size = int(number_of_leds * TARGET_WINDOW_PERCENT)
-
 # Time conversion constants
 MS_PER_SEC = 1000.0  # Convert seconds to milliseconds
 
@@ -87,11 +81,13 @@ class GameState:
     """Manages game state and timing."""
     
     def __init__(self) -> None:
+        # Store LED configuration
+        self.number_of_leds = args.leds
+        
         self.next_loop: int = 1
         self.loop_count: int = 0
         self.button_handler = ButtonHandler(
-            number_of_leds=number_of_leds,
-            target_window_size=target_window_size,
+            number_of_leds=self.number_of_leds,
             auto_score=args.auto_score
         )
         self.beat_start_time_ms: int = 0
@@ -104,7 +100,7 @@ class GameState:
         # Component managers
         self.audio_manager = AudioManager("music/Rise Up 4.mp3")
         self.start_ticks_ms: int = pygame.time.get_ticks()
-        self.wled_manager = WLEDManager(not args.disable_wled, QUAD_HOSTNAME, self.http_session, number_of_leds=number_of_leds//2)
+        self.wled_manager = WLEDManager(not args.disable_wled, QUAD_HOSTNAME, self.http_session, number_of_leds=self.number_of_leds//2)
         
         # Trail state manager (replaces individual trail state variables)
         self.trail_state_manager = TrailStateManager()
@@ -187,7 +183,7 @@ class GameState:
             # Light up LEDs within the target window
             target_color = TARGET_COLORS[target_hit]
             target_pos = self.button_handler.target_positions[target_hit]
-            window_start, window_end = self.button_handler.get_window_boundaries(target_pos)
+            window_start, window_end = self.button_handler.get_window_boundaries(target_pos, hit_trail.hits_by_type, target_hit)
             
             if window_start > window_end:
                 window_end += self.button_handler.number_of_leds
@@ -206,25 +202,14 @@ class GameState:
         await asyncio.sleep(3)
         print("Cleanup done, Exiting game")
 
-def get_target_ring_position(i: int, radius: int) -> Tuple[int, int]:
+def get_target_ring_position(i: int, radius: int, number_of_leds: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in a circular pattern at given radius, starting at 12 o'clock."""
     x, y = LEDPosition.get_ring_position(i, radius, number_of_leds)
     return (CIRCLE_CENTER_X + x, CIRCLE_CENTER_Y + y)
 
-def get_hit_trail_position(i: int) -> Tuple[int, int]:
+def get_hit_trail_position(i: int, number_of_leds: int) -> Tuple[int, int]:
     """Convert LED index to x,y coordinates in the hit trail ring, starting at 12 o'clock."""
-    return get_target_ring_position(i, HIT_TRAIL_RADIUS)
-
-def get_effective_window_size(phrase: int) -> int:
-    """Calculate the effective window size based on the current phrase.
-    
-    Args:
-        phrase: Current phrase number (0-based)
-        
-    Returns:
-        The window size to use for scoring
-    """
-    return target_window_size // 2 if phrase > 8 else target_window_size
+    return get_target_ring_position(i, HIT_TRAIL_RADIUS, number_of_leds)
 
 async def run_game() -> None:
     """Main game loop handling display, input, and game logic."""
@@ -236,11 +221,14 @@ async def run_game() -> None:
     # Initialize display and clock
     pygame.init()
     clock: Clock = Clock()
+    
+    game_state: GameState = GameState()
+    
     display = DisplayManager(
         screen_width=SCREEN_WIDTH,
         screen_height=SCREEN_HEIGHT,
         scaling_factor=SCALING_FACTOR,
-        led_count=number_of_leds,
+        led_count=game_state.number_of_leds,
         led_pin=LED_PIN,
         led_freq_hz=LED_FREQ_HZ,
         led_dma=LED_DMA,
@@ -250,10 +238,9 @@ async def run_game() -> None:
         use_sacn=not args.disable_sacn
     )
     
-    game_state: GameState = GameState()
     hit_trail = SimpleHitTrail(
         display,
-        number_of_leds
+        game_state.number_of_leds
     )
     
     logger.info("Showing main trail")
@@ -318,8 +305,6 @@ async def run_game() -> None:
                 print(f"Updating WLED {stable_score}, hit_trail.get_score(): {hit_trail.get_score()}")
                 await game_state.wled_manager.update_wled(int(stable_score*2))
 
-                game_state.button_handler.set_window_size(get_effective_window_size(stable_score))
-
                 if stable_score >= ending_phrase:
                     pygame.mixer.music.stop()
                     display.cleanup()  # Clean up display before exiting
@@ -337,7 +322,7 @@ async def run_game() -> None:
                 if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
                     game_state.fifth_line_target.maybe_start_fifth_line(current_phrase * 2 + (1 if beat_in_phrase == 4 else 0))
 
-            led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, number_of_leds)
+            led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, game_state.number_of_leds)
             
             if not game_state.button_handler.is_in_valid_window(led_position):
                 missed_target = game_state.button_handler.missed_target()
@@ -362,7 +347,7 @@ async def run_game() -> None:
             
             # Draw LEDs at the start and end of each target window
             for target_type, target_pos in game_state.button_handler.target_positions.items():
-                window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos)
+                window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos, hit_trail.hits_by_type, target_type)
                 display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], 0.5, 0)
                 display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], 0.5, 0)
 

@@ -197,7 +197,7 @@ class FifthLineTarget:
         if self._target_beat is None:
             return        
         
-        print(f"target delta: {self._target_beat - beat_float}")
+        # print(f"target delta: {self._target_beat - beat_float}")
         progress = 1.0 - (self._target_beat - beat_float) / (FIFTH_LINE_TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
         self._update_state(progress)
         if self.state == TargetState.NO_TARGET:  # Animation complete
