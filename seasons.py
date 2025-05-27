@@ -114,8 +114,10 @@ class GameState:
 
         # Initialize GPIO button if on Raspberry Pi
         self.fifth_line_button: Optional[Button] = None
+        self.fifth_line_pressed: bool = False
         if IS_RASPBERRY_PI:
             self.fifth_line_button = Button(22)  # GPIO 22 for fifth line hit
+            self.fifth_line_button.when_pressed = lambda: setattr(self, 'fifth_line_pressed', True)
 
     async def update_timing(self, current_time_ms: int) -> Tuple[int, float]:
         """Calculate current timing values."""
@@ -278,8 +280,9 @@ async def run_game() -> None:
             
             # Check if space bar or GPIO button was pressed when fifth line was in valid window
             fifth_line_pressed = game_state.fifth_line_target.state == TargetState.IN_WINDOW and args.auto_score
-            if game_state.fifth_line_button and game_state.fifth_line_button.is_pressed:
+            if game_state.fifth_line_pressed:
                 fifth_line_pressed = True
+                game_state.fifth_line_pressed = False  # Reset the flag after handling
             for key, keydown in get_key():
                 if key == " " and keydown:
                     fifth_line_pressed = True
