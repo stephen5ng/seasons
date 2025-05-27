@@ -164,7 +164,7 @@ class GameState:
                     int(TARGET_COLORS[target_miss].g * initial_intensity),
                     int(TARGET_COLORS[target_miss].b * initial_intensity)
                 )
-                display.set_target_trail_pixel(pos, faded_color, 1.0, 0)
+                display.set_target_trail_pixel(pos, faded_color, 0.5, 0)
 
     def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail: 'SimpleHitTrail', beat_float: float, display: DisplayManager) -> None:
         """Handle successful hits and update score.
@@ -310,6 +310,7 @@ async def run_game() -> None:
                     current_phrase = int(stable_score)
                     print(f"current_phrase: {current_phrase}")
                     if current_phrase < AUTOPILOT_PHRASE:
+                        # untether the music from the score
                         game_state.handle_music_loop(int(stable_score), current_time_ms)
  
                 # Start fifth line animation on measure boundaries
@@ -332,7 +333,7 @@ async def run_game() -> None:
             
             # Update stable_score only when outside a scoring window
             if not game_state.button_handler.is_in_valid_window(led_position):
-                if stable_score >= ending_phrase:
+                if not pygame.mixer.music.get_busy():
                     hit_trail.reset()
                 stable_score = hit_trail.get_score()
                 
