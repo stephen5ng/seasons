@@ -13,6 +13,7 @@ from gpiozero import Button
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
 MIN_WINDOW_SIZE = 8
+
 class ButtonConfig(NamedTuple):
     """Configuration for a GPIO button.
     
@@ -86,6 +87,7 @@ class ButtonHandler:
         # Initialize GPIO buttons
         self.simulated_keys: Set[int] = set()
         self.gpio_buttons: Dict[int, Button] = {}
+        self.pressed_buttons: Set[int] = set()
         
         # Only initialize GPIO buttons on Raspberry Pi
         if IS_RASPBERRY_PI:
@@ -93,6 +95,8 @@ class ButtonHandler:
             for target_type, config in self.BUTTON_CONFIGS.items():
                 button = Button(config.pin)
                 self.gpio_buttons[config.key] = button
+                # Add when_pressed callback
+                button.when_pressed = lambda key=config.key: self.pressed_buttons.add(key)
 
     def is_in_valid_window(self, led_position: int) -> bool:
         """Check if the current LED position is in a valid window for scoring.
@@ -128,6 +132,8 @@ class ButtonHandler:
             self.round_active = True  # Start a new scoring round
         elif not self.is_in_valid_window(led_position):
             self.round_active = False  # End the current scoring round
+            # Clear pressed buttons when outside scoring window
+            self.pressed_buttons.clear()
     
     def get_target_type(self, position: int) -> Optional[TargetType]:
         """Determine which target window the position is in, if any.
@@ -163,20 +169,17 @@ class ButtonHandler:
         hits: List[TargetType] = []
         misses: List[TargetType] = []
         
+        # Get pressed keys from pygame
         all_pressed_keys = pygame.key.get_pressed()
         keys_pressed = []
         for key in [config.key for config in self.BUTTON_CONFIGS.values()]:
             if all_pressed_keys[key]:
                 keys_pressed.append(key)
 
-        for k, v in self.gpio_buttons.items():
-            if v.is_pressed:
-                keys_pressed.append(k)
-                # print(f"{v.is_pressed}, {k}")
+        # Add GPIO button presses from our pressed_buttons set
+        keys_pressed.extend(self.pressed_buttons)
 
-        # if self.simulated_keys:
-        #     print(f"gpio: {self.simulated_keys}")        
-
+        # Add any simulated keys
         keys_pressed.extend(self.simulated_keys)
             
         target_keys = ButtonHandler.get_keys_for_target(target_type) if target_type else []
@@ -192,9 +195,7 @@ class ButtonHandler:
                     self.penalty_applied = False
                     hits.append(target_type)
             else:
-                # print(f"key_target: {key_target}")
                 if key_target is not None:
-                    # print(f"miss: {key_target}")
                     misses.append(key_target)
 
         return hits, misses
