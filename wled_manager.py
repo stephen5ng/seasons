@@ -24,7 +24,7 @@ WLED_BASE = {
             "on": True,
             "bri": 255,
             "set": 0,
-            "n": "my_name_fun0",
+            "n": "segment0",
             "ix": 128,
             "sel": True,
             "si": 0,
@@ -35,7 +35,7 @@ WLED_BASE = {
             "on": True,
             "bri": 255,
             "set": 0,
-            "n": "my_name_fun1",
+            "n": "segment1",
             "ix": 128,
             "sel": True,
             "o3": False,
@@ -47,7 +47,19 @@ WLED_BASE = {
             "on": True,
             "bri": 255,
             "set": 0,
-            "n": "my_name_fun2",
+            "n": "segment2",
+            "ix": 128,
+            "sel": True,
+            "o3": False,
+            "si": 0,
+        },
+        {
+            "id": 3,
+            "grp": 1,
+            "on": True,
+            "bri": 255,
+            "set": 0,
+            "n": "segment3",
             "ix": 128,
             "sel": True,
             "o3": False,
@@ -166,7 +178,7 @@ class WLEDManager:
         seg_list = [{**base_seg,
                      "start": i * NUMBER_OF_VICTORY_LEDS,
                      "stop": i*NUMBER_OF_VICTORY_LEDS + min(NUMBER_OF_VICTORY_LEDS, number_of_leds),
-                     "n": f"my_name_{i}",
+                     "n": f"segment_{i}",
                      "id": i
                      } for i in range(n)]
 
@@ -201,7 +213,7 @@ class WLEDManager:
             number_of_leds = number_of_leds * 4
         elif current_measure > 16:
             number_of_leds = number_of_leds * 2
-        wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, json_base, 3, number_of_leds)
+        wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, json_base, 4, number_of_leds)
         if wled_command != self.last_wled_command:
             # logger.debug(f"Sending WLED command: {wled_command} {number_of_leds}")
             self.last_wled_command = wled_command
