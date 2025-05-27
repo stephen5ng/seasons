@@ -25,7 +25,14 @@ class SimpleHitTrail:
         self.led_count = led_count
         self.max_hits = led_count // LEDS_PER_HIT
         self.max_hits_per_target = self.max_hits // 4
+        self._initialize_state()
 
+    def _initialize_state(self) -> None:
+        """Initialize or reset the hit trail state variables.
+        
+        This internal method sets up the hit tracking variables and clears
+        the LED display. It is used by both __init__ and reset.
+        """
         self.number_of_hits_by_type: Dict[TargetType, int] = {
             target_type: 0 for target_type in TargetType
         }
@@ -33,6 +40,18 @@ class SimpleHitTrail:
             target_type: [] for target_type in TargetType
         }
         self.total_hits: int = 0
+        
+        # Clear all LEDs in the hit trail
+        for i in range(self.led_count):
+            self.display.set_hit_trail_pixel(i, Color(0, 0, 0), -1)
+
+    def reset(self) -> None:
+        """Reset the hit trail to its initial state.
+        
+        This method reinitializes all hit tracking variables while preserving
+        the display and LED configuration.
+        """
+        self._initialize_state()
 
     def get_score(self) -> float:
         """Calculate current score based on total hits.
@@ -42,27 +61,15 @@ class SimpleHitTrail:
         """
         return self.total_hits / 4.0
 
-    def clear_some_hits(self) -> None:
-        """Clear half of the hits from the hit trail, cycling through target types."""
-        print(f"clearing half of hits, total_hits: {self.total_hits}")
-        
-        # Calculate how many hits to clear
-        hits_to_clear = self.total_hits // 2
-        hits_cleared = 0
-        
-        while hits_cleared < hits_to_clear:
-            for target_type in TargetType:
-                if self.hits_by_type[target_type]:
-                    self.remove_hit(target_type)
-                    hits_cleared += 1
-                    if hits_cleared >= hits_to_clear:
-                        return
-
     def add_hit(self, target_type: TargetType) -> None:
         print(f"adding hit for target_type: {target_type}")
         self.total_hits += 1
+        targets_tried = 0
         while self.number_of_hits_by_type[target_type] >= self.max_hits_per_target:
             target_type = target_type.next()
+            targets_tried += 1
+            if targets_tried > 4:
+                return
 
         target_position = target_type.value * self.max_hits_per_target + self.number_of_hits_by_type[target_type]
         self.number_of_hits_by_type[target_type] += 1

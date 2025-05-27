@@ -305,12 +305,6 @@ async def run_game() -> None:
                 print(f"Updating WLED {stable_score}, hit_trail.get_score(): {hit_trail.get_score()}")
                 await game_state.wled_manager.update_wled(int(stable_score*2))
 
-                if stable_score >= ending_phrase:
-                    pygame.mixer.music.stop()
-                    display.cleanup()  # Clean up display before exiting
-                    await game_state.exit_game()
-                    return
-    
                 # Sync music on phrase boundaries
                 if beat_in_phrase == 0:
                     current_phrase = int(stable_score)
@@ -338,8 +332,10 @@ async def run_game() -> None:
             
             # Update stable_score only when outside a scoring window
             if not game_state.button_handler.is_in_valid_window(led_position):
+                if stable_score >= ending_phrase:
+                    hit_trail.reset()
                 stable_score = hit_trail.get_score()
-            
+                
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
