@@ -263,7 +263,7 @@ async def run_game() -> None:
         }
 
         last_beat = -1
-        ending_phrase = 1 if args.one_loop else 19
+        ending_phrase = 1 if args.one_loop else ENDING_PHRASE
         stable_score = 0
         current_phrase = 0
         missed_targets = 0
@@ -309,7 +309,7 @@ async def run_game() -> None:
                 if beat_in_phrase == 0:
                     current_phrase = int(stable_score)
                     print(f"current_phrase: {current_phrase}")
-                    if current_phrase < 17:
+                    if current_phrase < AUTOPILOT_PHRASE:
                         game_state.handle_music_loop(int(stable_score), current_time_ms)
  
                 # Start fifth line animation on measure boundaries
@@ -347,7 +347,7 @@ async def run_game() -> None:
                 display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], 0.5, 0)
                 display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], 0.5, 0)
 
-            display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.8, 0)
+            display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.3, 0)
             display.draw_score_lines(hit_trail.get_score())
                         
             display.update()
