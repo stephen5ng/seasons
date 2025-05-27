@@ -94,7 +94,10 @@ class SacnDisplay:
             trail_start_offset: Offset for trail position
             _: Unused parameter (pygame_radius)
         """
-        pos = (pos + DISPLAY_LED_OFFSET) % self.leds_per_strip
+        # Use offset on first two strips but not on line 5.
+        if trail_start_offset < self.leds_per_strip*2:
+            pos = (pos + DISPLAY_LED_OFFSET) % self.leds_per_strip
+
         pos += trail_start_offset
 
         # Calculate DMX address (3 channels per LED)
