@@ -119,6 +119,38 @@ class GameState:
         if IS_RASPBERRY_PI:
             self.fifth_line_button = Button(22)  # GPIO 22 for fifth line hit
             self.fifth_line_button.when_pressed = lambda: setattr(self, 'fifth_line_pressed', True)
+            
+        # Music and timing state
+        self.music_started: bool = False
+        self.last_hit_time: int = 0
+        
+        # Display objects will be set after DisplayManager is created
+        self.display: Optional[DisplayManager] = None
+        self.default_display: Optional[DefaultTrailDisplay] = None
+        self.rainbow_display: Optional[RainbowTrailDisplay] = None
+        self.hit_trail: Optional[SimpleHitTrail] = None
+
+    def initialize_displays(self, display: DisplayManager) -> None:
+        """Initialize display objects after DisplayManager is created.
+        
+        Args:
+            display: The display manager instance
+        """
+        self.display = display
+        self.default_display = DefaultTrailDisplay(display, self.number_of_leds)
+        self.rainbow_display = RainbowTrailDisplay(display, self.number_of_leds)
+        self.hit_trail = SimpleHitTrail(display, self.number_of_leds, trail_display=self.default_display)
+
+    def stop_music_and_reset(self) -> None:
+        """Stop music and reset game state."""
+        if self.hit_trail is None or self.default_display is None:
+            raise RuntimeError("Display objects not initialized")
+            
+        pygame.mixer.music.stop()
+        self.hit_trail.trail_display = self.default_display
+        self.hit_trail.reset()
+        self.music_started = False
+        self.last_hit_time = 0
 
     async def update_timing(self, current_time_ms: int) -> Tuple[int, float]:
         """Calculate current timing values."""
@@ -241,18 +273,13 @@ async def run_game() -> None:
         use_sacn=not args.disable_sacn
     )
     
-    # Create hit trail and displays
-    default_display = DefaultTrailDisplay(display, game_state.number_of_leds)
-    rainbow_display = RainbowTrailDisplay(display, game_state.number_of_leds)
-    hit_trail = SimpleHitTrail(display, game_state.number_of_leds, trail_display=default_display)
+    # Initialize display objects in game state
+    game_state.initialize_displays(display)
 
     logger.info("Showing main trail")
-    logger.info(f"Created hit trail with {hit_trail.total_hits} total hits")
+    logger.info(f"Created hit trail with {game_state.hit_trail.total_hits} total hits")
     
     try:
-        # Wait for first hit before starting music
-        music_started = False
-        fifth_line_requests_music_start = False
         # Handle key press mapping
         key_mapping = {
             "r": TargetType.RED,
@@ -265,7 +292,6 @@ async def run_game() -> None:
         last_beat = -1
         stable_score = 0
         current_phrase = 0
-        missed_targets = 0
         while True:
             display.clear()
             current_time_ms: int = pygame.time.get_ticks()
@@ -285,10 +311,6 @@ async def run_game() -> None:
                 elif key == "quit":
                     display.cleanup()  # Clean up display before exiting
                     return
-                        
-            # Set music start request if fifth line pressed before music starts
-            if not music_started and (fifth_line_pressed or args.auto_score):
-                fifth_line_requests_music_start = True
 
             valid_targets = [t for t in game_state.fifth_line_targets if t.is_in_valid_window()]
             if valid_targets and (fifth_line_pressed or args.auto_score):
@@ -303,7 +325,7 @@ async def run_game() -> None:
                 # Check for penalties
                 if current_phrase < AUTOPILOT_PHRASE and target.check_penalties():
                     # Remove half of all hits as penalty for missing fifth line target
-                    hit_trail.remove_half_hits()
+                    game_state.hit_trail.remove_half_hits()
                     print("----------------Score penalty: Missed fifth line target")
                 if target.state == TargetState.NO_TARGET:
                     game_state.fifth_line_targets.remove(target)
@@ -315,21 +337,23 @@ async def run_game() -> None:
                 # print(f"Updating WLED {stable_score}, hit_trail.get_score(): {hit_trail.get_score()}")
                 await game_state.wled_manager.update_wled(int(stable_score*2))
 
-                # Sync music on phrase boundaries
+                print(f"music_started: {game_state.music_started}, args.auto_score: {args.auto_score}")
                 if beat_in_phrase == 0:
-                    if not music_started:
-                        if fifth_line_requests_music_start or args.auto_score:
-                            game_state.audio_manager.play_music(start_pos_s=0.0)
-                            game_state.start_ticks_ms = current_time_ms
-                            music_started = True
-                            print("Starting music on phrase boundary")
-                    
-                    current_phrase = int(stable_score)
-                    print(f"current_phrase: {current_phrase}")
-                    if current_phrase < AUTOPILOT_PHRASE:
-                        game_state.handle_music_loop(int(stable_score), current_time_ms)
-                    else:
-                        hit_trail.trail_display = rainbow_display
+                    if game_state.music_started:
+                        if current_time_ms - game_state.last_hit_time > 5000:
+                            game_state.stop_music_and_reset()
+                        else:
+                            current_phrase = int(stable_score)
+                            print(f"current_phrase: {current_phrase}")
+                            if current_phrase < AUTOPILOT_PHRASE:
+                                game_state.handle_music_loop(int(stable_score), current_time_ms)
+                            else:
+                                game_state.hit_trail.trail_display = game_state.rainbow_display
+                    elif game_state.last_hit_time > 0 or args.auto_score:
+                        game_state.audio_manager.play_music(start_pos_s=0.0)
+                        game_state.start_ticks_ms = current_time_ms
+                        game_state.music_started = True
+                        print("Starting music on phrase boundary")
 
                 # Start fifth line animation on measure boundaries
                 if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
@@ -339,28 +363,22 @@ async def run_game() -> None:
 
             led_position: int = LEDPosition.calculate_position(beat_in_phrase, fractional_beat, game_state.number_of_leds)
             
-            if not game_state.button_handler.is_in_valid_window(led_position):
-                missed_target = game_state.button_handler.missed_target()
-                if missed_target:
-                    missed_targets += 1
-            
             game_state.button_handler.reset_flags(led_position)
             
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
-            if music_started:
-                game_state.handle_hits(hits, led_position, hit_trail, beat_float, display)
+            if game_state.music_started:
+                game_state.handle_hits(hits, led_position, game_state.hit_trail, beat_float, display)
             game_state.handle_misses(misses, 8, display)
+            
+            if hits or misses or fifth_line_pressed:
+                game_state.last_hit_time = current_time_ms
             
             # Update stable_score only when outside a scoring window
             if not game_state.button_handler.is_in_valid_window(led_position):
-                if music_started and not pygame.mixer.music.get_busy():
-                    hit_trail.trail_display = default_display
-                    hit_trail.reset()
-                    # Reset music start request when music ends
-                    fifth_line_requests_music_start = False
-                    music_started = False
-                stable_score = hit_trail.get_score()
+                if game_state.music_started and not pygame.mixer.music.get_busy():
+                    game_state.stop_music_and_reset()
+                stable_score = game_state.hit_trail.get_score()
                 
             if led_position != game_state.current_led_position:
                 game_state.current_led_position = led_position
@@ -368,16 +386,16 @@ async def run_game() -> None:
                 game_state.trail_state_manager.update_position(led_position, current_time_ms / MS_PER_SEC)
             
             # Update display state
-            hit_trail.trail_display.update()
+            game_state.hit_trail.trail_display.update()
             
             # Draw LEDs at the start and end of each target window
             for target_type, target_pos in game_state.button_handler.target_positions.items():
-                window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos, hit_trail.hits_by_type, target_type)
+                window_start, window_end = game_state.button_handler.get_window_boundaries(target_pos, game_state.hit_trail.hits_by_type, target_type)
                 display.set_target_trail_pixel(window_start, TARGET_COLORS[target_type], 0.5, 0)
                 display.set_target_trail_pixel(window_end, TARGET_COLORS[target_type], 0.5, 0)
 
             display.set_target_trail_pixel(led_position, Color(255, 255, 255), 0.3, 0)
-            display.draw_score_lines(hit_trail.get_score())
+            display.draw_score_lines(game_state.hit_trail.get_score())
                         
             display.update()
             await clock.tick(30)
