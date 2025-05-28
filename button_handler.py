@@ -12,7 +12,7 @@ from gpiozero import Button
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
-MIN_WINDOW_SIZE = 8
+MIN_WINDOW_SIZE = 4
 
 class ButtonConfig(NamedTuple):
     """Configuration for a GPIO button.
@@ -246,10 +246,9 @@ class ButtonHandler:
         # Base window size is target_window_size
         window_size = self.target_window_size
         
-        # Reduce window size by 1 LED for each hit, with a minimum size of 2
         num_hits = len(hits_by_type[target_type])
         if num_hits > 0:
-            window_size = max(MIN_WINDOW_SIZE, window_size - num_hits)
+            window_size = max(MIN_WINDOW_SIZE, window_size - num_hits*2)
         window_start = (target_pos - window_size) % self.number_of_leds
         window_end = (target_pos + window_size) % self.number_of_leds
         return window_start, window_end
