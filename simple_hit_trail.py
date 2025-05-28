@@ -94,3 +94,19 @@ class SimpleHitTrail:
         for x in range(LEDS_PER_HIT):
             self.display.set_hit_trail_pixel(
                 target_position*LEDS_PER_HIT + x, color, -1)
+
+    def remove_half_hits(self) -> None:
+        """Remove half of the hits for each target type.
+        
+        This is used as a penalty for missing fifth line targets, providing a less
+        drastic penalty than completely resetting the score.
+        """
+        for target_type in TargetType:
+            hits = self.hits_by_type[target_type]
+            hits_to_remove = len(hits) // 2  # Integer division to remove half
+            
+            # Remove the most recent hits
+            for _ in range(hits_to_remove):
+                self.remove_hit(target_type)
+        
+        print(f"Removed half of hits, new total: {self.total_hits}")

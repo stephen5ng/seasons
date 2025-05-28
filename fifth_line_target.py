@@ -74,6 +74,7 @@ class FifthLineTarget:
         self._target_beat = target_measure * BEATS_PER_MEASURE
         self.target_hit_registered: bool = False
         self.state: TargetState = TargetState.PRE_WINDOW
+        self.penalty_applied: bool = False
         self._last_debug_str: str = ""  # Track last debug string
         print(f"Starting fifth line animation for measure {target_measure}")
     
@@ -85,9 +86,7 @@ class FifthLineTarget:
         """
         old_state = self.state
         
-        if self._target_beat is None:
-            self.state = TargetState.NO_TARGET
-        elif percent_complete < 1.0 - WINDOW_SIZE_PERCENT_BEFORE:
+        if percent_complete < 1.0 - WINDOW_SIZE_PERCENT_BEFORE:
             self.state = TargetState.PRE_WINDOW
         elif percent_complete < 1.0 + WINDOW_SIZE_PERCENT_AFTER:
             self.state = TargetState.IN_WINDOW
@@ -100,19 +99,14 @@ class FifthLineTarget:
             print(f"State transition: {old_state.name} -> {self.state.name}")
     
     def check_penalties(self) -> bool:
-        """Check if a penalty should be applied and handle state transitions.
-        
-        If in POST_WINDOW state, transitions to NO_TARGET regardless of hit status.
-        This ensures we only process each target once.
+        """Check if a penalty should be applied.
         
         Returns:
             True if a penalty should be applied (missed hit in valid window)
         """
-        if self.state == TargetState.POST_WINDOW:
+        if self.state == TargetState.POST_WINDOW and not self.penalty_applied:
             should_penalize = not self.target_hit_registered
-            self.state = TargetState.NO_TARGET
-            self._target_beat = None
-            self.target_hit_registered = False
+            self.penalty_applied = True
             return should_penalize
         return False
     
@@ -205,16 +199,13 @@ class FifthLineTarget:
             display: The display manager instance to draw on.
             beat_float: The current beat position as float.
         """
-        if self._target_beat is None:
+        if self.state == TargetState.NO_TARGET:
             return        
         
-        # print(f"target delta: {self._target_beat - beat_float}")
         progress = 1.0 - (self._target_beat - beat_float) / (FIFTH_LINE_TARGET_BUFFER_MEASURE*BEATS_PER_MEASURE)
         self._update_state(progress)
         if self.state == TargetState.NO_TARGET:  # Animation complete
             print(f"-------------Animation complete for target_beat: {self._target_beat}")
-            self._target_beat = None
-            self.target_hit_registered = False
         elif progress >= 0:  # Animation active
             self.draw_fifth_line(display, progress)
     

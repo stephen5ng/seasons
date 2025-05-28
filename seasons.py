@@ -304,6 +304,11 @@ async def run_game() -> None:
             # Update all fifth line targets and remove completed ones
             for target in game_state.fifth_line_targets[:]:  # Create copy of list for safe removal
                 target.update(display, beat_float)
+                # Check for penalties
+                if target.check_penalties():
+                    # Remove half of all hits as penalty for missing fifth line target
+                    hit_trail.remove_half_hits()
+                    print("Score penalty: Missed fifth line target")
                 if target.state == TargetState.NO_TARGET:
                     game_state.fifth_line_targets.remove(target)
 
