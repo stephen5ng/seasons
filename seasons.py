@@ -288,20 +288,16 @@ async def run_game() -> None:
                     return
                         
             # Set music start request if fifth line pressed before music starts
-            if not music_started and fifth_line_pressed:
+            if not music_started and (fifth_line_pressed or args.auto_score):
                 fifth_line_requests_music_start = True
                 print("Fifth line requesting music start")
 
-            if fifth_line_pressed:
-                # Count how many targets are in valid window
-                valid_targets = [t for t in game_state.fifth_line_targets if t.is_in_valid_window()]
-                if valid_targets:
-                    # Register hit for all targets in valid window
-                    for target in valid_targets:
-                        target.register_hit()
-                else:
-                    # If no valid hit, show miss effect
-                    FifthLineTarget.handle_fifth_line_miss(display)
+            valid_targets = [t for t in game_state.fifth_line_targets if t.is_in_valid_window()]
+            if valid_targets and (fifth_line_pressed or args.auto_score):
+                for target in valid_targets:
+                    target.register_hit()
+            elif fifth_line_pressed:
+                FifthLineTarget.handle_fifth_line_miss(display)
 
             # Update all fifth line targets and remove completed ones
             for target in game_state.fifth_line_targets[:]:  # Create copy of list for safe removal
