@@ -201,20 +201,16 @@ class GameState:
                 )
                 display.set_target_trail_pixel(pos, faded_color, 0.5, 0)
 
-    def handle_hits(self, hits: List[TargetType], led_position: int, hit_trail: 'SimpleHitTrail', beat_float: float, display: DisplayManager) -> None:
+    def handle_hits(self, hits: List[TargetType], hit_trail: 'SimpleHitTrail', display: DisplayManager, add_hit: bool = True) -> None:
         """Handle successful hits and update score.
         
         Args:
             hits: List of target types that were hit
-            led_position: Current LED position
             hit_trail: Hit trail instance
-            beat_float: Current beat position as float
             display: Display manager instance to draw on
+            add_hit: Whether to add the hit to the hit trail
         """
         for target_hit in hits:
-            if led_position > self.button_handler.number_of_leds / 2:
-                led_position -= self.button_handler.number_of_leds
-            
             # Light up LEDs within the target window
             target_color = TARGET_COLORS[target_hit]
             target_pos = self.button_handler.target_positions[target_hit]
@@ -226,7 +222,8 @@ class GameState:
             for i in range(window_start, window_end + 1):
                 display.set_target_trail_pixel(i % self.button_handler.number_of_leds, target_color, 1.0, 1)
     
-            hit_trail.add_hit(target_hit)
+            if add_hit:
+                hit_trail.add_hit(target_hit)
 
     async def exit_game(self) -> None:
         """Exit the game gracefully.
@@ -367,8 +364,7 @@ async def run_game() -> None:
             
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
-            if game_state.music_started:
-                game_state.handle_hits(hits, led_position, game_state.hit_trail, beat_float, display)
+            game_state.handle_hits(hits, game_state.hit_trail, display, game_state.music_started)
             game_state.handle_misses(misses, 8, display)
             
             if hits or misses or fifth_line_pressed:
