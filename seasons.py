@@ -250,12 +250,10 @@ async def run_game() -> None:
     logger.info(f"Created hit trail with {hit_trail.total_hits} total hits")
     
     try:
-        game_state.audio_manager.play_music(start_pos_s=0.0)
+        # Wait for first hit before starting music
+        music_started = False
+        fifth_line_requests_music_start = False
         
-        # Variables for tracking if we've completed one full loop in debug mode
-        previous_led_position = -1
-        was_in_valid_window = False  # Track previous fifth line valid window state
-
         # Handle key press mapping
         key_mapping = {
             "r": TargetType.RED,
@@ -266,7 +264,6 @@ async def run_game() -> None:
         }
 
         last_beat = -1
-        ending_phrase = 1 if args.one_loop else ENDING_PHRASE
         stable_score = 0
         current_phrase = 0
         missed_targets = 0
@@ -279,18 +276,22 @@ async def run_game() -> None:
             beat_in_phrase, beat_float = await game_state.update_timing(current_time_ms)
             fractional_beat: float = beat_float % 1
             
-            # Check if space bar or GPIO button was pressed when fifth line was in valid window
-            fifth_line_pressed = args.auto_score and any(target.is_in_valid_window() for target in game_state.fifth_line_targets)
-            if game_state.fifth_line_pressed:
-                fifth_line_pressed = True
-                game_state.fifth_line_pressed = False  # Reset the flag after handling
+            # Check for fifth line press (space bar or GPIO button)
+            fifth_line_pressed = game_state.fifth_line_pressed
+            game_state.fifth_line_pressed = False  # Reset GPIO flag
+            
             for key, keydown in get_key():
                 if key == " " and keydown:
                     fifth_line_pressed = True
                 elif key == "quit":
                     display.cleanup()  # Clean up display before exiting
                     return
-                
+                        
+            # Set music start request if fifth line pressed before music starts
+            if not music_started and fifth_line_pressed:
+                fifth_line_requests_music_start = True
+                print("Fifth line requesting music start")
+
             if fifth_line_pressed:
                 # Count how many targets are in valid window
                 valid_targets = [t for t in game_state.fifth_line_targets if t.is_in_valid_window()]
@@ -322,6 +323,13 @@ async def run_game() -> None:
 
                 # Sync music on phrase boundaries
                 if beat_in_phrase == 0:
+                    if not music_started:
+                        if fifth_line_requests_music_start or args.auto_score:
+                            game_state.audio_manager.play_music(start_pos_s=0.0)
+                            game_state.start_ticks_ms = current_time_ms
+                            music_started = True
+                            print("Starting music on phrase boundary")
+                    
                     current_phrase = int(stable_score)
                     print(f"current_phrase: {current_phrase}")
                     if current_phrase < AUTOPILOT_PHRASE:
