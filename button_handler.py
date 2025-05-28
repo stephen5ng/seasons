@@ -12,7 +12,7 @@ from gpiozero import Button
 
 # Check if we're on Raspberry Pi
 IS_RASPBERRY_PI = platform.system() == "Linux" and os.uname().machine.startswith("aarch64")
-MIN_WINDOW_SIZE = 4
+MIN_WINDOW_SIZE = 2
 
 class ButtonConfig(NamedTuple):
     """Configuration for a GPIO button.

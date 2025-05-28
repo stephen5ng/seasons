@@ -341,7 +341,7 @@ async def run_game() -> None:
                             game_state.stop_music_and_reset()
                         else:
                             current_phrase = int(stable_score)
-                            print(f"current_phrase: {current_phrase}")
+                            print(f"--> current_phrase: {current_phrase}")
                             if current_phrase < AUTOPILOT_PHRASE:
                                 game_state.handle_music_loop(int(stable_score), current_time_ms)
                             else:
