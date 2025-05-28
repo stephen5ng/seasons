@@ -20,7 +20,8 @@ from wled_manager import WLEDManager
 from display_manager import DisplayManager
 from audio_manager import AudioManager
 from trail_state_manager import TrailStateManager
-from simple_hit_trail import SimpleHitTrail
+from simple_hit_trail import SimpleHitTrail, DefaultTrailDisplay
+from rainbow_trail_display import RainbowTrailDisplay
 from fifth_line_target import FifthLineTarget, TargetState
 
 from game_constants import *
@@ -240,11 +241,11 @@ async def run_game() -> None:
         use_sacn=not args.disable_sacn
     )
     
-    hit_trail = SimpleHitTrail(
-        display,
-        game_state.number_of_leds
-    )
-    
+    # Create hit trail and displays
+    default_display = DefaultTrailDisplay(display, game_state.number_of_leds)
+    rainbow_display = RainbowTrailDisplay(display, game_state.number_of_leds)
+    hit_trail = SimpleHitTrail(display, game_state.number_of_leds, trail_display=default_display)
+
     logger.info("Showing main trail")
     logger.info(f"Created hit trail with {hit_trail.total_hits} total hits")
     
@@ -324,9 +325,10 @@ async def run_game() -> None:
                     current_phrase = int(stable_score)
                     print(f"current_phrase: {current_phrase}")
                     if current_phrase < AUTOPILOT_PHRASE:
-                        # untether the music from the score
                         game_state.handle_music_loop(int(stable_score), current_time_ms)
- 
+                    else:
+                        hit_trail.trail_display = rainbow_display
+
                 # Start fifth line animation on measure boundaries
                 if beat_in_phrase in (0, 4):  # Check for both start and middle of phrase
                     measure = current_phrase * 2 + (1 if beat_in_phrase == 4 else 0)
@@ -350,6 +352,7 @@ async def run_game() -> None:
             # Update stable_score only when outside a scoring window
             if not game_state.button_handler.is_in_valid_window(led_position):
                 if not pygame.mixer.music.get_busy():
+                    hit_trail.trail_display = default_display
                     hit_trail.reset()
                 stable_score = hit_trail.get_score()
                 
@@ -357,6 +360,9 @@ async def run_game() -> None:
                 game_state.current_led_position = led_position
                 # Store the timestamp and base white color for the new position
                 game_state.trail_state_manager.update_position(led_position, current_time_ms / MS_PER_SEC)
+            
+            # Update display state
+            hit_trail.trail_display.update()
             
             # Draw LEDs at the start and end of each target window
             for target_type, target_pos in game_state.button_handler.target_positions.items():

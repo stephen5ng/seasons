@@ -9,7 +9,7 @@ NUMBER_OF_LEDS: int = 300
 NUMBER_OF_VICTORY_LEDS: int = 150
 
 ENDING_PHRASE = 21
-AUTOPILOT_PHRASE = 17
+AUTOPILOT_PHRASE = 15
 
 # Target constants - will be calculated at runtime based on actual LED count
 TARGET_WINDOW_PERCENT = 0.10
