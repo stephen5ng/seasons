@@ -199,7 +199,7 @@ class WLEDManager:
             return
         print(f"WLED current measure: {current_measure}")
         # print(f"WLED config: {self.wled_config[current_phrase*8]}")
-        wled_base_command = {"on": current_measure != -1, "seg": self.wled_config.get(current_measure, [])}
+        wled_base_command = {"on": current_measure >= 1, "seg": self.wled_config.get(current_measure, [])}
         # print(f"WLED base command: {wled_base_command}")
         if wled_base_command and wled_base_command != self.last_wled_base_command:
             self.last_wled_base_command = wled_base_command
@@ -212,6 +212,6 @@ class WLEDManager:
             number_of_leds = number_of_leds * 2
         wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, WLED_BASE, 4, number_of_leds)
         if wled_command != self.last_wled_command:
-            # logger.debug(f"Sending WLED command: {wled_command} {number_of_leds}")
+            logger.debug(f"Sending WLED command: {wled_command} {number_of_leds}")
             self.last_wled_command = wled_command
             await self.wled_controller.send_json(wled_command)

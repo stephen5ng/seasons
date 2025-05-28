@@ -313,7 +313,7 @@ async def run_game() -> None:
                 print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}")
                 
                 # print(f"Updating WLED {stable_score}, hit_trail.get_score(): {hit_trail.get_score()}")
-                await game_state.wled_manager.update_wled(-1 if not music_started else int(stable_score*2))
+                await game_state.wled_manager.update_wled(int(stable_score*2))
 
                 # Sync music on phrase boundaries
                 if beat_in_phrase == 0:
@@ -348,7 +348,8 @@ async def run_game() -> None:
             
             hits, misses = game_state.button_handler.handle_keypress(led_position)
             
-            game_state.handle_hits(hits, led_position, hit_trail, beat_float, display)
+            if music_started:
+                game_state.handle_hits(hits, led_position, hit_trail, beat_float, display)
             game_state.handle_misses(misses, 8, display)
             
             # Update stable_score only when outside a scoring window
