@@ -5,7 +5,7 @@ import socket
 import logging
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 
 from wled_controller import WLEDController
 from game_constants import NUMBER_OF_VICTORY_LEDS
@@ -14,9 +14,7 @@ from game_constants import NUMBER_OF_VICTORY_LEDS
 logger = logging.getLogger(__name__)
 
 WLED_BASE = {
-    "on": True,
     "bri": 255,
-    "on": True,
     "seg": [
         {
             "id": 0,
@@ -188,32 +186,31 @@ class WLEDManager:
             "seg": seg_list
         }        
 
-    async def update_wled(self, current_measure) -> None:
+    async def update_wled(self, current_measure: int) -> None:
         """Update WLED device based on current measure and score.
         
         Checks if the measure or score has changed significantly enough to warrant
         sending a new command to the WLED device.
         
         Args:
-            current_phrase: Current phrase number
+            current_measure: Current measure number. If -1, WLED will be turned off.
         """
         if not self.enabled:
             return
         print(f"WLED current measure: {current_measure}")
         # print(f"WLED config: {self.wled_config[current_phrase*8]}")
-        wled_base_command = {"on": True, "seg": self.wled_config.get(current_measure, [])}
+        wled_base_command = {"on": current_measure != -1, "seg": self.wled_config.get(current_measure, [])}
         # print(f"WLED base command: {wled_base_command}")
         if wled_base_command and wled_base_command != self.last_wled_base_command:
             self.last_wled_base_command = wled_base_command
             # print(f"WLED config keys: {self.wled_config.keys()}")
             
-        json_base = WLED_BASE
         number_of_leds = self.number_of_leds // 4
         if current_measure > 30:
             number_of_leds = number_of_leds * 4
         elif current_measure > 16:
             number_of_leds = number_of_leds * 2
-        wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, json_base, 4, number_of_leds)
+        wled_command = self.merge_dicts_with_seg(self.last_wled_base_command, WLED_BASE, 4, number_of_leds)
         if wled_command != self.last_wled_command:
             # logger.debug(f"Sending WLED command: {wled_command} {number_of_leds}")
             self.last_wled_command = wled_command

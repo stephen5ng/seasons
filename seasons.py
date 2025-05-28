@@ -253,7 +253,6 @@ async def run_game() -> None:
         # Wait for first hit before starting music
         music_started = False
         fifth_line_requests_music_start = False
-        
         # Handle key press mapping
         key_mapping = {
             "r": TargetType.RED,
@@ -290,7 +289,6 @@ async def run_game() -> None:
             # Set music start request if fifth line pressed before music starts
             if not music_started and (fifth_line_pressed or args.auto_score):
                 fifth_line_requests_music_start = True
-                print("Fifth line requesting music start")
 
             valid_targets = [t for t in game_state.fifth_line_targets if t.is_in_valid_window()]
             if valid_targets and (fifth_line_pressed or args.auto_score):
@@ -315,7 +313,7 @@ async def run_game() -> None:
                 print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}")
                 
                 # print(f"Updating WLED {stable_score}, hit_trail.get_score(): {hit_trail.get_score()}")
-                await game_state.wled_manager.update_wled(int(stable_score*2))
+                await game_state.wled_manager.update_wled(-1 if not music_started else int(stable_score*2))
 
                 # Sync music on phrase boundaries
                 if beat_in_phrase == 0:
@@ -355,7 +353,7 @@ async def run_game() -> None:
             
             # Update stable_score only when outside a scoring window
             if not game_state.button_handler.is_in_valid_window(led_position):
-                if not pygame.mixer.music.get_busy():
+                if music_started and not pygame.mixer.music.get_busy():
                     hit_trail.trail_display = default_display
                     hit_trail.reset()
                     # Reset music start request when music ends
