@@ -337,7 +337,7 @@ async def run_game() -> None:
                 print(f"music_started: {game_state.music_started}, args.auto_score: {args.auto_score}")
                 if beat_in_phrase == 0:
                     if game_state.music_started:
-                        if current_time_ms - game_state.last_hit_time > 5000:
+                        if current_time_ms - game_state.last_hit_time > 30000:
                             game_state.stop_music_and_reset()
                         else:
                             current_phrase = int(stable_score)
