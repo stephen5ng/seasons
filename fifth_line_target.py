@@ -104,10 +104,10 @@ class FifthLineTarget:
         Returns:
             True if a penalty should be applied (missed hit in valid window)
         """
-        if self.state == TargetState.POST_WINDOW and not self.penalty_applied:
-            should_penalize = not self.target_hit_registered
+        if self.state == TargetState.POST_WINDOW and not self.penalty_applied and not self.target_hit_registered:
+            print(f"Penalizing for missed fifth line target: {self._target_beat}")
             self.penalty_applied = True
-            return should_penalize
+            return True
         return False
     
     def get_fifth_line_color(self, percent_complete: float, was_hit: bool) -> Color:
@@ -216,6 +216,7 @@ class FifthLineTarget:
             bool: True if the hit was registered, False if not in valid window.
         """
         if self.state == TargetState.IN_WINDOW:
+            print(f"Registering hit for fifth line target: {self._target_beat}")
             self.target_hit_registered = True
             return True
         return False
@@ -230,4 +231,12 @@ class FifthLineTarget:
         if debug_str != self._last_debug_str:
             self._last_debug_str = debug_str
             print(debug_str)
-        return debug_str 
+        return debug_str
+
+    def is_in_valid_window(self) -> bool:
+        """Check if the target is currently in the valid hit window.
+        
+        Returns:
+            True if the target is in the valid window for hits
+        """
+        return self.state == TargetState.IN_WINDOW 

@@ -280,7 +280,7 @@ async def run_game() -> None:
             fractional_beat: float = beat_float % 1
             
             # Check if space bar or GPIO button was pressed when fifth line was in valid window
-            fifth_line_pressed = args.auto_score and any(target.state == TargetState.IN_WINDOW for target in game_state.fifth_line_targets)
+            fifth_line_pressed = args.auto_score and any(target.is_in_valid_window() for target in game_state.fifth_line_targets)
             if game_state.fifth_line_pressed:
                 fifth_line_pressed = True
                 game_state.fifth_line_pressed = False  # Reset the flag after handling
@@ -292,32 +292,33 @@ async def run_game() -> None:
                     return
                 
             if fifth_line_pressed:
-                # Try to register hit for any target in valid window
-                hit_registered = False
-                for target in game_state.fifth_line_targets:
-                    if target.register_hit():
-                        hit_registered = True
-                        break
-                if not hit_registered:
+                # Count how many targets are in valid window
+                valid_targets = [t for t in game_state.fifth_line_targets if t.is_in_valid_window()]
+                if valid_targets:
+                    # Register hit for all targets in valid window
+                    for target in valid_targets:
+                        target.register_hit()
+                else:
                     # If no valid hit, show miss effect
                     FifthLineTarget.handle_fifth_line_miss(display)
 
             # Update all fifth line targets and remove completed ones
-            for target in game_state.fifth_line_targets[:]:  # Create copy of list for safe removal
-                target.update(display, beat_float)
-                # Check for penalties
-                if target.check_penalties():
-                    # Remove half of all hits as penalty for missing fifth line target
-                    hit_trail.remove_half_hits()
-                    print("Score penalty: Missed fifth line target")
-                if target.state == TargetState.NO_TARGET:
-                    game_state.fifth_line_targets.remove(target)
+            if current_phrase < AUTOPILOT_PHRASE:
+                for target in game_state.fifth_line_targets[:]:  # Create copy of list for safe removal
+                    target.update(display, beat_float)
+                    # Check for penalties
+                    if target.check_penalties():
+                        # Remove half of all hits as penalty for missing fifth line target
+                        hit_trail.remove_half_hits()
+                        print("----------------Score penalty: Missed fifth line target")
+                    if target.state == TargetState.NO_TARGET:
+                        game_state.fifth_line_targets.remove(target)
 
             if last_beat != int(beat_float):
                 last_beat = int(beat_float)
                 print(f"beat_in_phrase: {beat_in_phrase}, beat_float: {beat_float}")
                 
-                print(f"Updating WLED {stable_score}, hit_trail.get_score(): {hit_trail.get_score()}")
+                # print(f"Updating WLED {stable_score}, hit_trail.get_score(): {hit_trail.get_score()}")
                 await game_state.wled_manager.update_wled(int(stable_score*2))
 
                 # Sync music on phrase boundaries
