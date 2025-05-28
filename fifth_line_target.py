@@ -11,6 +11,7 @@ from typing import Optional
 import pygame
 from pygame import Color
 import easing_functions
+import random
 
 from game_constants import (
     BEATS_PER_MEASURE,
@@ -22,6 +23,23 @@ from display_manager import DisplayManager
 WINDOW_SIZE_PERCENT_BEFORE = 0.10
 WINDOW_SIZE_PERCENT_AFTER = 0.20
 WINDOW_SIZE_LEDS_BEFORE = int(150*WINDOW_SIZE_PERCENT_BEFORE)
+
+# Sparkle effect constants
+SPARKLE_COLORS = [
+    Color(255, 255, 255),  # Warm white
+    Color(200, 150, 50),   # Ember
+    Color(255, 50, 50),    # Bright red
+    Color(255, 100, 100),  # Light red
+    Color(50, 50, 255),    # Bright blue
+    Color(100, 100, 255),  # Light blue
+    Color(255, 255, 50),   # Bright yellow
+    Color(255, 255, 150),  # Light yellow
+    Color(255, 255, 50),   # Bright yellow
+    Color(255, 255, 150),  # Light yellow
+    Color(50, 255, 50),    # Bright green
+    Color(150, 255, 150),  # Light green
+]
+SPARKLE_CHANCE = 0.7  # Probability of a sparkle at each position
 
 class TargetState(Enum):
     """States for the fifth line target.
@@ -126,7 +144,18 @@ class FifthLineTarget:
         elif self.state == TargetState.IN_WINDOW:
             base_color = Color(255, 165, 0)  # Orange in valid window
         else:
-            base_color = Color(255, 255, 255)  # White otherwise
+            # Create sparkle effect
+            if random.random() < SPARKLE_CHANCE:
+                base_color = random.choice(SPARKLE_COLORS)
+                # Add random intensity variation
+                intensity = random.uniform(0.5, 1.0)
+                base_color = Color(
+                    int(base_color.r * intensity),
+                    int(base_color.g * intensity),
+                    int(base_color.b * intensity)
+                )
+            else:
+                base_color = Color(100, 50, 0)  # Dim ember color when not sparkling
         
         # Apply fade-out for animation completion
         if percent_complete >= 1.0:
