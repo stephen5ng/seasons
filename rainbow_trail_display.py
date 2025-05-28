@@ -6,7 +6,7 @@ all LEDs in a rainbow pattern during autopilot mode.
 from pygame import Color, time
 from display_manager import DisplayManager
 import random
-from typing import List
+from typing import List, Dict, Optional
 
 # Define available colors
 RAINBOW_COLORS = [
@@ -31,21 +31,32 @@ class RainbowTrailDisplay:
         """
         self.display = display
         self.led_count = led_count
-        self.last_update_ms = 0
-        self.UPDATE_INTERVAL_MS = 200  # Update every 200ms
+        self.last_update_ms = time.get_ticks()
+        self.current_offset = 0
         
-        # Calculate number of color swaths needed
-        self.num_swaths = (led_count + PIXELS_PER_SWATH - 1) // PIXELS_PER_SWATH
+        # Define rainbow colors
+        self.colors = [
+            Color(255, 0, 0),      # Red
+            Color(0, 255, 0),      # Green
+            Color(0, 0, 255),      # Blue
+            Color(255, 255, 0),    # Yellow
+            Color(255, 165, 0),    # Orange
+        ]
         
-        # Initialize array with random game colors for each swath
-        self.colors: List[Color] = []
-        last_color = None
-        for _ in range(self.num_swaths):
-            # Get available colors (all except the last used color)
-            available_colors = [c for c in RAINBOW_COLORS if c != last_color]
-            color = random.choice(available_colors)
-            self.colors.append(color)
-            last_color = color
+        # Each color gets 4 pixels
+        self.pixels_per_color = 4
+        
+    def get_current_colors(self) -> List[Color]:
+        """Get the current color sequence.
+        
+        Returns:
+            List of colors in current sequence
+        """
+        # Create the full sequence of colors with each color repeated for pixels_per_color
+        color_sequence = []
+        for color in self.colors:
+            color_sequence.extend([color] * self.pixels_per_color)
+        return color_sequence
 
     def set_pixel(self, position: int, color: Color, duration: float) -> None:
         """Set a pixel in the display.
@@ -65,24 +76,25 @@ class RainbowTrailDisplay:
         pass
 
     def update(self) -> None:
-        """Update the display state by rotating colors once per second."""
-        current_time_ms = time.get_ticks()
-        if current_time_ms - self.last_update_ms >= self.UPDATE_INTERVAL_MS:
-            # Rotate colors array by 1 position, ensuring no adjacent duplicates
-            if self.colors[0] != self.colors[-1]:  # Safe to rotate if ends are different
-                self.colors = self.colors[1:] + self.colors[:1]
-            else:
-                # If rotation would create adjacent duplicates, swap last color
-                available_colors = [c for c in RAINBOW_COLORS if c != self.colors[0] and c != self.colors[-2]]
-                self.colors[-1] = random.choice(available_colors)
-                self.colors = self.colors[1:] + self.colors[:1]
-            self.last_update_ms = current_time_ms
+        """Update the rainbow trail display.
         
-        # Always display current color array in 4-pixel swaths
-        for swath_idx in range(self.num_swaths):
-            color = self.colors[swath_idx]
-            # Set all 4 pixels in this swath to the same color
-            for pixel in range(PIXELS_PER_SWATH):
-                led_idx = swath_idx * PIXELS_PER_SWATH + pixel
-                if led_idx < self.led_count:  # Don't exceed LED strip length
-                    self.display.set_hit_trail_pixel(led_idx, color, 0.5) 
+        This rotates the colors every 200ms to create an animated effect.
+        """
+        current_time_ms = time.get_ticks()
+        if current_time_ms - self.last_update_ms >= 200:  # Update every 200ms
+            self.current_offset = (self.current_offset + 1) % len(self.colors)
+            self.last_update_ms = current_time_ms
+            
+        # Get the current sequence of colors
+        colors = self.get_current_colors()
+        total_pattern_length = len(colors)
+        
+        # Update both hit trail and target trail pixels
+        for i in range(self.led_count):
+            # Calculate color index with offset and wrap around
+            color_idx = (i + self.current_offset * self.pixels_per_color) % total_pattern_length
+            color = colors[color_idx]
+            
+            # Update both trails with the same rainbow pattern
+            self.display.set_hit_trail_pixel(i, color, 1.0)  # Layer 0 for hit trail
+            self.display.set_target_trail_pixel(i, color, 1.0, 0)  # Layer 0 for target trail 

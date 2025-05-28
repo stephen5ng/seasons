@@ -216,7 +216,7 @@ class FifthLineTarget:
             bool: True if the hit was registered, False if not in valid window.
         """
         if self.state == TargetState.IN_WINDOW:
-            print(f"Registering hit for fifth line target: {self._target_beat}")
+            # print(f"Registering hit for fifth line target: {self._target_beat}")
             self.target_hit_registered = True
             return True
         return False
