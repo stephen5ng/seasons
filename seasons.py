@@ -362,6 +362,9 @@ async def run_game() -> None:
                 if not pygame.mixer.music.get_busy():
                     hit_trail.trail_display = default_display
                     hit_trail.reset()
+                    # Reset music start request when music ends
+                    fifth_line_requests_music_start = False
+                    music_started = False
                 stable_score = hit_trail.get_score()
                 
             if led_position != game_state.current_led_position:
